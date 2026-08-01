@@ -1,0 +1,64 @@
+<!-- @dsCard group="Écrans" viewport="1440x900" name="App Hygie — Écrans — lots 1+2+3" subtitle="12 écrans interactifs : dashboard, sport, séance, records, sommeil, sync, login, onboarding, membres, appareils, réglages" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Hygie — App</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<script src="data.js"></script>
+<script type="text/babel" src="Dashboard.jsx"></script>
+<script type="text/babel" src="Sport.jsx"></script>
+<script type="text/babel" src="SessionDetail.jsx"></script>
+<script type="text/babel" src="Records.jsx"></script>
+<script type="text/babel" src="Sleep.jsx"></script>
+<script type="text/babel" src="Sync.jsx"></script>
+<script type="text/babel" src="Login.jsx"></script>
+<script type="text/babel" src="Onboarding.jsx"></script>
+<script type="text/babel" src="Members.jsx"></script>
+<script type="text/babel" src="Devices.jsx"></script>
+<script type="text/babel" src="Account.jsx"></script>
+</head>
+<body><div id="root"></div>
+<script type="text/babel">
+const {Sidebar,TimeNav,TimeScrubber,EmptyState,Button}=window.Hygie_70a315;
+const NAV=[{id:'dash',icon:'monitoring',label:'Dashboard'},{id:'sport',icon:'exercise',label:'Sport',badge:961},{id:'records',icon:'trophy',label:'Records'},{id:'sleep',icon:'bedtime',label:'Sommeil'},{section:'Instance'},{id:'sync',icon:'sync',label:'Synchronisation'},{id:'devices',icon:'devices',label:'Appareils'},{id:'members',icon:'group',label:'Membres'},{id:'account',icon:'settings',label:'Réglages'}];
+const TITLES={dash:'Dashboard',sport:'Sport',records:'Records',sleep:'Sommeil',sync:'Synchronisation',devices:'Appareils',members:'Membres',account:'Réglages'};
+function App(){
+  const D=window.HYGIE_DATA;
+  const [route,setRoute]=React.useState(()=>{try{return JSON.parse(localStorage.getItem('hygie.route'))||{screen:'dash'};}catch(e){return {screen:'dash'};}});
+  const [preset,setPreset]=React.useState('1m');
+  const [compare,setCompare]=React.useState(true);
+  const [win,setWin]=React.useState([0.93,0.965]);
+  React.useEffect(()=>{try{localStorage.setItem('hygie.route',JSON.stringify(route));}catch(e){}},[route]);
+  const go=id=>setRoute({screen:id});
+  const openSession=id=>setRoute({screen:'session',id});
+  const [rangeLabel,compareLabel]=D.rangeLabels[preset]||D.rangeLabels['1m'];
+  const timed=route.screen==='dash'||route.screen==='sport'||route.screen==='sleep';
+  if(route.screen==='login')return <HygieLogin done={()=>go('dash')}/>;
+  if(route.screen==='onboarding')return <HygieOnboarding done={()=>go('dash')}/>;
+  return <div style={{display:'flex',minHeight:'100vh'}}>
+    <Sidebar items={NAV} active={route.screen==='session'?'sport':route.screen} onNavigate={go}
+      user={{name:'Anna Martin',email:'anna@exemple.fr'}} syncStatus="fresh" syncDetail="Sync il y a 4 min"
+      style={{position:'sticky',top:0,height:'100vh',flex:'none'}}/>
+    <main style={{flex:1,minWidth:0,padding:'16px 22px 48px'}}>
+      {timed&&<div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:14}}>
+        <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
+          <h1 style={{margin:0,font:'600 var(--text-xl)/1.2 var(--font-ui)',flex:'none'}}>{TITLES[route.screen]}</h1>
+          <TimeNav preset={preset} onPresetChange={setPreset} rangeLabel={rangeLabel} compare={compare} onCompareChange={()=>setCompare(!compare)} compareLabel={compareLabel} style={{marginLeft:'auto'}}/>
+        </div>
+        <TimeScrubber data={D.volumeAllTime} window={win} onChange={setWin} startLabel="oct. 2012" endLabel="août 2026" height={40}/>
+      </div>}
+      {route.screen==='dash'&&<HygieDashboard compare={compare} compareLabel={compareLabel} openSession={openSession} goSport={()=>go('sport')}/>}
+      {route.screen==='sport'&&<HygieSport openSession={openSession}/>}
+      {route.screen==='session'&&<HygieSessionDetail id={route.id} back={()=>go('sport')}/>}
+      {route.screen==='sleep'&&<HygieSleep compare={compare} compareLabel={compareLabel}/>}
+      {route.screen==='records'&&<HygieRecords openSession={openSession}/>}
+      {route.screen==='sync'&&<HygieSync goDevices={()=>go('devices')}/>}
+      {route.screen==='members'&&<HygieMembers previewOnboarding={()=>go('onboarding')}/>}
+      {route.screen==='devices'&&<HygieDevices goSync={()=>go('sync')}/>}
+      {route.screen==='account'&&<HygieAccount logout={()=>go('login')} previewOnboarding={()=>go('onboarding')}/>}
+    </main>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>
