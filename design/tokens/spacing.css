@@ -1,0 +1,8 @@
+:root{
+--sp-0:2px;--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-6:24px;--sp-7:32px;--sp-8:40px;--sp-9:56px;
+--r-sm:4px;--r-md:6px;--r-lg:10px;--r-full:999px;
+--control-h-sm:26px;--control-h-md:32px;
+--shadow-1:0 1px 2px oklch(0 0 0 / 0.06);--shadow-2:0 6px 24px oklch(0 0 0 / 0.12);
+--ease:cubic-bezier(0.25,0.1,0.25,1);/* @kind other */
+--dur:120ms;/* @kind other */
+}
