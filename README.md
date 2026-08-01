@@ -15,7 +15,7 @@ Self-hosted web dashboard for Apple Health data: workouts, sleep, nutrition, rec
 
 - **No health data in this repo, ever.** No fixtures from real exports, no screenshots with real values, no sample dumps. Synthetic data only.
 - **No secrets in code or history.** All configuration through environment variables. `.env*` is git-ignored; `.env.example` documents the contract.
-- **Personal by design.** One user today, optional household accounts later (family members, each seeing only their own data). Magic-link email auth with a closed allowlist. Not a SaaS. Data is scoped per user from day one.
+- **Multi-account by design, private by default.** Built from the start for several accounts (a household: each member sees only their own data), but never open signup: members join by invitation from the instance admin. Magic-link email auth. Not a SaaS. Every table and every query is scoped per user.
 - **The database is reconstructible.** Raw detail is kept, rollups are derived, backups are encrypted and stored off-platform.
 
 ## Stack
