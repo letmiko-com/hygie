@@ -10,6 +10,7 @@ Self-hosted web dashboard for Apple Health data: workouts, sleep, nutrition, rec
 - Backfills history from the native Apple Health `export.zip` (streaming XML import, runs locally, never through HTTP).
 - Stores everything in Postgres: compact observations, workouts, sleep phases, rebuildable rollups.
 - Serves flexible time navigation through a Next.js app: any window from a single day to multi-year and all-time (24h, 7d, 1m, 6m, 1y, custom ranges, period-over-period comparisons), plus all-time records (distance, duration, speed).
+- Treats trends as a first-class concept on every metric: direction and magnitude vs the previous period, moving averages, long-term trajectories. Every number should answer "and is it getting better or worse?".
 
 ## Design principles
 
