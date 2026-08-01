@@ -1,0 +1,27 @@
+# dependencies / build
+node_modules/
+.next/
+out/
+dist/
+
+# environment and secrets
+.env
+.env.*
+!.env.example
+
+# Apple Health raw data: never in the repo, in any form
+export.zip
+export*.xml
+apple_health_export/
+workout-routes/
+*.gpx
+*.fit
+electrocardiograms/
+
+# local databases and dumps
+*.sql.gz
+*.dump
+*.sqlite
+
+# OS / editor noise
+.DS_Store
