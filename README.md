@@ -9,7 +9,7 @@ Self-hosted web dashboard for Apple Health data: workouts, sleep, nutrition, rec
 - Ingests Apple Health data through [Health Auto Export](https://www.healthyapps.dev/) (JSON push to a REST endpoint) for continuous sync.
 - Backfills history from the native Apple Health `export.zip` (streaming XML import, runs locally, never through HTTP).
 - Stores everything in Postgres: compact observations, workouts, sleep phases, rebuildable rollups.
-- Serves 24h / 7d / 1m / 6m views and all-time records (distance, duration, speed) through a Next.js app.
+- Serves flexible time navigation through a Next.js app: any window from a single day to multi-year and all-time (24h, 7d, 1m, 6m, 1y, custom ranges, period-over-period comparisons), plus all-time records (distance, duration, speed).
 
 ## Design principles
 
