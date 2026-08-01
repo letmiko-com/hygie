@@ -24,4 +24,4 @@ Next.js (standalone) + Postgres, deployed on Railway. Auth.js magic links over c
 
 ## License
 
-Not decided yet. All rights reserved until the project is opened.
+[AGPL-3.0](./LICENSE). Self-host it, modify it, share it; if you serve a modified version to others, publish your changes.
