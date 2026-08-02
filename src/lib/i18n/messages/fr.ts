@@ -13,6 +13,7 @@ export const fr: Messages = {
     dashboard: 'Dashboard',
     sport: 'Sport',
     sync: 'Synchronisation',
+    records: 'Records',
     instance: 'Instance',
   },
   noSubject: {
@@ -117,6 +118,29 @@ export const fr: Messages = {
     splitPace: 'Allure',
     gpsPlaceholder: 'Tracé GPS, carte à venir',
     noHr: 'Pas de fréquence cardiaque enregistrée sur cette séance',
+  },
+  records: {
+    title: 'Records',
+    subtitle: 'All-time et par sport, chaque record porte sa progression. Clic : la séance où il a été établi.',
+    newBadge: 'Nouveau',
+    vsPrevYear: 'vs année préc.',
+    tableTitle: 'Records par sport',
+    sportCol: 'Sport',
+    eventCol: 'Épreuve',
+    recordCol: 'Record',
+    dateCol: 'Établi le',
+    trendCol: '12 mois',
+    kinds: {
+      longest_distance: 'Plus longue distance',
+      longest_duration: 'Plus longue durée',
+      best_pace: 'Meilleure allure moy. (≥ 5 km)',
+      best_speed: 'Meilleure vitesse moy. (≥ 20 km)',
+      biggest_climb: 'Plus grand D+',
+    } as Record<string, string>,
+    progressionTitle: (label: string) => `Progression, ${label}`,
+    progressionNote:
+      'Meilleure valeur par année. La progression d’un record se lit dans le temps, pas comme une valeur isolée.',
+    empty: 'Aucune séance, donc aucun record à afficher',
   },
   sync: {
     title: 'Synchronisation',
