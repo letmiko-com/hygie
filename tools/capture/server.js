@@ -52,6 +52,7 @@ const server = http.createServer((req, res) => {
   // Everything else requires the token, checked before reading any body.
   const token = req.headers['x-capture-token'] || url.searchParams.get('token');
   if (!token || !constantTimeEqual(token, TOKEN)) {
+    console.log(`rejected 401: ${req.method} ${url.pathname} token=${token ? 'present-but-wrong' : 'missing'} ua=${(req.headers['user-agent'] || '?').slice(0, 40)}`);
     res.writeHead(401, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ error: 'unauthorized' }));
     req.destroy();
