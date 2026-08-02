@@ -1,0 +1,1377 @@
+{
+  "comment": "Seed for units/metric_types/metric_category_values. Supported types come from docs/hae-mapping.md; unsupported ones were observed in the real export.xml (2026-08-02). xml.unit is the unit expected in export.xml, xml.factor the multiplier to the canonical unit (percent types are 0-1 fractions in the XML; energies are kcal).",
+  "metric_types": [
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierHeartRate",
+      "kind": "quantity",
+      "hae_name": "heart_rate",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "count/min",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "count/min",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierRestingHeartRate",
+      "kind": "quantity",
+      "hae_name": "resting_heart_rate",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "count/min",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "count/min",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierWalkingHeartRateAverage",
+      "kind": "quantity",
+      "hae_name": "walking_heart_rate_average",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "count/min",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "count/min",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
+      "kind": "quantity",
+      "hae_name": "heart_rate_variability",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "ms",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "ms",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierRespiratoryRate",
+      "kind": "quantity",
+      "hae_name": "respiratory_rate",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "count/min",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "count/min",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierOxygenSaturation",
+      "kind": "quantity",
+      "hae_name": "blood_oxygen_saturation",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "%",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "%",
+        "factor": 100
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierBodyTemperature",
+      "kind": "quantity",
+      "hae_name": "body_temperature",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "degC",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "degC",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierAppleSleepingWristTemperature",
+      "kind": "quantity",
+      "hae_name": "apple_sleeping_wrist_temperature",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "degC",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "degC",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierAppleSleepingBreathingDisturbances",
+      "kind": "quantity",
+      "hae_name": "breathing_disturbances",
+      "hae_regime": "raw_discrete",
+      "aggregation": "sum",
+      "canonical_unit": "count",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "count",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierHeadphoneAudioExposure",
+      "kind": "quantity",
+      "hae_name": "headphone_audio_exposure",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "dBASPL",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "dBASPL",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierPhysicalEffort",
+      "kind": "quantity",
+      "hae_name": "physical_effort",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "kcal/hr·kg",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "kcal/hr·kg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierStairAscentSpeed",
+      "kind": "quantity",
+      "hae_name": "stair_speed_up",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "m/s",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "m/s",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierStairDescentSpeed",
+      "kind": "quantity",
+      "hae_name": "stair_speed_down",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "m/s",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "m/s",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierWalkingSpeed",
+      "kind": "quantity",
+      "hae_name": "walking_speed",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "km/hr",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "km/hr",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierWalkingStepLength",
+      "kind": "quantity",
+      "hae_name": "walking_step_length",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "cm",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "cm",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierWalkingAsymmetryPercentage",
+      "kind": "quantity",
+      "hae_name": "walking_asymmetry_percentage",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "%",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "%",
+        "factor": 100
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierWalkingDoubleSupportPercentage",
+      "kind": "quantity",
+      "hae_name": "walking_double_support_percentage",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "%",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "%",
+        "factor": 100
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierTimeInDaylight",
+      "kind": "quantity",
+      "hae_name": "time_in_daylight",
+      "hae_regime": "raw_discrete",
+      "aggregation": "sum",
+      "canonical_unit": "min",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "min",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryWater",
+      "kind": "quantity",
+      "hae_name": "dietary_water",
+      "hae_regime": "raw_discrete",
+      "aggregation": "sum",
+      "canonical_unit": "mL",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "mL",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierNumberOfAlcoholicBeverages",
+      "kind": "quantity",
+      "hae_name": "alcohol_consumption",
+      "hae_regime": "raw_discrete",
+      "aggregation": "sum",
+      "canonical_unit": "count",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "count",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierStepCount",
+      "kind": "quantity",
+      "hae_name": "step_count",
+      "hae_regime": "minute_cumulative",
+      "aggregation": "sum",
+      "canonical_unit": "count",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "count",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierActiveEnergyBurned",
+      "kind": "quantity",
+      "hae_name": "active_energy",
+      "hae_regime": "minute_cumulative",
+      "aggregation": "sum",
+      "canonical_unit": "kJ",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "kcal",
+        "factor": 4.184
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierBasalEnergyBurned",
+      "kind": "quantity",
+      "hae_name": "basal_energy_burned",
+      "hae_regime": "minute_cumulative",
+      "aggregation": "sum",
+      "canonical_unit": "kJ",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "kcal",
+        "factor": 4.184
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDistanceWalkingRunning",
+      "kind": "quantity",
+      "hae_name": "walking_running_distance",
+      "hae_regime": "minute_cumulative",
+      "aggregation": "sum",
+      "canonical_unit": "km",
+      "quantize_scale": 1000000,
+      "supported": true,
+      "xml": {
+        "unit": "km",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierFlightsClimbed",
+      "kind": "quantity",
+      "hae_name": "flights_climbed",
+      "hae_regime": "minute_cumulative",
+      "aggregation": "sum",
+      "canonical_unit": "count",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "count",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierAppleExerciseTime",
+      "kind": "quantity",
+      "hae_name": "apple_exercise_time",
+      "hae_regime": "minute_cumulative",
+      "aggregation": "sum",
+      "canonical_unit": "min",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "min",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierAppleStandTime",
+      "kind": "quantity",
+      "hae_name": "apple_stand_time",
+      "hae_regime": "minute_cumulative",
+      "aggregation": "sum",
+      "canonical_unit": "min",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "min",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierBloodPressureSystolic",
+      "kind": "quantity",
+      "hae_name": "blood_pressure",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "mmHg",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "mmHg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierBloodPressureDiastolic",
+      "kind": "quantity",
+      "hae_name": "blood_pressure",
+      "hae_regime": "raw_discrete",
+      "aggregation": "average",
+      "canonical_unit": "mmHg",
+      "quantize_scale": 1000,
+      "supported": true,
+      "xml": {
+        "unit": "mmHg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKCategoryTypeIdentifierAppleStandHour",
+      "kind": "category",
+      "hae_name": "apple_stand_hour",
+      "hae_regime": "daily_summary",
+      "aggregation": "none",
+      "canonical_unit": null,
+      "quantize_scale": null,
+      "supported": true
+    },
+    {
+      "hk_identifier": "HKCategoryTypeIdentifierSleepAnalysis",
+      "kind": "category",
+      "hae_name": "sleep_analysis",
+      "hae_regime": "daily_summary",
+      "aggregation": "duration",
+      "canonical_unit": null,
+      "quantize_scale": null,
+      "supported": true
+    },
+    {
+      "hk_identifier": "HKCategoryTypeIdentifierSexualActivity",
+      "kind": "category",
+      "hae_name": "sexual_activity",
+      "hae_regime": "daily_summary",
+      "aggregation": "none",
+      "canonical_unit": null,
+      "quantize_scale": null,
+      "supported": true
+    },
+    {
+      "hk_identifier": "HKCategoryTypeIdentifierAudioExposureEvent",
+      "kind": "category",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": null,
+      "quantize_scale": null,
+      "supported": false
+    },
+    {
+      "hk_identifier": "HKCategoryTypeIdentifierHeadphoneAudioExposureEvent",
+      "kind": "category",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": null,
+      "quantize_scale": null,
+      "supported": false
+    },
+    {
+      "hk_identifier": "HKCategoryTypeIdentifierHighHeartRateEvent",
+      "kind": "category",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": null,
+      "quantize_scale": null,
+      "supported": false
+    },
+    {
+      "hk_identifier": "HKCategoryTypeIdentifierLowHeartRateEvent",
+      "kind": "category",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": null,
+      "quantize_scale": null,
+      "supported": false
+    },
+    {
+      "hk_identifier": "HKCategoryTypeIdentifierMindfulSession",
+      "kind": "category",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": null,
+      "quantize_scale": null,
+      "supported": false
+    },
+    {
+      "hk_identifier": "HKDataTypeSleepDurationGoal",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "hr",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "hr",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierAppleWalkingSteadiness",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "%",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "%",
+        "factor": 100
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierAtrialFibrillationBurden",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "%",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "%",
+        "factor": 100
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierBodyFatPercentage",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "%",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "%",
+        "factor": 100
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierBodyMass",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "kg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "kg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierBodyMassIndex",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "count",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "count",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierCyclingCadence",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "count/min",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "count/min",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryBiotin",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mcg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mcg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryCalcium",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryCarbohydrates",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "g",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "g",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryCholesterol",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryCopper",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryEnergyConsumed",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "kcal",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "kcal",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryFatMonounsaturated",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "g",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "g",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryFatPolyunsaturated",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "g",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "g",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryFatSaturated",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "g",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "g",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryFatTotal",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "g",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "g",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryFiber",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "g",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "g",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryFolate",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mcg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mcg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryIodine",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mcg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mcg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryIron",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryMagnesium",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryManganese",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryNiacin",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryPantothenicAcid",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryPhosphorus",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryPotassium",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryProtein",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "g",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "g",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryRiboflavin",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietarySelenium",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mcg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mcg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietarySodium",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietarySugar",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "g",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "g",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryThiamin",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryVitaminA",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mcg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mcg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryVitaminB12",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mcg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mcg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryVitaminB6",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryVitaminC",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryVitaminD",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mcg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mcg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryVitaminE",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryVitaminK",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mcg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mcg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDietaryZinc",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDistanceCycling",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "km",
+      "quantize_scale": 1000000,
+      "supported": false,
+      "xml": {
+        "unit": "km",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierDistanceRowing",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "km",
+      "quantize_scale": 1000000,
+      "supported": false,
+      "xml": {
+        "unit": "km",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierEnvironmentalAudioExposure",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "dBASPL",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "dBASPL",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierEnvironmentalSoundReduction",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "dBASPL",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "dBASPL",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierEstimatedWorkoutEffortScore",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "appleEffortScore",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "appleEffortScore",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierHeartRateRecoveryOneMinute",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "count/min",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "count/min",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierHeight",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "cm",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "cm",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierLeanBodyMass",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "kg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "kg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierRowingSpeed",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "km/hr",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "km/hr",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierRunningGroundContactTime",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "ms",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "ms",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierRunningPower",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "W",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "W",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierRunningSpeed",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "km/hr",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "km/hr",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierRunningStrideLength",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "m",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "m",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierRunningVerticalOscillation",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "cm",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "cm",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierSixMinuteWalkTestDistance",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "m",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "m",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierUnderwaterDepth",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "m",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "m",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierVO2Max",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "mL/min·kg",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "mL/min·kg",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierWaterTemperature",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "degC",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "degC",
+        "factor": 1
+      }
+    },
+    {
+      "hk_identifier": "HKQuantityTypeIdentifierWorkoutEffortScore",
+      "kind": "quantity",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": "appleEffortScore",
+      "quantize_scale": 1000,
+      "supported": false,
+      "xml": {
+        "unit": "appleEffortScore",
+        "factor": 1
+      }
+    }
+  ],
+  "metric_category_values": {
+    "HKCategoryTypeIdentifierSleepAnalysis": [
+      {
+        "raw_value": 0,
+        "slug": "in_bed",
+        "hk_value": "HKCategoryValueSleepAnalysisInBed"
+      },
+      {
+        "raw_value": 1,
+        "slug": "asleep_unspecified",
+        "hk_value": "HKCategoryValueSleepAnalysisAsleepUnspecified"
+      },
+      {
+        "raw_value": 2,
+        "slug": "awake",
+        "hk_value": "HKCategoryValueSleepAnalysisAwake"
+      },
+      {
+        "raw_value": 3,
+        "slug": "asleep_core",
+        "hk_value": "HKCategoryValueSleepAnalysisAsleepCore"
+      },
+      {
+        "raw_value": 4,
+        "slug": "asleep_deep",
+        "hk_value": "HKCategoryValueSleepAnalysisAsleepDeep"
+      },
+      {
+        "raw_value": 5,
+        "slug": "asleep_rem",
+        "hk_value": "HKCategoryValueSleepAnalysisAsleepREM"
+      }
+    ],
+    "HKCategoryTypeIdentifierAppleStandHour": [
+      {
+        "raw_value": 0,
+        "slug": "stand_hour_stood",
+        "hk_value": "HKCategoryValueAppleStandHourStood"
+      },
+      {
+        "raw_value": 1,
+        "slug": "stand_hour_idle",
+        "hk_value": "HKCategoryValueAppleStandHourIdle"
+      }
+    ]
+  }
+}
