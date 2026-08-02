@@ -23,11 +23,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     await signOut({ redirectTo: '/login' });
   }
 
-  // Nav grows as screens land (sport arrives with its phase).
   const sections: NavSection[] = [
     {
       label: '',
-      items: [{ href: '/', icon: 'monitoring', label: m.nav.dashboard }],
+      items: [
+        { href: '/', icon: 'monitoring', label: m.nav.dashboard },
+        { href: '/sport', icon: 'exercise', label: m.nav.sport },
+      ],
     },
     {
       label: m.nav.instance,

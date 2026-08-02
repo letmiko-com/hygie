@@ -576,10 +576,10 @@
       "kind": "quantity",
       "hae_name": null,
       "hae_regime": "unsupported",
-      "aggregation": "none",
+      "aggregation": "average",
       "canonical_unit": "count/min",
       "quantize_scale": 1000,
-      "supported": false,
+      "supported": true,
       "xml": {
         "unit": "count/min",
         "factor": 1
@@ -1066,10 +1066,10 @@
       "kind": "quantity",
       "hae_name": null,
       "hae_regime": "unsupported",
-      "aggregation": "none",
+      "aggregation": "sum",
       "canonical_unit": "km",
       "quantize_scale": 1000000,
-      "supported": false,
+      "supported": true,
       "xml": {
         "unit": "km",
         "factor": 1
@@ -1192,10 +1192,10 @@
       "kind": "quantity",
       "hae_name": null,
       "hae_regime": "unsupported",
-      "aggregation": "none",
+      "aggregation": "average",
       "canonical_unit": "ms",
       "quantize_scale": 1000,
-      "supported": false,
+      "supported": true,
       "xml": {
         "unit": "ms",
         "factor": 1
@@ -1206,10 +1206,10 @@
       "kind": "quantity",
       "hae_name": null,
       "hae_regime": "unsupported",
-      "aggregation": "none",
+      "aggregation": "average",
       "canonical_unit": "W",
       "quantize_scale": 1000,
-      "supported": false,
+      "supported": true,
       "xml": {
         "unit": "W",
         "factor": 1
@@ -1220,10 +1220,10 @@
       "kind": "quantity",
       "hae_name": null,
       "hae_regime": "unsupported",
-      "aggregation": "none",
+      "aggregation": "average",
       "canonical_unit": "km/hr",
       "quantize_scale": 1000,
-      "supported": false,
+      "supported": true,
       "xml": {
         "unit": "km/hr",
         "factor": 1
@@ -1234,10 +1234,10 @@
       "kind": "quantity",
       "hae_name": null,
       "hae_regime": "unsupported",
-      "aggregation": "none",
+      "aggregation": "average",
       "canonical_unit": "m",
       "quantize_scale": 1000,
-      "supported": false,
+      "supported": true,
       "xml": {
         "unit": "m",
         "factor": 1
@@ -1248,10 +1248,10 @@
       "kind": "quantity",
       "hae_name": null,
       "hae_regime": "unsupported",
-      "aggregation": "none",
+      "aggregation": "average",
       "canonical_unit": "cm",
       "quantize_scale": 1000,
-      "supported": false,
+      "supported": true,
       "xml": {
         "unit": "cm",
         "factor": 1
