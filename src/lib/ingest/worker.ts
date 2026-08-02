@@ -303,6 +303,25 @@ function sleep(ms: number, s: WorkerState): Promise<void> {
   });
 }
 
+const MAINTENANCE_EVERY_MS = 60 * 60 * 1000;
+
+/**
+ * Hourly housekeeping piggybacked on the worker loop: expired database
+ * sessions and consumed-or-stale magic-link tokens have no reason to
+ * outlive their expiry (revocation stays immediate either way; this only
+ * keeps the auth tables from growing forever). Logs carry counts only.
+ */
+async function runMaintenance(): Promise<void> {
+  const db = getDb();
+  const sessions = await db.query(`delete from auth_sessions where expires_at < now()`);
+  const tokens = await db.query(`delete from auth_verification_tokens where expires_at < now()`);
+  if ((sessions.rowCount ?? 0) > 0 || (tokens.rowCount ?? 0) > 0) {
+    console.log(
+      `[worker] maintenance: purged ${sessions.rowCount ?? 0} expired sessions, ${tokens.rowCount ?? 0} expired tokens`
+    );
+  }
+}
+
 async function runLoop(workerId: string): Promise<void> {
   const s = state();
   try {
@@ -313,9 +332,14 @@ async function runLoop(workerId: string): Promise<void> {
     );
   }
   console.log(`[worker] ingest worker ${workerId} started`);
+  let lastMaintenance = 0;
   while (!s.stopping) {
     let claimed: ClaimedBatch | null = null;
     try {
+      if (Date.now() - lastMaintenance > MAINTENANCE_EVERY_MS) {
+        lastMaintenance = Date.now();
+        await runMaintenance();
+      }
       claimed = await claimNext(workerId);
       if (claimed) {
         try {
