@@ -87,6 +87,13 @@ export function fmtKcalFromKj(kj: number | null, locale: Locale): string {
   return kcal === null ? ABSENT : `${fmtInt(kcal, locale)} kcal`;
 }
 
+/** Pace from seconds per km: "4:52 /km". */
+export function fmtPace(secPerKm: number | null): string {
+  if (secPerKm === null || !Number.isFinite(secPerKm) || secPerKm <= 0) return ABSENT;
+  const s = Math.round(secPerKm);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} /km`;
+}
+
 /** 'YYYY-MM-DD' local day -> localized date; the string carries no zone. */
 export function fmtDay(
   day: string | null,

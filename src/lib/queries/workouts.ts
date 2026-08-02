@@ -195,6 +195,36 @@ export async function getWorkout(ctx: SubjectContext, workoutId: string): Promis
   return { ...mapItem(r), elevationUpM: r.elevation_up_m, stats: r.stats, hasRoute: r.has_route };
 }
 
+export interface RawSample {
+  ts: Date;
+  value: number;
+  sourceName: string;
+}
+
+/** Raw observation samples of one metric inside a time window (session charts). */
+export async function observationSamples(
+  ctx: SubjectContext,
+  hkIdentifier: string,
+  fromTs: Date,
+  toTs: Date
+): Promise<RawSample[]> {
+  const type = await getMetricType(hkIdentifier);
+  interface Row {
+    ts: Date;
+    value: number;
+    source_name: string;
+  }
+  const { rows } = await getDb().query<Row>(
+    `select o.start_ts as ts, o.value, s.name as source_name
+     from observations o join sources s on s.id = o.source_id
+     where o.subject_id = $1 and o.type_id = $2
+       and o.start_ts >= $3 and o.start_ts < $4
+     order by o.start_ts`,
+    [ctx.subjectId, type.id, fromTs, toTs]
+  );
+  return rows.map((r) => ({ ts: r.ts, value: r.value, sourceName: r.source_name }));
+}
+
 export interface WorkoutHrSeries {
   sourceName: string;
   samples: Array<{ ts: Date; bpm: number }>;

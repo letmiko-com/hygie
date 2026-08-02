@@ -27,7 +27,10 @@ const DIST_TO_M = { km: 1000, m: 1, mi: 1609.344, yd: 0.9144, cm: 0.01, ft: 0.30
 
 function usage(msg) {
   if (msg) console.error(msg);
-  console.error('usage: node scripts/backfill/import-xml.mjs <export.zip|export.xml> --subject <uuid> [--database-url <url>]');
+  console.error(
+    'usage: node scripts/backfill/import-xml.mjs <export.zip|export.xml> --subject <uuid> ' +
+      '[--database-url <url>] [--only-types <hk1,hk2,...>]'
+  );
   process.exit(2);
 }
 
@@ -35,12 +38,15 @@ const args = process.argv.slice(2);
 let input = null;
 let subjectId = null;
 let databaseUrl = process.env.DATABASE_URL;
+let onlyTypes = null; // Set<hk_identifier> | null
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--subject') subjectId = args[++i];
   else if (args[i] === '--database-url') databaseUrl = args[++i];
+  else if (args[i] === '--only-types') onlyTypes = new Set((args[++i] ?? '').split(',').filter(Boolean));
   else if (!input) input = args[i];
   else usage(`unexpected argument: ${args[i]}`);
 }
+if (onlyTypes !== null && onlyTypes.size === 0) usage('--only-types needs a comma-separated list');
 if (!input || !subjectId) usage();
 if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subjectId)) {
   usage('--subject must be a uuid');
@@ -206,11 +212,19 @@ try {
     [subjectId, checksum]
   );
   if (prior.rowCount > 0) {
-    console.error(
-      `refusing to re-import: this file (sha256 ${checksum.toString('hex').slice(0, 12)}…) ` +
-      `was already imported for this subject by run ${prior.rows[0].id}`
-    );
-    process.exit(1);
+    // COPY has no row-level dedup: a full re-run of an imported file would
+    // duplicate every row. Re-import is only allowed in --only-types mode,
+    // the "taxonomy grew, pick up newly supported types" case, where the
+    // selected types are expected to have no existing rows.
+    if (onlyTypes === null) {
+      console.error(
+        `refusing to re-import: this file (sha256 ${checksum.toString('hex').slice(0, 12)}…) ` +
+        `was already imported for this subject by run ${prior.rows[0].id} ` +
+        `(use --only-types to import newly supported types from the same file)`
+      );
+      process.exit(1);
+    }
+    console.warn(`file already imported by run ${prior.rows[0].id}; --only-types re-import`);
   }
   const stale = await meta.query(
     `select count(*)::int as n from import_runs
@@ -278,6 +292,7 @@ try {
     sleep_segments_inserted: 0,
     workouts_inserted: 0,
     skipped: {
+      not_selected: {},            // --only-types mode: supported but not in the list
       unsupported_type: {},        // allowlist: supported = false
       unknown_type: {},            // absent from metric_types
       nested_duplicate: {},        // Record inside Correlation/Workout (dup per DTD)
@@ -317,6 +332,7 @@ try {
     const type = types.get(hk);
     if (type === undefined) return bump(counts.skipped.unknown_type, hk);
     if (!type.supported) return bump(counts.skipped.unsupported_type, hk);
+    if (onlyTypes !== null && !onlyTypes.has(hk)) return bump(counts.skipped.not_selected, hk);
 
     const startDate = attr(line, 'startDate');
     const endDate = attr(line, 'endDate');
@@ -430,12 +446,18 @@ try {
         if (key === 'HKIndoorWorkout') workout.isIndoor = attr(line, 'value') === '1';
         else if (key === 'HKElevationAscended') workout.elevation = decodeEntities(attr(line, 'value') ?? '');
       } else if (line.startsWith('</Workout>')) {
-        await finalizeWorkout(workout);
+        if (!workout.skip) await finalizeWorkout(workout);
         workout = null;
         inActivity = false;
         inRoute = false;
       }
     } else if (line.startsWith('<Workout ')) {
+      // Workouts have no row-level dedup either: never re-import them in
+      // --only-types mode (the mode exists for metric observations only).
+      if (onlyTypes !== null) {
+        if (!line.endsWith('/>')) workout = { skip: true, statistics: [] };
+        continue;
+      }
       const w = {
         activityType: attr(line, 'workoutActivityType'),
         sourceName: attr(line, 'sourceName'),
