@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   // Health payloads are streamed to disk in route handlers, never buffered by the
   // framework: keep every ingest route out of any proxy/middleware matcher.
+  // Enforced today by the matcher in src/proxy.ts (session gate), which excludes
+  // /api/v1/ingest explicitly; any future matcher change must preserve this.
   poweredByHeader: false,
 };
 

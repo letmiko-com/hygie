@@ -25,3 +25,4 @@ electrocardiograms/
 
 # OS / editor noise
 .DS_Store
+tsconfig.tsbuildinfo
