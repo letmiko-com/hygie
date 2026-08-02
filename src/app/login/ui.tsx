@@ -2,6 +2,9 @@
 // design/ui_kits/app/Login.jsx (server components, inline styles on the CSS
 // tokens imported by globals.css).
 import type { CSSProperties, ReactNode } from 'react';
+import { Logo } from '@/components/ui/Logo';
+
+export { Logo };
 
 export const panelStyle: CSSProperties = {
   background: 'var(--surface)',
@@ -30,21 +33,6 @@ export const primaryButtonStyle: CSSProperties = {
   color: 'var(--on-accent)',
   border: '1px solid transparent',
 };
-
-export function Logo({ size = 26 }: { size?: number }) {
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-      <svg width={size} height={size} viewBox="0 0 32 32" fill="var(--accent)" style={{ flex: 'none' }} aria-hidden>
-        <rect x="4" y="13" width="6" height="15" rx="3" />
-        <rect x="13" y="4" width="6" height="24" rx="3" />
-        <rect x="22" y="9" width="6" height="12" rx="3" />
-      </svg>
-      <span style={{ font: `600 ${Math.round(size * 0.85)}px/1 var(--font-ui)`, color: 'var(--text-1)', letterSpacing: '-0.01em' }}>
-        Hygie
-      </span>
-    </span>
-  );
-}
 
 /** Centered column: logo, one panel, AGPL footer. */
 export function LoginShell({ children }: { children: ReactNode }) {

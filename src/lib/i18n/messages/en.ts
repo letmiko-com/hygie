@@ -1,0 +1,76 @@
+// Base language. fr.ts must satisfy Messages, so a missing key is a type
+// error, never a silent English fallback at runtime.
+export const en = {
+  common: {
+    noData: 'No data',
+    noDataOnPeriod: 'No data on this period',
+    approx: '≈',
+    logout: 'Sign out',
+    sourceLink: 'Source',
+    loading: 'Loading',
+  },
+  nav: {
+    dashboard: 'Dashboard',
+    sport: 'Sport',
+    sync: 'Synchronization',
+    instance: 'Instance',
+  },
+  noSubject: {
+    title: 'No health data linked to this account',
+    hint: 'This account has no subject grant. Administration accounts see sync state only, never health data.',
+  },
+  syncStatus: {
+    fresh: 'Up to date',
+    syncing: 'Syncing',
+    stale: 'Behind',
+    error: 'Error',
+    never: 'Never synced',
+  },
+  batchStatus: {
+    received: 'Received',
+    validated: 'Validated',
+    normalized: 'Visible',
+    rollups_ready: 'Visible',
+    failed: 'Failed',
+  },
+  sync: {
+    title: 'Synchronization',
+    subtitle: 'Freshness, ingested volumes and recent batches for your account.',
+    via: (device: string) => `via ${device}`,
+    totalMeasures: 'Total measures',
+    totalMeasuresSub: (types: number) => `${types} types with data`,
+    coveredPeriod: 'Covered period',
+    years: (n: number) => `${n} years`,
+    ingested30d: 'Ingested, 30 d',
+    ingestedSub: 'points made visible',
+    vsPrev30d: 'vs previous 30 d',
+    sessions: 'Sessions',
+    sessionsSub: 'workouts imported',
+    devices: 'Devices',
+    deviceKey: 'Key',
+    deviceRevoked: 'Revoked',
+    lastSeen: 'Last seen',
+    volumesTitle: 'Measures ingested per day, 30 days',
+    volumesNote:
+      'Dashed bars are days with no data received. Not days with zero measures.',
+    batchesTitle: 'Recent batches',
+    batchReceived: 'Received',
+    batchDevice: 'Device',
+    batchStatusCol: 'Status',
+    batchPoints: 'Points',
+    batchSize: 'Size',
+    batchAttempts: 'Attempts',
+    batchError: 'Error',
+    noBatches: 'No batch received yet',
+    noBatchesHint: 'Batches appear here as soon as a paired device pushes data.',
+    topTypesTitle: (shown: number, total: number) => `Data types, top ${shown} of ${total}`,
+    typeCol: 'Type',
+    countCol: 'Measures',
+    shareCol: 'Share',
+    lessThanShare: '< 0.1 %',
+    receivedVsVisible:
+      'A batch is visible once normalized: received does not mean queryable yet.',
+  },
+};
+
+export type Messages = typeof en;
