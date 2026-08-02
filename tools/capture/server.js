@@ -65,6 +65,20 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Download one captured body (still gzipped) by id, for offline analysis.
+  const dl = url.pathname.match(/^\/captures\/([A-Za-z0-9-]+)\/body$/);
+  if (req.method === 'GET' && dl) {
+    const p = path.join(DATA_DIR, `${dl[1]}.body.gz`);
+    if (!fs.existsSync(p)) {
+      res.writeHead(404, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: 'not found' }));
+      return;
+    }
+    res.writeHead(200, { 'content-type': 'application/gzip' });
+    fs.createReadStream(p).pipe(res);
+    return;
+  }
+
   if (req.method === 'POST') {
     const started = Date.now();
     const id = `${new Date(started).toISOString().replace(/[:.]/g, '-')}-${String(++seq).padStart(4, '0')}`;
