@@ -1,0 +1,6 @@
+/* Design tokens are the single source of truth, synced from the design reference. */
+@import '../../design/tokens/fonts.css';
+@import '../../design/tokens/colors.css';
+@import '../../design/tokens/typography.css';
+@import '../../design/tokens/spacing.css';
+@import '../../design/tokens/base.css';
