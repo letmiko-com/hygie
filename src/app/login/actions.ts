@@ -4,11 +4,17 @@
 // message. No account-existence oracle in the response, no address and no
 // token in the logs. For unknown emails, signIn is never even called: zero
 // token created, zero email sent.
+// Timing: the SMTP send is fire-and-forget (see auth.ts), and the response
+// is padded to a constant floor so the remaining known-account work (token
+// insert, ~10-20 ms) cannot be told apart from the unknown-account path.
 import { redirect } from 'next/navigation';
 import { signIn } from '@/auth';
 import { getDb } from '@/lib/db';
 
+const MIN_RESPONSE_MS = 400;
+
 export async function requestLoginLink(formData: FormData): Promise<void> {
+  const started = Date.now();
   const email = String(formData.get('email') ?? '')
     .trim()
     .toLowerCase();
@@ -30,5 +36,9 @@ export async function requestLoginLink(formData: FormData): Promise<void> {
     }
   }
 
+  const elapsed = Date.now() - started;
+  if (elapsed < MIN_RESPONSE_MS) {
+    await new Promise((resolve) => setTimeout(resolve, MIN_RESPONSE_MS - elapsed));
+  }
   redirect('/login/sent');
 }

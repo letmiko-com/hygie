@@ -58,7 +58,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const base = process.env.HYGIE_BASE_URL ?? original.origin;
         const verifyUrl = new URL('/login/verify', base);
         verifyUrl.search = original.search;
-        await sendMagicLinkEmail(identifier, verifyUrl.toString());
+        // Fire and forget: the SMTP round trip (hundreds of ms) must not sit
+        // in the response path, or /login answers measurably slower for
+        // known accounts than for unknown ones (timing oracle on account
+        // existence). The process is persistent (no serverless teardown) and
+        // the send needs no request context; failures are logged without
+        // address or token, and the user-facing message is neutral anyway.
+        void sendMagicLinkEmail(identifier, verifyUrl.toString()).catch((err) => {
+          console.error(
+            `[auth] magic link send failed: ${err instanceof Error ? err.name : 'error'}`
+          );
+        });
       },
     }),
   ],
