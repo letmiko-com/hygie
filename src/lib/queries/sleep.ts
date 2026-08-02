@@ -126,11 +126,18 @@ export async function sleepNights(ctx: SubjectContext, range: DayRange): Promise
     });
   }
   for (const r of haeRes.rows) {
+    // Measured on real payloads: HAE fills the stage columns and leaves
+    // asleep at 0. The asleep total is the sum of stages in that case.
+    const stagesSum =
+      r.core_s === null && r.deep_s === null && r.rem_s === null
+        ? null
+        : (r.core_s ?? 0) + (r.deep_s ?? 0) + (r.rem_s ?? 0);
+    const asleep = r.asleep_s !== null && r.asleep_s > 0 ? r.asleep_s : stagesSum;
     byNight.set(r.night_date, {
       nightDate: r.night_date,
       channel: 'hae',
       sourceName: null,
-      asleepS: r.asleep_s,
+      asleepS: asleep,
       coreS: r.core_s,
       deepS: r.deep_s,
       remS: r.rem_s,

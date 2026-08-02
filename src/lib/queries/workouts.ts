@@ -260,6 +260,124 @@ export async function workoutSeries(
   return rows;
 }
 
+/** Last workouts whatever the period (dashboard "recent sessions"). */
+export async function recentWorkouts(ctx: SubjectContext, limit = 5): Promise<WorkoutListItem[]> {
+  const hrType = await getMetricType('HKQuantityTypeIdentifierHeartRate');
+  const rows = await heavyRead<WorkoutRow>(
+    `select w.id, w.activity_type, s.name as source_name, w.start_ts, w.end_ts,
+            w.tz_offset_min, w.is_indoor, w.duration_s, w.distance_m, w.energy_kj,
+            hr.avg_hr_bpm
+     from workouts w
+     join sources s on s.id = w.source_id
+     ${AVG_HR_LATERAL}
+     where w.subject_id = $1
+     order by w.start_ts desc
+     limit $3`,
+    [ctx.subjectId, hrType.id, limit]
+  );
+  return rows.map(mapItem);
+}
+
+/** Workout minutes per local day (regularity heatmap). Days without workouts are absent. */
+export async function workoutMinutesPerDay(
+  ctx: SubjectContext,
+  range: DayRange
+): Promise<Map<string, number>> {
+  interface Row {
+    day: string;
+    minutes: number;
+  }
+  const { rows } = await getDb().query<Row>(
+    `select ((w.start_ts at time zone $4)::date)::text as day,
+            (sum(w.duration_s) / 60)::float8 as minutes
+     from workouts w
+     where w.subject_id = $1
+       and w.start_ts >= ($2::date::timestamp at time zone $4)
+       and w.start_ts < ($3::date::timestamp at time zone $4)
+     group by 1`,
+    [ctx.subjectId, range.fromDay, range.toDayExcl, ctx.timezone]
+  );
+  return new Map(rows.map((r) => [r.day, r.minutes]));
+}
+
+export interface WeekVolume {
+  /** ISO week start (Monday), local to the subject. */
+  weekStart: string;
+  sessions: number;
+  distanceM: number | null;
+  durationS: number;
+}
+
+/** Weekly training volume, dense week axis (weeks without sessions = 0 sessions, null distance). */
+export async function weeklyVolume(ctx: SubjectContext, range: DayRange): Promise<WeekVolume[]> {
+  interface Row {
+    week_start: string;
+    sessions: number;
+    distance_m: number | null;
+    duration_s: number | null;
+  }
+  const { rows } = await getDb().query<Row>(
+    `with weeks as (
+       select w::date as week_start
+       from generate_series(date_trunc('week', $2::date), date_trunc('week', $3::date - 1), interval '1 week') w
+     ),
+     agg as (
+       select date_trunc('week', (w.start_ts at time zone $4)::date)::date as week_start,
+              count(*)::int as sessions,
+              sum(w.distance_m) as distance_m,
+              sum(w.duration_s) as duration_s
+       from workouts w
+       where w.subject_id = $1
+         and w.start_ts >= ($2::date::timestamp at time zone $4)
+         and w.start_ts < ($3::date::timestamp at time zone $4)
+       group by 1
+     )
+     select weeks.week_start::text as week_start, coalesce(agg.sessions, 0) as sessions,
+            agg.distance_m, agg.duration_s
+     from weeks left join agg using (week_start)
+     order by weeks.week_start`,
+    [ctx.subjectId, range.fromDay, range.toDayExcl, ctx.timezone]
+  );
+  return rows.map((r) => ({
+    weekStart: r.week_start,
+    sessions: r.sessions,
+    distanceM: r.distance_m,
+    durationS: r.duration_s ?? 0,
+  }));
+}
+
+/** Monthly workout minutes over the whole history (scrubber silhouette). */
+export async function monthlyTrainingSilhouette(ctx: SubjectContext): Promise<number[]> {
+  interface Row {
+    month: string;
+    minutes: number;
+  }
+  const { rows } = await getDb().query<Row>(
+    `select to_char(date_trunc('month', (w.start_ts at time zone $2)::date), 'YYYY-MM') as month,
+            (sum(w.duration_s) / 60)::float8 as minutes
+     from workouts w
+     where w.subject_id = $1
+     group by 1 order by 1`,
+    [ctx.subjectId, ctx.timezone]
+  );
+  if (rows.length === 0) return [];
+  const byMonth = new Map(rows.map((r) => [r.month, r.minutes]));
+  const out: number[] = [];
+  const [firstY, firstM] = rows[0].month.split('-').map(Number);
+  const last = rows[rows.length - 1].month;
+  for (let y = firstY, mth = firstM; ; ) {
+    const key = `${y}-${String(mth).padStart(2, '0')}`;
+    out.push(byMonth.get(key) ?? 0);
+    if (key === last) break;
+    mth += 1;
+    if (mth > 12) {
+      mth = 1;
+      y += 1;
+    }
+  }
+  return out;
+}
+
 export interface WorkoutSplit {
   km: number;
   durationS: number;
