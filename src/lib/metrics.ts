@@ -67,6 +67,36 @@ export const METRIC_DISPLAY: Record<string, MetricDisplay> = {
     icon: 'directions_bike',
     label: { en: 'Cycling distance', fr: 'Distance vélo' },
   },
+  HKQuantityTypeIdentifierCyclingCadence: {
+    family: 'distance',
+    icon: 'directions_bike',
+    label: { en: 'Cycling cadence', fr: 'Cadence vélo' },
+  },
+  HKQuantityTypeIdentifierRunningPower: {
+    family: 'power',
+    icon: 'bolt',
+    label: { en: 'Running power', fr: 'Puissance de course' },
+  },
+  HKQuantityTypeIdentifierRunningSpeed: {
+    family: 'activity',
+    icon: 'speed',
+    label: { en: 'Running speed', fr: 'Vitesse de course' },
+  },
+  HKQuantityTypeIdentifierRunningStrideLength: {
+    family: 'activity',
+    icon: 'steps',
+    label: { en: 'Stride length', fr: 'Longueur de foulée' },
+  },
+  HKQuantityTypeIdentifierRunningGroundContactTime: {
+    family: 'activity',
+    icon: 'timer',
+    label: { en: 'Ground contact time', fr: 'Temps de contact au sol' },
+  },
+  HKQuantityTypeIdentifierRunningVerticalOscillation: {
+    family: 'activity',
+    icon: 'height',
+    label: { en: 'Vertical oscillation', fr: 'Oscillation verticale' },
+  },
   HKQuantityTypeIdentifierFlightsClimbed: {
     family: 'activity',
     icon: 'floor',
