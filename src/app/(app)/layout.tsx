@@ -35,7 +35,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     },
     {
       label: m.nav.instance,
-      items: [{ href: '/sync', icon: 'sync', label: m.nav.sync }],
+      items: [
+        { href: '/sync', icon: 'sync', label: m.nav.sync },
+        { href: '/devices', icon: 'devices', label: m.nav.devices },
+      ],
     },
   ];
 

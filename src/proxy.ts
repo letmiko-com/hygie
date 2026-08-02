@@ -30,8 +30,9 @@ export default async function proxy(request: NextRequest): Promise<NextResponse>
 export const config = {
   // Everything except: /login* (sign-in flow), /api/auth* (Auth.js endpoints,
   // needed to obtain a session), /api/v1/ingest* (device-key auth, streamed
-  // bodies: keep out of any matcher, see next.config.ts), and the whole
-  // /_next/* internal space: static assets carry no data, and gating the dev
-  // HMR websocket (a 307 on the upgrade) leaves dev pages unhydrated.
-  matcher: ['/((?!login|api/auth|api/v1/ingest|_next|favicon\\.ico|robots\\.txt).*)'],
+  // bodies: keep out of any matcher, see next.config.ts), the whole /_next/*
+  // internal space (static assets carry no data, and gating the dev HMR
+  // websocket leaves dev pages unhydrated), and /fonts/* (self-hosted font
+  // files: gating them strips the login page of its typography and icons).
+  matcher: ['/((?!login|api/auth|api/v1/ingest|_next|fonts|favicon\\.ico|robots\\.txt).*)'],
 };
