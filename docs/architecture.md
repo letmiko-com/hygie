@@ -87,8 +87,10 @@ secondary indexes → first full backup → then enable PITR.
 ## 5. Auth and security
 
 - Auth.js magic link over SMTP (custom relay, port 2587 from Railway). POST-confirmation
-  page so mailbox link scanners cannot consume tokens. No public signup: accounts are
-  created by admin invitation only.
+  page so mailbox link scanners cannot consume tokens. No public signup: the first admin
+  is created by a one-time bootstrap (CLI or env var), members by admin invitation
+  afterwards. Sessions live in the database (immediate revocation must be real; no
+  self-contained JWT).
 - Device API keys: random, shown once, stored hashed, revocable, one per device per
   subject. Separate secret universe from user sessions.
 - No health values, payloads, or secrets in logs. Ingestion logs metadata only (batch id,
