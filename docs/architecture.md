@@ -20,7 +20,7 @@ exactly one subject and authenticates with its own API key.
   controls Postgres can read everything.
 - Deleting a member = revoke sessions, device keys, and grants immediately (data becomes
   unreachable), then a background job physically purges rows and raw files, verifiably.
-  Restores from backup must not resurrect revoked keys.
+  Restores from backup must not resurrect revoked keys: a tombstone registry (purged subjects, revoked keys) is stored outside the main backup set and re-applied after any restore. Purge runs table by table in batches; ON DELETE CASCADE is an integrity net, not the purge algorithm.
 
 ## 2. Data channels: the two-regime rule
 
@@ -29,10 +29,10 @@ XML backfill carries raw records. They must never be merged into one series.
 
 | Channel | Content | Dedup |
 |---|---|---|
-| `raw` (XML backfill, and HAE discrete types) | Raw samples: heart rate, HRV, SpO2, respiratory rate, walking metrics, temperatures, ... | Proven exact: (type, normalized source, minute-truncated ts, canonical value); second-precision with ±1s tolerance for heart rate |
+| `raw` (XML backfill, and HAE discrete types) | Raw samples: heart rate, HRV, SpO2, respiratory rate, walking metrics, temperatures, ... | Exact within one origin on (type, normalized source, ts, quantized value_key); the ±1s tolerance applies ONLY to one-to-one XML↔HAE matching at ingestion (multiset matching in staging, ambiguous groups quarantined, never silent drops) |
 | `minute` (HAE cumulative types) | Per-minute aggregates already deduplicated by Apple (steps, active/basal energy, distance, stand/exercise time) | None vs raw; idempotent vs re-emissions by unique (subject, type, minute) |
 
-Per (subject, type) there is a **channel cutover timestamp**: before it, truth comes from
+Cutover invariants: the raw→minute transition is monotone and never reverts automatically; exactly one device is authoritative for cumulatives per (subject, type) (recorded on the cutover; a non-authoritative device sending a different value creates a logged conflict, never a silent overwrite); missing HAE data after the cutover is a gap, never a fallback to XML; moving a cutover invalidates rollups on the affected range. Per (subject, type) there is a **channel cutover timestamp** (raw < cutover ≤ minute): before it, truth comes from
 the XML backfill (raw records, Apple-style dedup computed by us at query time per source
 priority); after it, cumulative truth comes from the HAE minute channel (Apple's own
 deduplicated totals — this is what the Santé app displays, which resolves the metric-truth
@@ -51,8 +51,12 @@ is an in-process loop; no third service.
    request path. Row inserted in `ingest_batches` with status `received`, HTTP 200 only
    after both are durable. Response carries `batch_id`.
 2. Worker loop (in-process, interval + on-boot recovery): `received → validated →
-   normalized → rollups_ready | failed`. Each transition is idempotent and resumable;
-   a crashed step is retried from its persisted state.
+   normalized → rollups_ready | failed`. Claim protocol: atomic claim (FOR UPDATE SKIP
+   LOCKED + lease with `locked_until`), one transaction per step, status updated only
+   after the matching commit, advisory lock per subject/type, no new claims after
+   SIGTERM. Bodies are written temp-name → fsync → atomic rename → row insert; boot
+   reconciles orphan files and rowless rows. A Railway redeploy mid-normalization
+   simply expires the lease and the next process replays idempotently.
 3. Normalization: HAE name → HK identifier mapping (31 verified entries, see
    `docs/hae-mapping.md`); unit conversion driven by the payload's `units` field (never
    assumed: kJ vs kcal, % vs fraction); source-name normalization (U+00A0 → space;
@@ -71,12 +75,11 @@ secondary indexes → first full backup → then enable PITR.
 
 ## 4. Query layer and rollups
 
-- One composite index `(type_id, start_ts)` per subject partition of `observations` covers
+- One composite index `(subject_id, type_id, start_ts)` on `observations` (no table partitioning at this volume) covers
   all time navigation (measured: every dashboard query < 200 ms on real data). Additional
   indexes only on evidence (~200 MB each).
 - Rollups exist ONLY for all-time/multi-year views (measured: 1.24s raw → 107ms via hourly
-  rollup). Hourly UTC rollups; daily aggregation computed in the subject's IANA timezone
-  from hourly (exact for integer-offset timezones). Rollups are derived and rebuildable,
+  rollup). Hourly UTC rollups; daily views aggregate full hours and compute the two partial edge hours from raw, so half-hour timezones stay exact. Rollups are derived and rebuildable,
   never the source of truth.
 - p95 budget for dashboard queries: 500 ms, re-verified with EXPLAIN ANALYZE when the
   schema evolves.
