@@ -159,6 +159,7 @@ export async function receiveHaeBatch(req: Request): Promise<Response> {
   // 1. Authentication first: never touch the body for an unknown key.
   const key = req.headers.get('x-hygie-device-key');
   if (!key) {
+    console.warn(`[ingest] rejected: missing device key (ua=${(req.headers.get('user-agent') || '?').slice(0, 40)})`);
     return errorResponse(401, 'missing_device_key', 'X-Hygie-Device-Key header is required');
   }
   let device: { deviceId: string; subjectId: string } | null;
@@ -172,6 +173,8 @@ export async function receiveHaeBatch(req: Request): Promise<Response> {
   }
   if (device === null) {
     // Unknown and revoked keys are indistinguishable on purpose (no oracle).
+    // Key prefix only: enough to tell "old capture token" from "typo in the real key".
+    console.warn(`[ingest] rejected: unknown device key (prefix=${key.slice(0, 5)}…, ua=${(req.headers.get('user-agent') || '?').slice(0, 40)})`);
     return errorResponse(401, 'invalid_device_key', 'unknown or revoked device key');
   }
 
