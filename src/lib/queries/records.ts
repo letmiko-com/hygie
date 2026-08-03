@@ -195,3 +195,74 @@ export function sportRecords(workouts: WorkoutLite[], activityType: string, now:
 
   return out;
 }
+
+/** One session's record candidates, mirroring sportRecords' rules exactly. */
+function candidatesOf(w: WorkoutLite): Array<{ kind: RecordKind; value: number; lowerIsBetter: boolean }> {
+  const out: Array<{ kind: RecordKind; value: number; lowerIsBetter: boolean }> = [];
+  const distance = w.distanceM !== null && w.distanceM > 0 ? w.distanceM : null;
+  if (distance !== null) out.push({ kind: 'longest_distance', value: distance, lowerIsBetter: false });
+  if (w.durationS > 0) out.push({ kind: 'longest_duration', value: w.durationS, lowerIsBetter: false });
+  if (distance !== null && w.durationS > 0) {
+    // Pace reads naturally for foot sports, speed for wheeled ones.
+    if (w.activityType === 'HKWorkoutActivityTypeCycling') {
+      if (distance >= MIN_SPEED_DISTANCE_M) {
+        out.push({ kind: 'best_speed', value: distance / 1000 / (w.durationS / 3600), lowerIsBetter: false });
+      }
+    } else if (distance >= MIN_PACE_DISTANCE_M) {
+      out.push({ kind: 'best_pace', value: w.durationS / (distance / 1000), lowerIsBetter: true });
+    }
+  }
+  if (w.elevationUpM !== null && w.elevationUpM > 0) {
+    out.push({ kind: 'biggest_climb', value: w.elevationUpM, lowerIsBetter: false });
+  }
+  return out;
+}
+
+/** A record that was actually beaten on a given day, with the mark it replaced. */
+export interface RecordEvent {
+  kind: RecordKind;
+  activityType: string;
+  workoutId: string;
+  ts: Date;
+  value: number;
+  /** The best that stood until this session. */
+  previous: number;
+  invert: boolean;
+}
+
+/**
+ * Records broken during a window, replayed chronologically over the whole
+ * history: the running best per (sport, kind) is what makes an improvement a
+ * record, so the full list is needed even to answer about three days.
+ * A sport's first session is NOT an event (it beats nothing); only a mark
+ * that replaces an existing one counts. `keep` filters on the event date,
+ * which the caller resolves in the subject's timezone.
+ */
+export function recordEvents(workouts: WorkoutLite[], keep: (ts: Date) => boolean): RecordEvent[] {
+  const best = new Map<string, number>();
+  const out: RecordEvent[] = [];
+  const chronological = [...workouts].sort((a, b) => a.startTs.getTime() - b.startTs.getTime());
+
+  for (const w of chronological) {
+    for (const c of candidatesOf(w)) {
+      const key = `${w.activityType}|${c.kind}`;
+      const previous = best.get(key);
+      const better =
+        previous === undefined || (c.lowerIsBetter ? c.value < previous : c.value > previous);
+      if (!better) continue;
+      best.set(key, c.value);
+      if (previous !== undefined && keep(w.startTs)) {
+        out.push({
+          kind: c.kind,
+          activityType: w.activityType,
+          workoutId: w.id,
+          ts: w.startTs,
+          value: c.value,
+          previous,
+          invert: c.lowerIsBetter,
+        });
+      }
+    }
+  }
+  return out;
+}

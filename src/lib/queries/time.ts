@@ -29,6 +29,14 @@ export function todayInZone(timeZone: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone }).format(new Date());
 }
 
+/**
+ * Local day of an instant in an IANA zone. Formatting, not arithmetic: the
+ * zone database answers, we never compute an offset by hand.
+ */
+export function dayInZone(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone }).format(date);
+}
+
 function toUtcMs(day: string): number {
   const ms = Date.parse(`${day}T00:00:00Z`);
   if (!Number.isFinite(ms)) throw new Error(`invalid day: ${day}`);
