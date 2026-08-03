@@ -47,7 +47,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   ];
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'stretch' }}>
+    <div className="hy-shell" style={{ display: 'flex', minHeight: '100vh', alignItems: 'stretch' }}>
       <Sidebar
         sections={sections}
         userName={ctx?.subjectName ?? email}
@@ -55,7 +55,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         logoutLabel={m.common.logout}
         onLogout={logout}
       />
-      <main style={{ flex: 1, minWidth: 0, padding: '18px 22px 36px', boxSizing: 'border-box' }}>
+      <main className="hy-main" style={{ flex: 1, minWidth: 0, padding: '18px 22px 36px', boxSizing: 'border-box' }}>
         <div style={{ maxWidth: 1440, margin: '0 auto' }}>
           {ctx ? children : <EmptyState icon="lock" title={m.noSubject.title} hint={m.noSubject.hint} />}
         </div>

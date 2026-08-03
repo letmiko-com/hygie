@@ -4,6 +4,8 @@ import type { Metadata } from 'next';
 // design/tokens/fonts.css are reference-only and dead after bundling.
 import './fonts.css';
 import './globals.css';
+// Small-screen rules, last so they win over the component styles they move.
+import './responsive.css';
 
 export const metadata: Metadata = {
   title: 'Hygie',

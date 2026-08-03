@@ -217,7 +217,7 @@ export default async function RecordsPage() {
       {/* The table needs ~580 px for its five non-wrapping columns; at 5fr/4fr
           it got 502 px on a 1175 px viewport and the trend column had to be
           scrolled to. Progression keeps enough width to stay readable. */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 7fr) minmax(260px, 4fr)', gap: 12 }}>
+      <div className="hy-split" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 7fr) minmax(260px, 4fr)', gap: 12 }}>
         <Panel padding="6px 10px 10px">
           <div style={{ padding: '8px 2px 0' }}>
             <PanelLabel>{m.records.tableTitle}</PanelLabel>

@@ -190,7 +190,7 @@ export default async function SyncPage() {
                   />
                 </span>
               </div>
-              <div style={{ display: 'flex', gap: 24 }}>
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                 <StatTile label={m.sync.deviceKey} value={`${d.keyPrefix}…`} sub={d.platform ?? undefined} />
                 {/* The subtitle dates what the tile measures: the last push.
                     It carried the PAIRING date, read as "seen on that day",
@@ -206,7 +206,7 @@ export default async function SyncPage() {
         })}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 2fr)', gap: 12 }}>
+      <div className="hy-split" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 2fr)', gap: 12 }}>
         <Panel>
           <PanelLabel
             trailing={
