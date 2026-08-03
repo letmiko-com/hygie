@@ -210,7 +210,7 @@ export default async function ExplorePage({
 
   const [chart, silhouette] = await Promise.all([
     charted.length > 0
-      ? exploreChart(ctx, charted, range, prevRange, elapsed, today)
+      ? exploreChart(ctx, charted, range, prevRange, elapsed)
       : Promise.resolve(null),
     monthlyTrainingSilhouette(ctx),
   ]);
