@@ -410,6 +410,7 @@ export default async function SleepPage({
               <LineChart
                 height={150}
                 ariaLabel={m.sleep.durationChart}
+                emptyLabel={m.common.noDataOnPeriod}
                 yFormat={(v) => fmtNumber(v, locale, 1)}
                 xLabels={chartXLabels}
                 series={[

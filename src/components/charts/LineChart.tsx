@@ -109,6 +109,7 @@ export function LineChart({
   yFormat = (v: number) => String(Math.round(v)),
   gridLines = 3,
   ariaLabel,
+  emptyLabel,
 }: {
   series: LineSeries[];
   xLabels?: string[];
@@ -116,6 +117,8 @@ export function LineChart({
   yFormat?: (v: number) => string;
   gridLines?: number;
   ariaLabel: string;
+  /** Rendered instead of an empty frame when nothing can be plotted. */
+  emptyLabel?: string;
 }) {
   const rolled = series.map((s) => ({
     ...s,
@@ -124,7 +127,24 @@ export function LineChart({
   const all = rolled.flatMap((s) => [...s.data, ...(s.rolledData ?? [])]).filter(
     (v): v is number => v !== null
   );
-  if (all.length === 0) return <div style={{ height }} />;
+  if (all.length === 0) {
+    // An empty frame reads as "flat", which is a lie: say the window carries
+    // no measure instead of drawing nothing.
+    return (
+      <div
+        style={{
+          height,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          font: 'italic 400 var(--text-sm)/1.4 var(--font-ui)',
+          color: 'var(--text-3)',
+        }}
+      >
+        {emptyLabel ?? ''}
+      </div>
+    );
+  }
 
   let min = Math.min(...all);
   let max = Math.max(...all);
@@ -221,6 +241,30 @@ export function LineChart({
               )
             )}
           </svg>
+          {/* A measure with no neighbour has no line to live on (a window with
+              three scattered nights, a first day of data). It is still data:
+              it gets a dot. HTML rather than SVG because the viewBox above is
+              stretched with preserveAspectRatio none. */}
+          {rolled.flatMap((s, si) =>
+            segments(s.rolledData ?? s.data, x, y)
+              .filter((seg) => seg.length === 1)
+              .map(([[px, py]], di) => (
+                <span
+                  key={`${si}-${di}`}
+                  aria-hidden
+                  style={{
+                    position: 'absolute',
+                    left: `${px}%`,
+                    top: `${py}%`,
+                    width: 4,
+                    height: 4,
+                    borderRadius: '50%',
+                    background: s.color,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                />
+              ))
+          )}
         </div>
       </div>
       {(xLabels.length > 0 || legend.length > 0) && (
