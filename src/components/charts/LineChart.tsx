@@ -97,6 +97,17 @@ function Path({
 }
 
 /**
+ * Decimals a graduation needs so two adjacent ones never print the same
+ * label: a window whose values span 0.4 bpm printed "68" four times, an
+ * axis that carries no information.
+ */
+function axisDigits(span: number, gridLines: number): number {
+  const step = Math.abs(span) / Math.max(1, gridLines);
+  if (!Number.isFinite(step) || step === 0) return 0;
+  return Math.min(3, Math.max(0, Math.ceil(-Math.log10(step))));
+}
+
+/**
  * Line chart, SVG stretched in a flex row next to an HTML y-axis column
  * (design reference: design/components/charts/LineChart.jsx). Null points
  * break the lines into real gaps. Comparison series use the same color
@@ -106,7 +117,7 @@ export function LineChart({
   series,
   xLabels = [],
   height = 190,
-  yFormat = (v: number) => String(Math.round(v)),
+  yFormat = (v: number, digits: number) => v.toFixed(digits),
   gridLines = 3,
   ariaLabel,
   emptyLabel,
@@ -114,7 +125,8 @@ export function LineChart({
   series: LineSeries[];
   xLabels?: string[];
   height?: number;
-  yFormat?: (v: number) => string;
+  /** `digits` is the precision the graduations need to stay distinct. */
+  yFormat?: (v: number, digits: number) => string;
   gridLines?: number;
   ariaLabel: string;
   /** Rendered instead of an empty frame when nothing can be plotted. */
@@ -161,6 +173,7 @@ export function LineChart({
   const y = (v: number) => 100 - ((v - min) / (max - min)) * 100;
 
   const ticks = Array.from({ length: gridLines + 1 }, (_, i) => max - ((max - min) * i) / gridLines);
+  const tickDigits = axisDigits(max - min, gridLines);
   const legend: ReactNode[] = rolled
     .filter((s) => s.label)
     .map((s, i) => (
@@ -197,7 +210,7 @@ export function LineChart({
           }}
         >
           {ticks.map((t, i) => (
-            <span key={i}>{yFormat(t)}</span>
+            <span key={i}>{yFormat(t, tickDigits)}</span>
           ))}
         </div>
         <div style={{ position: 'relative', flex: 1, height }}>

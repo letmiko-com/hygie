@@ -27,12 +27,15 @@ import {
   type DayRange,
 } from '@/lib/queries/time';
 import { parseTimeParams, type TimeSearchParams } from '@/lib/queries/time-params';
+import { dayAxisLabels } from '@/lib/time-format';
 import { monthlyTrainingSilhouette } from '@/lib/queries/workouts';
 
 export const metadata: Metadata = { title: 'Sommeil · Hygie' };
 export const dynamic = 'force-dynamic';
 
 const SLEEP_COLOR = 'var(--data-sleep)';
+/** One night must stay a bar, not a block stretched over the whole panel. */
+const BAR_MAX_W = 56;
 const PHASES = [
   { key: 'deep', opacity: 1, color: SLEEP_COLOR },
   { key: 'core', opacity: 0.55, color: SLEEP_COLOR },
@@ -133,6 +136,12 @@ function NightBars({
     return n ? toView(n) : null;
   });
   const maxH = Math.max(9, ...views.filter((v): v is NightView => v !== null).map((v) => v.totalH + v.awakeH));
+  // A few nights must stay bars: stretched to fill the panel, a single night
+  // read as one sleep spanning the whole window. The cap applies to the plot
+  // AND to the date axis below it, otherwise the labels stop sitting under
+  // the bars they date. Wide windows exceed it and are unaffected.
+  const gap = days.length > 45 ? 1 : 4;
+  const plotMaxW = days.length * BAR_MAX_W + (days.length - 1) * gap;
   return (
     <div>
       <div
@@ -141,8 +150,9 @@ function NightBars({
         style={{
           display: 'flex',
           alignItems: 'flex-end',
-          gap: days.length > 45 ? 1 : 4,
+          gap,
           height: 170,
+          maxWidth: plotMaxW,
           borderBottom: '1px solid var(--border-strong)',
         }}
       >
@@ -191,13 +201,14 @@ function NightBars({
           display: 'flex',
           justifyContent: 'space-between',
           marginTop: 5,
+          maxWidth: plotMaxW,
           font: '400 var(--text-2xs)/1 var(--font-data)',
           color: 'var(--chart-axis)',
         }}
       >
-        <span>{fmtDay(days[0], locale, { day: 'numeric', month: 'short' })}</span>
-        <span>{fmtDay(days[Math.floor(days.length / 2)], locale, { day: 'numeric', month: 'short' })}</span>
-        <span>{fmtDay(days[days.length - 1], locale, { day: 'numeric', month: 'short' })}</span>
+        {dayAxisLabels(days, locale, 3, { day: 'numeric', month: 'short' }).map((label, i) => (
+          <span key={i}>{label}</span>
+        ))}
       </div>
       <div style={{ display: 'flex', gap: 14, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         {PHASES.map((p) => (
@@ -296,10 +307,12 @@ export default async function SleepPage({
     return n && n.asleepS !== null ? n.asleepS / 3600 : null;
   });
 
-  const chartXLabels = [0, 0.5, 1].map((f) => {
-    const idx = Math.min(days.length - 1, Math.round(f * (days.length - 1)));
-    return fmtDay(days[idx], locale, rangeDays > 366 ? { month: 'short', year: '2-digit' } : { day: 'numeric', month: 'short' });
-  });
+  const chartXLabels = dayAxisLabels(
+    days,
+    locale,
+    3,
+    rangeDays > 366 ? { month: 'short', year: '2-digit' } : { day: 'numeric', month: 'short' }
+  );
 
   const measuredCount = views.length;
   const missingCount = Math.min(rangeDays, elapsed) - measuredCount;
@@ -416,7 +429,7 @@ export default async function SleepPage({
                 height={150}
                 ariaLabel={m.sleep.durationChart}
                 emptyLabel={m.common.noDataOnPeriod}
-                yFormat={(v) => fmtNumber(v, locale, 1)}
+                yFormat={(v, digits) => fmtNumber(v, locale, Math.max(1, digits))}
                 xLabels={chartXLabels}
                 series={[
                   {
