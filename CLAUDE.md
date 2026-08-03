@@ -27,8 +27,9 @@ config 100 % par variables d'environnement (`.env.example` = contrat).
 - « Pas de donnée ≠ zéro » dans toute UI et toute requête.
 - Tendances en citoyen de première classe : chaque valeur affichée porte direction/amplitude
   (la couleur encode la QUALITÉ de la tendance, pas la direction : baisser peut être bien).
-- Rollups uniquement pour all-time/multi-années (mesuré : le brut répond < 200 ms ailleurs).
-  Budget p95 : 500 ms, à vérifier par EXPLAIN ANALYZE sur les données réelles.
+- Rollups au-delà de 31 jours de fenêtre, brut en deçà et pour la journée en cours (règle
+  mesurée, documentée en tête de `src/lib/queries/series.ts`). Budget p95 : 500 ms, à vérifier
+  par EXPLAIN ANALYZE sur les données réelles.
 - Journées calculées dans le fuseau du sujet ; unités canoniques en base, affichage par l'UI.
 - i18n dès le premier composant (base EN, FR première langue). Pas de nouvelle dépendance
   sans justification écrite.
