@@ -152,6 +152,68 @@ export const METRIC_DISPLAY: Record<string, MetricDisplay> = {
     icon: 'readiness_score',
     label: { en: 'Physical effort', fr: 'Effort physique' },
   },
+  // Every remaining type carrying data in the real export: the explorer
+  // offers the whole taxonomy, and an offer must be readable.
+  HKQuantityTypeIdentifierWalkingStepLength: {
+    family: 'activity',
+    icon: 'steps',
+    label: { en: 'Walking step length', fr: 'Longueur de pas' },
+  },
+  HKQuantityTypeIdentifierWalkingDoubleSupportPercentage: {
+    family: 'activity',
+    icon: 'steps',
+    label: { en: 'Double support time', fr: 'Temps de double appui' },
+  },
+  HKQuantityTypeIdentifierWalkingAsymmetryPercentage: {
+    family: 'activity',
+    icon: 'steps',
+    label: { en: 'Walking asymmetry', fr: 'Asymétrie de marche' },
+  },
+  HKQuantityTypeIdentifierStairAscentSpeed: {
+    family: 'activity',
+    icon: 'floor',
+    label: { en: 'Stair ascent speed', fr: 'Vitesse en montée d’escalier' },
+  },
+  HKQuantityTypeIdentifierStairDescentSpeed: {
+    family: 'activity',
+    icon: 'floor',
+    label: { en: 'Stair descent speed', fr: 'Vitesse en descente d’escalier' },
+  },
+  HKQuantityTypeIdentifierDietaryWater: {
+    family: 'water',
+    icon: 'water_drop',
+    label: { en: 'Water intake', fr: 'Eau bue' },
+  },
+  HKQuantityTypeIdentifierTimeInDaylight: {
+    family: 'neutral',
+    icon: 'sunny',
+    label: { en: 'Time in daylight', fr: 'Temps à la lumière du jour' },
+  },
+  HKQuantityTypeIdentifierBodyTemperature: {
+    family: 'water',
+    icon: 'thermostat',
+    label: { en: 'Body temperature', fr: 'Température corporelle' },
+  },
+  HKQuantityTypeIdentifierBloodPressureSystolic: {
+    family: 'heart',
+    icon: 'monitor_heart',
+    label: { en: 'Systolic pressure', fr: 'Tension systolique' },
+  },
+  HKQuantityTypeIdentifierBloodPressureDiastolic: {
+    family: 'heart',
+    icon: 'monitor_heart',
+    label: { en: 'Diastolic pressure', fr: 'Tension diastolique' },
+  },
+  HKQuantityTypeIdentifierAppleSleepingBreathingDisturbances: {
+    family: 'sleep',
+    icon: 'pulmonology',
+    label: { en: 'Breathing disturbances', fr: 'Perturbations respiratoires' },
+  },
+  HKQuantityTypeIdentifierNumberOfAlcoholicBeverages: {
+    family: 'neutral',
+    icon: 'local_bar',
+    label: { en: 'Alcoholic drinks', fr: 'Boissons alcoolisées' },
+  },
 };
 
 export function dataColor(family: DataFamily): string {
