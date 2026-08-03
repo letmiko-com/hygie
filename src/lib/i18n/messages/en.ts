@@ -51,6 +51,7 @@ export const en = {
     from: 'From',
     to: 'To',
     apply: 'Apply',
+    invalidRange: 'The end date must come after the start date.',
     prevPeriod: 'Previous period',
     nextPeriod: 'Next period',
     vsWord: 'vs',

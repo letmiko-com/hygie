@@ -51,6 +51,7 @@ export const fr: Messages = {
     from: 'Du',
     to: 'Au',
     apply: 'Appliquer',
+    invalidRange: 'La date de fin doit suivre la date de début.',
     prevPeriod: 'Période précédente',
     nextPeriod: 'Période suivante',
     vsWord: 'vs',
