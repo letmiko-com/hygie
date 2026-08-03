@@ -517,6 +517,14 @@ try {
     `${counts.workouts_inserted} workouts; ${skippedTotal} records skipped ` +
     `(detail per type in import_runs.counts, run ${runId})`
   );
+  // A bulk COPY writes behind the rollups' back: nothing invalidated them.
+  if (counts.observations_inserted > 0) {
+    console.log(
+      `rollups are now stale for this subject. Rebuild them with:\n` +
+      `  npm run rollups -- --subject ${subjectId}` +
+      (onlyTypes === null ? '' : ` --types ${[...onlyTypes].join(',')}`)
+    );
+  }
 } catch (err) {
   if (runId !== null) {
     try { await copy.query('rollback'); } catch { /* connection may be gone */ }

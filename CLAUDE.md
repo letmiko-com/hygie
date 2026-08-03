@@ -43,7 +43,8 @@ config 100 % par variables d'environnement (`.env.example` = contrat).
 - Base de DEV avec les données réelles complètes : conteneur Docker local `hygie-pgbench`,
   `postgres://postgres:<mdp local, voir ~/Letmiko/work/hygie/bench/>@127.0.0.1:5433/hygie_dev`
   (6,48 M observations réelles importées). S'en servir pour développer et mesurer.
-- Scripts : `npm run migrate` / `seed` / `backfill`. Tests manuels : harnais dans
+- Scripts : `npm run migrate` / `seed` / `backfill` / `rollups` (reconstruction de
+  `rollup_hourly`, à lancer après tout backfill XML). Tests manuels : harnais dans
   `~/Letmiko/work/hygie/test-ingest/` et `test-auth/`.
 - `~/Letmiko/work/hygie/` contient des données de santé réelles : exclu de git, ne jamais
   committer quoi que ce soit qui en provient.

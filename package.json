@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "migrate": "node scripts/migrate.mjs",
     "seed": "node scripts/seed-taxonomy.mjs",
-    "backfill": "node scripts/backfill/import-xml.mjs"
+    "backfill": "node scripts/backfill/import-xml.mjs",
+    "rollups": "node scripts/rebuild-rollups.mjs"
   },
   "dependencies": {
     "next": "^16.0.0",
