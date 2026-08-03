@@ -1,6 +1,9 @@
 // Sync status reads. "Received" and "visible" are different facts
-// (architecture §3.5): a batch is visible once status >= 'normalized' —
-// never key on 'rollups_ready', the rollup step is currently a no-op.
+// (architecture §3.5): a batch is visible once status >= 'normalized'. Do not
+// key visibility on 'rollups_ready' — the rollup step is real work now, and
+// waiting for it would hide data the read layer already serves: below the
+// width threshold every screen reads the sources, and above it today comes
+// from the sources too (queries/series.ts).
 // Errors surfaced to the UI carry code and step only, never raw messages
 // (no health values or payload fragments can leak through them).
 import { getDb } from '@/lib/db';
