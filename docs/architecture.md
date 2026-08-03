@@ -83,9 +83,17 @@ secondary indexes → first full backup → then enable PITR.
 - One composite index `(subject_id, type_id, start_ts)` on `observations` (no table partitioning at this volume) covers
   all time navigation (measured: every dashboard query < 200 ms on real data). Additional
   indexes only on evidence (~200 MB each).
-- Rollups exist ONLY for all-time/multi-year views (measured: 1.24s raw → 107ms via hourly
-  rollup). Hourly UTC rollups; daily views aggregate full hours and compute the two partial edge hours from raw, so half-hour timezones stay exact. Rollups are derived and rebuildable,
-  never the source of truth.
+- Rollups serve wide windows only. The read layer picks its source per query on the WIDTH of
+  the window: at or below 31 days the sources answer (measured: single-digit ms), above it the
+  closed history is summed from `rollup_hourly` (measured, all-time heart rate: 1774 ms and
+  42 560 buffers raw → 75 ms and 1 092). 31 days is where the two paths cross on the densest
+  and the most channel-heavy series; the exact value is a plateau, not a cliff.
+  Hourly UTC rollups; daily views aggregate full hours and compute the two partial edge hours
+  from raw, so half-hour timezones stay exact — and the sources-only path deduplicates
+  cumulatives per (UTC hour, local day) for the same reason, so a day does not change value
+  with the width of the window it is read through. Today (from local midnight in the subject's
+  zone) is always read from the sources: a batch is visible at `normalized` and rolled up at
+  `rollups_ready`. Rollups are derived and rebuildable, never the source of truth.
 - `rollup_hourly` is built by one SQL function, `rollup_rebuild_range(subject, type,
   from, to)` (migration 0002), which applies the same truth rules as the read layer
   (two-regime rule, one winning source per UTC hour before the cutover) and is used by
