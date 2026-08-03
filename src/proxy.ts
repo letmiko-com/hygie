@@ -32,7 +32,9 @@ export const config = {
   // needed to obtain a session), /api/v1/ingest* (device-key auth, streamed
   // bodies: keep out of any matcher, see next.config.ts), the whole /_next/*
   // internal space (static assets carry no data, and gating the dev HMR
-  // websocket leaves dev pages unhydrated), and /fonts/* (self-hosted font
-  // files: gating them strips the login page of its typography and icons).
-  matcher: ['/((?!login|api/auth|api/v1/ingest|_next|fonts|favicon\\.ico|robots\\.txt).*)'],
+  // websocket leaves dev pages unhydrated), /fonts/* (self-hosted font files:
+  // gating them strips the login page of its typography and icons) and the
+  // favicon (app/icon.svg carries no data, and gating it left the sign-in tab
+  // with the browser's blank icon).
+  matcher: ['/((?!login|api/auth|api/v1/ingest|_next|fonts|icon\\.svg|favicon\\.ico|robots\\.txt).*)'],
 };
