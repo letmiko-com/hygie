@@ -26,7 +26,7 @@ import { getMessages, resolveLocale } from '@/lib/i18n';
 import { dataColor } from '@/lib/metrics';
 import { sportDisplay, sportLabel } from '@/lib/sports';
 import { getSubjectContext } from '@/lib/queries/context';
-import { addDays, todayInZone } from '@/lib/queries/time';
+import { addDays, dayInZone } from '@/lib/queries/time';
 import {
   getWorkout,
   observationSamples,
@@ -83,12 +83,17 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
 
   const sport = sportDisplay(workout.activityType);
   const color = dataColor(sport.family);
-  const today = todayInZone(ctx.timezone);
 
+  // The reference window is the 90 days BEFORE this session, in the subject's
+  // zone: anchoring it on today compared an April session against July ones,
+  // and a session alone in the window was compared against itself, which
+  // printed an exact "0,0 %" instead of an absence. Its own day is excluded,
+  // so the session can never enter its own average.
+  const workoutDay = dayInZone(workout.startTs, ctx.timezone);
   const [hrSeries, splits, sameSport90] = await Promise.all([
     workoutHeartRate(ctx, workout.id),
     workoutSplits(ctx, workout.id),
-    workoutSummary(ctx, { fromDay: addDays(today, -90), toDayExcl: addDays(today, 1) }, workout.activityType),
+    workoutSummary(ctx, { fromDay: addDays(workoutDay, -90), toDayExcl: workoutDay }, workout.activityType),
   ]);
 
   const isRun = workout.activityType === 'HKWorkoutActivityTypeRunning';
@@ -238,6 +243,7 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
           <LineChart
             height={150}
             ariaLabel={m.session.hrChart}
+            yFormat={(v, digits) => fmtNumber(v, locale, digits)}
             series={[{ data: hrValues, color: 'var(--data-heart)', area: true }]}
             xLabels={[0, 0.25, 0.5, 0.75, 1].map((f) => (f === 1 ? durationLabel : midLabel(f)))}
           />
@@ -262,6 +268,7 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
               <LineChart
                 height={110}
                 ariaLabel={m.session.powerChart}
+                yFormat={(v, digits) => fmtNumber(v, locale, digits)}
                 series={[{ data: downsample(power.map((p) => p.value), 300), color: dataColor('power'), area: true }]}
                 xLabels={['0:00', durationLabel]}
               />
