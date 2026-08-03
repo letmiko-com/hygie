@@ -43,6 +43,33 @@ function fmtRecordValue(r: SportRecord, locale: Locale): string {
   }
 }
 
+/**
+ * Progression axis: the record card reads "21,5 km", the chart under it must
+ * not read "21536". Canonical units live in the database, the axis converts
+ * like every other display, and the unit goes in the panel title because a
+ * 34px tick column cannot carry it.
+ */
+function progressionAxis(
+  kind: RecordKind,
+  locale: Locale
+): { unit: string; format: (v: number) => string } {
+  switch (kind) {
+    case 'longest_distance':
+      return { unit: 'km', format: (v) => fmtNumber(v / 1000, locale, 1) };
+    case 'longest_duration':
+      return { unit: 'h', format: (v) => fmtNumber(v / 3600, locale, 1) };
+    case 'best_pace':
+      return {
+        unit: '/km',
+        format: (v) => `${Math.floor(Math.round(v) / 60)}:${String(Math.round(v) % 60).padStart(2, '0')}`,
+      };
+    case 'best_speed':
+      return { unit: 'km/h', format: (v) => fmtNumber(v, locale, 1) };
+    case 'biggest_climb':
+      return { unit: 'm', format: (v) => fmtInt(v, locale) };
+  }
+}
+
 /** One emblematic record per sport: pace for running, speed for cycling,
  * otherwise the longest distance, falling back to the longest duration. */
 function emblematicKind(activityType: string): RecordKind[] {
@@ -260,14 +287,15 @@ export default async function RecordsPage() {
                 <TrendChip deltaPct={progRecord.deltaPct} invert={progRecord.invert} label={m.records.vsPrevYear} locale={locale} />
               }
             >
-              {m.records.progressionTitle(
+              {`${m.records.progressionTitle(
                 `${sportLabel(progRecord.activityType, locale)} · ${m.records.kinds[progRecord.kind]}`
-              )}
+              )} (${progressionAxis(progRecord.kind, locale).unit})`}
             </PanelLabel>
             <LineChart
               height={168}
               ariaLabel={m.records.progressionTitle(m.records.kinds[progRecord.kind])}
-              yFormat={(v) => (progIsPace ? fmtNumber(v, locale, 1) : String(Math.round(v)))}
+              emptyLabel={m.common.noData}
+              yFormat={progressionAxis(progRecord.kind, locale).format}
               xLabels={progYears.filter((_, i) => i % Math.ceil(progYears.length / 8) === 0)}
               series={[{ data: progValues, color: dataColor(progSport.family), area: true }]}
             />

@@ -333,6 +333,7 @@ export default async function DashboardPage({
           <LineChart
             height={190}
             ariaLabel={m.dash.hrChartTitle}
+            emptyLabel={m.common.noDataOnPeriod}
             xLabels={chartXLabels}
             series={[
               {
