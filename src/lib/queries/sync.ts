@@ -187,8 +187,6 @@ export async function ingestVolumesByDay(ctx: SubjectContext, days = 30): Promis
 }
 
 export interface DataTotals {
-  /** Table-level estimate (reltuples): exact count costs 400ms for a cosmetic figure. */
-  observationsApprox: number;
   minuteStats: number;
   workouts: number;
   sleepSegments: number;
@@ -202,7 +200,6 @@ export async function dataTotals(ctx: SubjectContext): Promise<DataTotals> {
   const key = `totals:${ctx.subjectId}:${todayInZone(ctx.timezone)}`;
   return cached(key, 6 * 60 * 60_000, async () => {
     interface Row {
-      observations_approx: string;
       minute_stats: number;
       workouts: number;
       sleep_segments: number;
@@ -227,8 +224,7 @@ export async function dataTotals(ctx: SubjectContext): Promise<DataTotals> {
                 count(*) filter (where min_ts is not null)::int as types_with_data
          from per_type
        )
-       select (select reltuples::bigint from pg_class where relname = 'observations') as observations_approx,
-              (select count(*)::int from minute_stats where subject_id = $1) as minute_stats,
+       select (select count(*)::int from minute_stats where subject_id = $1) as minute_stats,
               (select count(*)::int from workouts where subject_id = $1) as workouts,
               (select count(*)::int from sleep_segments where subject_id = $1) as sleep_segments,
               (select count(*)::int from sleep_daily where subject_id = $1) as sleep_nights,
@@ -240,7 +236,6 @@ export async function dataTotals(ctx: SubjectContext): Promise<DataTotals> {
     );
     const r = rows[0];
     return {
-      observationsApprox: Number(r.observations_approx),
       minuteStats: r.minute_stats,
       workouts: r.workouts,
       sleepSegments: r.sleep_segments,
@@ -258,25 +253,47 @@ export interface TypeCount {
   sharePct: number;
 }
 
+interface TypeCountRow {
+  hk_identifier: string;
+  n: string;
+}
+
 /**
- * Per-type observation counts. This is the one full index sweep of the sync
- * screen (~6.5M entries): cached per local day, first visitor pays it once.
+ * Per-type observation counts FOR THIS SUBJECT. This is the one full index
+ * sweep of the sync screen (~7M entries, 0.7-1s): cached per local day, the
+ * first visitor pays it once, and it is the single source for both the type
+ * table and the subject's observation total.
  */
-export async function topTypes(ctx: SubjectContext, limit = 8): Promise<TypeCount[]> {
-  const key = `toptypes:${ctx.subjectId}:${todayInZone(ctx.timezone)}`;
-  const all = await cached(key, 24 * 60 * 60_000, async () => {
-    interface Row {
-      hk_identifier: string;
-      n: string;
-    }
-    return heavyRead<Row>(
+async function typeCounts(ctx: SubjectContext): Promise<TypeCountRow[]> {
+  const key = `typecounts:${ctx.subjectId}:${todayInZone(ctx.timezone)}`;
+  return cached(key, 24 * 60 * 60_000, () =>
+    heavyRead<TypeCountRow>(
       `select t.hk_identifier, count(*) as n
        from observations o join metric_types t on t.id = o.type_id
        where o.subject_id = $1
        group by 1 order by n desc`,
       [ctx.subjectId]
-    );
-  });
+    )
+  );
+}
+
+/**
+ * Observations recorded FOR THIS SUBJECT. Derived from the sweep the sync
+ * screen already pays for, so it costs nothing more there and is never
+ * requested by the screens that only need the coverage bounds.
+ *
+ * It replaces a pg_class reltuples estimate that counted the whole table,
+ * every subject mixed: a member with a few thousand measures was shown the
+ * household's millions. An aggregate over other subjects is a leak like any
+ * other, and no cheapness argument survives it.
+ */
+export async function observationCount(ctx: SubjectContext): Promise<number> {
+  const rows = await typeCounts(ctx);
+  return rows.reduce((acc, r) => acc + Number(r.n), 0);
+}
+
+export async function topTypes(ctx: SubjectContext, limit = 8): Promise<TypeCount[]> {
+  const all = await typeCounts(ctx);
   const total = all.reduce((acc, r) => acc + Number(r.n), 0);
   return all.slice(0, limit).map((r) => ({
     hkIdentifier: r.hk_identifier,

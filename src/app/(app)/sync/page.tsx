@@ -30,6 +30,7 @@ import {
   ingestVolumesByDay,
   recentBatches,
   syncOverview,
+  observationCount,
   topTypes,
   type BatchInfo,
 } from '@/lib/queries/sync';
@@ -69,12 +70,13 @@ export default async function SyncPage() {
   const m: Messages = getMessages(locale);
   const tz = ctx.timezone;
 
-  const [overview, batches, volumes, totals, types] = await Promise.all([
+  const [overview, batches, volumes, totals, types, observations] = await Promise.all([
     syncOverview(ctx),
     recentBatches(ctx, 15),
     ingestVolumesByDay(ctx, 60),
     dataTotals(ctx),
     topTypes(ctx, 8),
+    observationCount(ctx),
   ]);
 
   const last30 = volumes.slice(30);
@@ -100,7 +102,7 @@ export default async function SyncPage() {
         )
       : null;
 
-  const totalMeasures = totals.observationsApprox + totals.minuteStats;
+  const totalMeasures = observations + totals.minuteStats;
   const dayLabel = (day: string | undefined) =>
     day ? fmtDay(day, locale, { day: 'numeric', month: 'short' }) : '';
 
