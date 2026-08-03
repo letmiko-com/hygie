@@ -320,7 +320,7 @@ export default async function DashboardPage({
         />
       </div>
 
-      <div style={{ ...gridPanel, gridTemplateColumns: 'minmax(0, 2fr) minmax(260px, 1fr)' }}>
+      <div className="hy-split" style={{ ...gridPanel, gridTemplateColumns: 'minmax(0, 2fr) minmax(260px, 1fr)' }}>
         <Panel>
           <PanelLabel
             trailing={
@@ -412,7 +412,7 @@ export default async function DashboardPage({
 
       {/* alignItems start: each panel keeps its own height, the heatmap is
           not stretched to the length of the timeline next to it. */}
-      <div style={{ ...gridPanel, gridTemplateColumns: 'minmax(0, auto) minmax(320px, 1fr)', alignItems: 'start' }}>
+      <div className="hy-split" style={{ ...gridPanel, gridTemplateColumns: 'minmax(0, auto) minmax(320px, 1fr)', alignItems: 'start' }}>
         <Panel style={{ overflowX: 'auto', minWidth: 0 }}>
           <PanelLabel
             trailing={
@@ -423,6 +423,9 @@ export default async function DashboardPage({
           >
             {m.dash.regularityTitle}
           </PanelLabel>
+          {/* 52 fixed-width columns: an intrinsic width that must scroll
+              inside the panel rather than widen the page. */}
+          <div className="hy-scrollx">
           <CalendarHeatmap
             values={heatValues}
             titles={heatTitles}
@@ -430,7 +433,8 @@ export default async function DashboardPage({
             dayLabels={m.dash.dayInitials}
             ariaLabel={m.dash.regularityTitle}
           />
-          <div style={{ display: 'flex', gap: 28, marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+          </div>
+          <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
             <StatTile label={m.dash.sessionsTile} value={fmtInt(heatSummary.count, locale)} />
             <StatTile label={m.dash.hoursTile} value={fmtNumber(heatSummary.totalDurationS / 3600, locale, 1)} />
             <StatTile

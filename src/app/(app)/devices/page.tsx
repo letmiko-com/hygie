@@ -159,7 +159,7 @@ export default async function DevicesPage() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 28, padding: '2px 4px' }}>
+      <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', padding: '2px 4px' }}>
         <StatTile label={m.devices.activeTile} value={fmtInt(active.length, locale)} />
         <StatTile label={m.devices.lastPushTile} value={lastPush ? fmtRelative(lastPush, locale, tz) : null} />
       </div>

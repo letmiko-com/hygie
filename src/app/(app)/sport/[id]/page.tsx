@@ -244,6 +244,7 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
 
       {(power.length > 1 || splits !== null) && (
         <div
+          className="hy-split"
           style={{
             display: 'grid',
             gridTemplateColumns: power.length > 1 && splits !== null ? '1fr 1fr' : '1fr',

@@ -1,0 +1,83 @@
+/*
+ * Small screens. Hygie is built for a real screen and stays that way above
+ * 900 px: nothing here touches the desktop layout. Below it, the app used to
+ * be unusable rather than merely cramped — the 212 px sidebar was fixed, the
+ * two-column panels never collapsed, and the document itself scrolled
+ * sideways.
+ *
+ * One breakpoint on purpose. Styles are inline throughout the components, so
+ * every rule below needs a class on the element it moves; that class is the
+ * only reason those elements carry one.
+ */
+
+@media (max-width: 900px) {
+  /* Shell: nav above the content instead of beside it. */
+  .hy-shell {
+    flex-direction: column;
+  }
+
+  .hy-sidebar {
+    width: 100% !important;
+    height: auto !important;
+    position: static !important;
+    flex-direction: row !important;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* The nav becomes one horizontal, scrollable strip. Section titles go: a
+     row of seven destinations does not need the word "Instance" above it. */
+  .hy-nav {
+    flex-direction: row !important;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex: 1;
+    scrollbar-width: none;
+  }
+
+  .hy-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hy-nav-section {
+    flex-direction: row !important;
+  }
+
+  .hy-nav-label {
+    display: none !important;
+  }
+
+  .hy-nav a {
+    white-space: nowrap;
+  }
+
+  /* Identity: initials and sign-out stay reachable, the address does not fit. */
+  .hy-user {
+    border-top: none !important;
+    padding: 0 !important;
+    flex: none;
+  }
+
+  .hy-user-text {
+    display: none !important;
+  }
+
+  .hy-main {
+    padding: 12px 12px 28px !important;
+  }
+
+  /* Panels laid out side by side stack. */
+  .hy-split {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Plots with an intrinsic width (52 weeks of heatmap) scroll inside their
+     panel; the page never scrolls sideways. */
+  .hy-scrollx {
+    overflow-x: auto;
+  }
+}

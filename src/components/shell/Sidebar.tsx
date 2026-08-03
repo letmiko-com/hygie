@@ -48,6 +48,7 @@ export function Sidebar({
   return (
     <nav
       aria-label="Hygie"
+      className="hy-sidebar"
       style={{
         width: 212,
         flex: 'none',
@@ -68,11 +69,11 @@ export function Sidebar({
         </Link>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, overflowY: 'auto' }}>
+      <div className="hy-nav" style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, overflowY: 'auto' }}>
         {sections.map((section, si) => (
-          <div key={si} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div key={si} className="hy-nav-section" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {section.label && (
-              <span className="hy-label" style={{ padding: '12px 8px 4px' }}>
+              <span className="hy-label hy-nav-label" style={{ padding: '12px 8px 4px' }}>
                 {section.label}
               </span>
             )}
@@ -107,6 +108,7 @@ export function Sidebar({
       </div>
 
       <div
+        className="hy-user"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -134,6 +136,7 @@ export function Sidebar({
           {initials}
         </span>
         <span
+          className="hy-user-text"
           style={{
             flex: 1,
             minWidth: 0,

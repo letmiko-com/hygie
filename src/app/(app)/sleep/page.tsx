@@ -420,7 +420,7 @@ export default async function SleepPage({
             </p>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(280px, 2fr)', gap: 12 }}>
+          <div className="hy-split" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(280px, 2fr)', gap: 12 }}>
             <Panel>
               <PanelLabel>{m.sleep.durationChart}</PanelLabel>
               <LineChart
