@@ -163,6 +163,10 @@ export const fr: Messages = {
     sessionsPerWeek: 'Séances / semaine',
     empty: 'Aucune séance sur la période',
     emptyHint: 'Les séances apparaissent ici une fois synchronisées ou backfillées.',
+    pagination: 'Pages de séances',
+    prevPage: 'Page précédente',
+    nextPage: 'Page suivante',
+    pageOf: (n: number, total: number) => `Page ${n} sur ${total}`,
   },
   session: {
     back: 'Retour à la liste',

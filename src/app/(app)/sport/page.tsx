@@ -2,6 +2,7 @@
 // band with trends, per-sport tabs (links, URL is the state), sessions
 // grouped by month, all under the shared time navigation.
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { SessionRow } from '@/components/data/SessionRow';
 import { StatTile } from '@/components/data/StatTile';
 import { TrendChip } from '@/components/data/TrendChip';
@@ -12,7 +13,7 @@ import { Panel, PanelLabel } from '@/components/ui/Panel';
 import { TimeNav } from '@/components/time/TimeNav';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
 import { fmtDay, fmtDuration, fmtHoursMinutes, fmtInt, fmtKcalFromKj, fmtKm } from '@/lib/format';
-import { getMessages, resolveLocale, type Locale } from '@/lib/i18n';
+import { getMessages, resolveLocale } from '@/lib/i18n';
 import { dataColor } from '@/lib/metrics';
 import { sportDisplay, sportLabel } from '@/lib/sports';
 import { getSubjectContext } from '@/lib/queries/context';
@@ -30,6 +31,9 @@ import {
 
 export const metadata: Metadata = { title: 'Sport · Hygie' };
 export const dynamic = 'force-dynamic';
+
+/** Sessions per page. All-time held ~1000 rows, i.e. 4.7 MB of HTML. */
+const PAGE_SIZE = 50;
 
 function pct(cur: number | null, prev: number | null): number | null {
   if (cur === null || prev === null || prev === 0) return null;
@@ -56,11 +60,17 @@ export default async function SportPage({
   const prevRange = comparisonRange(preset, range, elapsed);
   const rangeDays = daysBetween(range.fromDay, range.toDayExcl);
 
-  const [summary, prevSummary, counts, list, weeks, silhouette] = await Promise.all([
-    workoutSummary(ctx, range, sport),
+  const summary = await workoutSummary(ctx, range, sport);
+  // The requested page is clamped to what the period actually holds, so a
+  // hand-written ?page=999 shows the last page instead of an empty list.
+  const pageCount = Math.max(1, Math.ceil(summary.count / PAGE_SIZE));
+  const rawPage = Number.parseInt(typeof sp.page === 'string' ? sp.page : '', 10);
+  const pageNo = Number.isFinite(rawPage) ? Math.min(Math.max(rawPage, 1), pageCount) : 1;
+
+  const [prevSummary, counts, list, weeks, silhouette] = await Promise.all([
     workoutSummary(ctx, prevRange, sport),
     workoutCountsByActivity(ctx, range),
-    workoutsInRange(ctx, range, sport),
+    workoutsInRange(ctx, range, sport, { limit: PAGE_SIZE, offset: (pageNo - 1) * PAGE_SIZE }),
     rangeDays <= 200 ? weeklyVolume(ctx, range) : Promise.resolve(null),
     monthlyTrainingSilhouette(ctx),
   ]);
@@ -78,6 +88,13 @@ export default async function SportPage({
   const tabHref = (s?: string) => {
     const q = new URLSearchParams(timeQuery);
     if (s) q.set('sport', s);
+    const qs = q.toString();
+    return `/sport${qs ? `?${qs}` : ''}`;
+  };
+  const pageHref = (n: number) => {
+    const q = new URLSearchParams(timeQuery);
+    if (sport) q.set('sport', sport);
+    if (n > 1) q.set('page', String(n));
     const qs = q.toString();
     return `/sport${qs ? `?${qs}` : ''}`;
   };
@@ -254,6 +271,49 @@ export default async function SportPage({
           ))}
         </Panel>
       )}
+
+      {pageCount > 1 && (
+        <nav
+          aria-label={m.sport.pagination}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}
+        >
+          <PageLink href={pageHref(pageNo - 1)} disabled={pageNo === 1} label={m.sport.prevPage} />
+          <span
+            className="tnum"
+            style={{ font: '400 var(--text-sm)/1 var(--font-data)', color: 'var(--text-2)' }}
+          >
+            {m.sport.pageOf(pageNo, pageCount)}
+          </span>
+          <PageLink href={pageHref(pageNo + 1)} disabled={pageNo === pageCount} label={m.sport.nextPage} />
+        </nav>
+      )}
     </div>
+  );
+}
+
+/** A disabled page control must not stay clickable: it renders as plain text. */
+function PageLink({ href, disabled, label }: { href: string; disabled: boolean; label: string }) {
+  const style: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    height: 'var(--control-h-md)',
+    padding: '0 12px',
+    borderRadius: 'var(--r-md)',
+    border: '1px solid var(--border-strong)',
+    font: '500 var(--text-sm)/1 var(--font-ui)',
+    color: disabled ? 'var(--text-3)' : 'var(--text-1)',
+    opacity: disabled ? 0.5 : 1,
+  };
+  if (disabled) {
+    return (
+      <span aria-disabled style={style}>
+        {label}
+      </span>
+    );
+  }
+  return (
+    <Link href={href} className="hy-btn" style={{ ...style, textDecoration: 'none' }}>
+      {label}
+    </Link>
   );
 }
