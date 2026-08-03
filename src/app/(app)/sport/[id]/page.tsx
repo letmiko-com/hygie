@@ -4,10 +4,10 @@
 // and km splits appear only when the data exists. Facts, never inventions:
 // a missing distance reads "not measured", a missing elevation "no GPS".
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { LineChart } from '@/components/charts/LineChart';
 import { DataTable } from '@/components/data/DataTable';
-import { EmptyState } from '@/components/data/EmptyState';
 import { SourceBadge } from '@/components/data/SourceBadge';
 import { StatTile } from '@/components/data/StatTile';
 import { TrendChip } from '@/components/data/TrendChip';
@@ -64,22 +64,10 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
 
   const { id } = await params;
   const workout = /^[0-9a-f-]{36}$/i.test(id) ? await getWorkout(ctx, id) : null;
-  if (!workout) {
-    return (
-      <Panel>
-        <EmptyState
-          icon="search_off"
-          title={m.session.notFound}
-          hint={m.session.notFoundHint}
-          action={
-            <Link href="/sport" className="hy-btn" style={{ color: 'var(--accent-strong)', font: '500 var(--text-sm)/1 var(--font-ui)' }}>
-              {m.session.back}
-            </Link>
-          }
-        />
-      </Panel>
-    );
-  }
+  // A session that does not exist for this subject is a 404, not a 200
+  // carrying an apology: not-found.tsx renders the same panel with the right
+  // status. Unparseable ids never reach the database.
+  if (!workout) notFound();
 
   const sport = sportDisplay(workout.activityType);
   const color = dataColor(sport.family);
