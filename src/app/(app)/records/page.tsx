@@ -13,7 +13,7 @@ import { TrendChip } from '@/components/data/TrendChip';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { Panel, PanelLabel } from '@/components/ui/Panel';
-import { fmtDay, fmtDuration, fmtInt, fmtNumber, fmtPace } from '@/lib/format';
+import { fmtDuration, fmtInt, fmtNumber, fmtPace } from '@/lib/format';
 import { getMessages, resolveLocale, type Locale, type Messages } from '@/lib/i18n';
 import { dataColor } from '@/lib/metrics';
 import { sportDisplay, sportLabel } from '@/lib/sports';
@@ -214,7 +214,10 @@ export default async function RecordsPage() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 5fr) minmax(280px, 4fr)', gap: 12 }}>
+      {/* The table needs ~580 px for its five non-wrapping columns; at 5fr/4fr
+          it got 502 px on a 1175 px viewport and the trend column had to be
+          scrolled to. Progression keeps enough width to stay readable. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 7fr) minmax(260px, 4fr)', gap: 12 }}>
         <Panel padding="6px 10px 10px">
           <div style={{ padding: '8px 2px 0' }}>
             <PanelLabel>{m.records.tableTitle}</PanelLabel>

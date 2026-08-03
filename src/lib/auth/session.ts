@@ -10,7 +10,7 @@ export function hashToken(raw: string): string {
   return createHash('sha256').update(raw).digest('hex');
 }
 
-function useSecureCookies(): boolean {
+function secureCookiesEnabled(): boolean {
   return (process.env.HYGIE_BASE_URL ?? '').startsWith('https://');
 }
 
@@ -19,11 +19,11 @@ function useSecureCookies(): boolean {
  * the __Secure- prefix follows the deployment scheme derived from HYGIE_BASE_URL.
  */
 export function sessionCookieName(): string {
-  return useSecureCookies() ? '__Secure-hygie.session-token' : 'hygie.session-token';
+  return secureCookiesEnabled() ? '__Secure-hygie.session-token' : 'hygie.session-token';
 }
 
 export function sessionCookieSecure(): boolean {
-  return useSecureCookies();
+  return secureCookiesEnabled();
 }
 
 /**
