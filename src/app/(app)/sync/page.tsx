@@ -34,6 +34,7 @@ import {
   topTypes,
   type BatchInfo,
 } from '@/lib/queries/sync';
+import { dayInZone } from '@/lib/queries/time';
 
 export const metadata: Metadata = { title: 'Synchronisation · Hygie' };
 export const dynamic = 'force-dynamic';
@@ -193,10 +194,13 @@ export default async function SyncPage() {
               </div>
               <div style={{ display: 'flex', gap: 24 }}>
                 <StatTile label={m.sync.deviceKey} value={`${d.keyPrefix}…`} sub={d.platform ?? undefined} />
+                {/* The subtitle dates what the tile measures: the last push.
+                    It carried the PAIRING date, read as "seen on that day",
+                    and in UTC, so a push at 01:00 local dated the day before. */}
                 <StatTile
                   label={m.sync.lastSeen}
                   value={d.lastSeenAt ? fmtRelative(d.lastSeenAt, locale, tz) : null}
-                  sub={d.createdAt ? fmtDay(d.createdAt.toISOString().slice(0, 10), locale) : undefined}
+                  sub={d.lastSeenAt ? fmtDay(dayInZone(d.lastSeenAt, tz), locale) : undefined}
                 />
               </div>
             </Panel>
