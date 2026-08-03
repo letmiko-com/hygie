@@ -19,6 +19,25 @@ function lastDay(range: DayRange): string {
   return new Date(t).toISOString().slice(0, 10);
 }
 
+/**
+ * Evenly spaced labels for a day axis, never more than the axis has days:
+ * a one-day window printed "3 août" in all five slots, which says nothing
+ * about the axis and reads as five distinct dates.
+ */
+export function dayAxisLabels(
+  days: string[],
+  locale: Locale,
+  slots: number,
+  options: Intl.DateTimeFormatOptions
+): string[] {
+  if (days.length === 0 || slots < 1) return [];
+  const count = Math.min(slots, days.length);
+  const last = days.length - 1;
+  const indexes =
+    count === 1 ? [last] : Array.from({ length: count }, (_, i) => Math.round((i / (count - 1)) * last));
+  return [...new Set(indexes)].map((i) => fmt(days[i], locale, options));
+}
+
 export function rangeLabel(preset: Preset | null, range: DayRange, locale: Locale): string {
   const last = lastDay(range);
   if (preset === '24h' || range.fromDay === last) {

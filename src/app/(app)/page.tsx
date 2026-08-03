@@ -36,6 +36,7 @@ import {
   type DayRange,
 } from '@/lib/queries/time';
 import { parseTimeParams, type TimeSearchParams } from '@/lib/queries/time-params';
+import { dayAxisLabels } from '@/lib/time-format';
 import {
   monthlyTrainingSilhouette,
   weeklyVolume,
@@ -214,11 +215,12 @@ export default async function DashboardPage({
             : null;
         })()
       : null;
-  const chartXLabels = [0, 0.25, 0.5, 0.75, 1].map((f) => {
-    const idx = Math.min(chartLen - 1, Math.round(f * (chartLen - 1)));
-    const day = hrCur.points[idx]?.day;
-    return day ? fmtDay(day, locale, chartLen > 366 ? { month: 'short', year: '2-digit' } : { day: 'numeric', month: 'short' }) : '';
-  });
+  const chartXLabels = dayAxisLabels(
+    hrCur.points.map((p) => p.day),
+    locale,
+    5,
+    chartLen > 366 ? { month: 'short', year: '2-digit' } : { day: 'numeric', month: 'short' }
+  );
 
   // --- today panel -------------------------------------------------------------
   const todayKj = todayEnergy.points[0]?.value ?? null;
@@ -334,6 +336,7 @@ export default async function DashboardPage({
             height={190}
             ariaLabel={m.dash.hrChartTitle}
             emptyLabel={m.common.noDataOnPeriod}
+            yFormat={(v, digits) => fmtNumber(v, locale, digits)}
             xLabels={chartXLabels}
             series={[
               {
