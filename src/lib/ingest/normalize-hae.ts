@@ -794,15 +794,34 @@ async function normalizeWorkout(ctx: Ctx, w: HaeWorkout): Promise<void> {
   const sourceId = await getSourceId(ctx, seriesSource);
 
   // Stable external identity first: replays must not create a second workout.
+  // Scoped to the device's subject, without exception: the external id comes
+  // from the payload, so an unscoped lookup would let a device paired with one
+  // subject adopt another subject's workout and write points into it
+  // (workout_points and workout_route_points carry no subject_id of their own).
   const known = await ctx.client.query<{ workout_id: string }>(
-    `select workout_id from workout_external_ids where namespace = 'hae' and external_id = $1`,
-    [w.id]
+    `select e.workout_id from workout_external_ids e
+     join workouts w on w.id = e.workout_id
+     where e.namespace = 'hae' and e.external_id = $1 and w.subject_id = $2`,
+    [w.id, ctx.batch.subject_id]
   );
   let workoutId: string;
   if (known.rows.length > 0) {
     workoutId = known.rows[0].workout_id;
     wc.already_known = (wc.already_known ?? 0) + 1;
   } else {
+    // Same external id under another subject: never adopted, never a silent
+    // drop either. The workout below is created for this subject alone, and the
+    // collision is counted so it can be seen.
+    const foreign = await ctx.client.query(
+      `select 1 from workout_external_ids e
+       join workouts w on w.id = e.workout_id
+       where e.namespace = 'hae' and e.external_id = $1 and w.subject_id <> $2
+       limit 1`,
+      [w.id, ctx.batch.subject_id]
+    );
+    if ((foreign.rowCount ?? 0) > 0) {
+      wc.external_id_other_subject = (wc.external_id_other_subject ?? 0) + 1;
+    }
     // Fingerprint match against the XML backfill (heuristic, not identity):
     // adopt only a single unambiguous candidate without an hae identity yet.
     const candidates = await ctx.client.query<{ id: string }>(
