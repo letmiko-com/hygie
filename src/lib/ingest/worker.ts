@@ -9,7 +9,7 @@
 // 'rollups_ready' is earned, not declared: the normalize transaction queues the
 // UTC hours it touched (src/lib/rollups.ts) and step 3 rebuilds them all first.
 // When idle the loop drains the ranges queued by everyone else (cutovers, XML
-// backfill).
+// backfill) and, hourly, rotates raw bodies past their retention.
 import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, rename, stat, unlink } from 'node:fs/promises';
 import { hostname } from 'node:os';
@@ -343,11 +343,61 @@ function sleep(ms: number, s: WorkerState): Promise<void> {
 
 const MAINTENANCE_EVERY_MS = 60 * 60 * 1000;
 
+const PURGE_CHUNK = 500;
+
+/**
+ * Rotation of the raw bodies (architecture §3.4): the compressed payload is a
+ * 30-day replay window, not an archive. Past purge_after the FILE is deleted and
+ * only then the row is stamped, so a crash in between simply retries (a missing
+ * file is a success, not an error). The batch row itself is never touched:
+ * checksums, counts and status stay for audit.
+ * Only settled batches are eligible: a batch still waiting to be processed keeps
+ * its body whatever its age, since deleting it would destroy the very data the
+ * worker has not managed to ingest yet.
+ */
+async function purgeExpiredRawBodies(): Promise<void> {
+  const db = getDb();
+  const { rows } = await db.query<{ id: string; raw_path: string }>(
+    `select id, raw_path from ingest_batches
+     where raw_purged_at is null
+       and purge_after < current_date
+       and status in ('rollups_ready', 'failed')
+     order by purge_after
+     limit ${PURGE_CHUNK}`
+  );
+  let purged = 0;
+  let missing = 0;
+  for (const row of rows) {
+    try {
+      await unlink(resolveRawPath(row.raw_path));
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        console.error(
+          `[worker] purge: cannot delete body of batch ${row.id}: ${err instanceof Error ? err.message : 'unknown error'}`
+        );
+        continue;
+      }
+      missing++;
+    }
+    await db.query(
+      'update ingest_batches set raw_purged_at = now() where id = $1 and raw_purged_at is null',
+      [row.id]
+    );
+    purged++;
+  }
+  if (purged > 0) {
+    console.log(
+      `[worker] maintenance: purged ${purged} expired raw bodies (${missing} already gone)`
+    );
+  }
+}
+
 /**
  * Hourly housekeeping piggybacked on the worker loop: expired database
  * sessions and consumed-or-stale magic-link tokens have no reason to
  * outlive their expiry (revocation stays immediate either way; this only
- * keeps the auth tables from growing forever). Logs carry counts only.
+ * keeps the auth tables from growing forever), and raw bodies past their
+ * retention. Logs carry counts only.
  */
 async function runMaintenance(): Promise<void> {
   const db = getDb();
@@ -358,6 +408,7 @@ async function runMaintenance(): Promise<void> {
       `[worker] maintenance: purged ${sessions.rowCount ?? 0} expired sessions, ${tokens.rowCount ?? 0} expired tokens`
     );
   }
+  await purgeExpiredRawBodies();
 }
 
 async function runLoop(workerId: string): Promise<void> {

@@ -65,7 +65,12 @@ is an in-process loop; no third service.
    `avgHeartRate`/`maxHeartRate` are recovery values (2 min post-workout) — ignored;
    blood pressure arrives fused (split into the two HK types); HAE `sleep_analysis` is a
    daily summary (stored in `sleep_daily`, distinct from raw `sleep_segments`).
-4. Raw bodies are kept compressed 30 days (rotation by `purge_after`), replayable.
+4. Raw bodies are kept compressed 30 days, replayable. Rotation runs in the worker's
+   hourly maintenance: for settled batches (`rollups_ready`/`failed`) past `purge_after`
+   the file is deleted first, then the row is stamped `raw_purged_at` — a crash in
+   between just retries, a missing file counts as done. The batch row survives forever
+   (checksums, counts, status): rotation frees bytes, never audit trail. A batch still
+   in flight keeps its body whatever its age.
 5. Sync status endpoint distinguishes "batch received" from "data visible"
    (status ≥ `normalized`).
 
