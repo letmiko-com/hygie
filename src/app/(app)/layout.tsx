@@ -8,15 +8,18 @@ import { auth, signOut } from '@/auth';
 import { EmptyState } from '@/components/data/EmptyState';
 import { Sidebar, type NavSection } from '@/components/shell/Sidebar';
 import { getMessages } from '@/lib/i18n';
-import { getSubjectContext } from '@/lib/queries/context';
+import { getSessionUser, getSubjectContext } from '@/lib/queries/context';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const session = await auth();
   const email = session?.user?.email;
   if (!email) redirect('/login');
 
-  const ctx = await getSubjectContext();
-  const m = getMessages(ctx?.locale);
+  const [ctx, user] = await Promise.all([getSubjectContext(), getSessionUser()]);
+  // The language is a property of the ACCOUNT, not of its health scope: a
+  // pure-admin account has no subject context and must still be served in
+  // its own language.
+  const m = getMessages(ctx?.locale ?? user?.locale);
 
   async function logout() {
     'use server';
