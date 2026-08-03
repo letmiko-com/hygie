@@ -81,6 +81,20 @@ secondary indexes → first full backup → then enable PITR.
 - Rollups exist ONLY for all-time/multi-year views (measured: 1.24s raw → 107ms via hourly
   rollup). Hourly UTC rollups; daily views aggregate full hours and compute the two partial edge hours from raw, so half-hour timezones stay exact. Rollups are derived and rebuildable,
   never the source of truth.
+- `rollup_hourly` is built by one SQL function, `rollup_rebuild_range(subject, type,
+  from, to)` (migration 0002), which applies the same truth rules as the read layer
+  (two-regime rule, one winning source per UTC hour before the cutover) and is used by
+  both the worker and the rebuild script, so the two cannot drift.
+- Invalidation is exact and transactional: whoever writes a source row queues the UTC
+  hours it touched in `rollup_dirty_ranges` **inside the same transaction** (committed
+  write ⟺ committed invalidation). Deriving the hours from a batch's `declared_range`
+  would recompute untouched hours and still miss the ones a cutover invalidates outside
+  it. The worker drains its batch's ranges before the batch reaches `rollups_ready`, and
+  drains everyone else's when idle. Category types are never rolled up (no numeric value);
+  `min`/`max` are meaningful for raw types only.
+- Bulk writes that bypass the worker (XML backfill, hand-moved cutover) invalidate
+  nothing on their own: the operator runs `npm run rollups -- --subject <uuid>`
+  afterwards (idempotent, one transaction per month per type).
 - p95 budget for dashboard queries: 500 ms, re-verified with EXPLAIN ANALYZE when the
   schema evolves.
 

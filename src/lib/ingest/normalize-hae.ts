@@ -13,6 +13,12 @@ import { gunzipSync } from 'node:zlib';
 import type pg from 'pg';
 import { getDataDir } from '@/lib/ingest/receive';
 import {
+  enqueueDirtyRanges,
+  markDirtyHour,
+  type DirtyHours,
+  type DirtyRange,
+} from '@/lib/rollups';
+import {
   isHaePayload,
   type HaeMetric,
   type HaePayload,
@@ -265,6 +271,8 @@ type MetricCounters = Record<string, number>;
 export interface NormalizeCounts {
   metrics: Record<string, MetricCounters>;
   workouts?: MetricCounters;
+  /** Invalidation ranges queued for the rollup builder (see src/lib/rollups.ts). */
+  dirty_ranges?: number;
 }
 
 function bump(counts: NormalizeCounts, name: string, key: string, by = 1): void {
@@ -288,6 +296,10 @@ interface Ctx {
   subjectTimezone: string;
   sourceIds: Map<string, number>;
   unitIds: Map<string, number>;
+  // Rollup invalidation, flushed to rollup_dirty_ranges in this transaction:
+  // exactly the UTC hours whose sources changed, never a whole batch range.
+  dirtyHours: DirtyHours;
+  dirtyRanges: DirtyRange[];
 }
 
 async function getSourceId(ctx: Ctx, rawName: string | undefined): Promise<number> {
@@ -543,19 +555,22 @@ async function normalizeRawRegime(ctx: Ctx, staged: StagedRaw[]): Promise<void> 
     }
   }
 
-  // Insert the leftovers as new hae-origin observations.
-  const inserted = await ctx.client.query<{ type_id: number }>(
+  // Insert the leftovers as new hae-origin observations. Every inserted row
+  // dirties its UTC hour: dedup and XML matching drop rows that change nothing,
+  // and those must not trigger a rollup rebuild.
+  const inserted = await ctx.client.query<{ type_id: number; start_ts: Date }>(
     `insert into observations
        (subject_id, type_id, source_id, start_ts, value, value_key,
         tz_offset_min, origin, original_unit_id, ingest_batch_id)
      select $1, type_id, source_id, start_ts, value, value_key,
             tz_offset_min, 'hae', original_unit_id, $2
      from staging_hae
-     returning type_id`,
+     returning type_id, start_ts`,
     [ctx.batch.subject_id, ctx.batch.id]
   );
   for (const row of inserted.rows) {
     bump(ctx.counts, nameByTypeId.get(row.type_id) ?? String(row.type_id), 'inserted');
+    markDirtyHour(ctx.dirtyHours, row.type_id, row.start_ts);
   }
 }
 
@@ -590,12 +605,34 @@ async function normalizeMinuteRegime(ctx: Ctx, points: MinutePoint[]): Promise<v
     // Cutover bootstrap: the first device ever seen for (subject, type) becomes
     // authoritative, cutover at its earliest minute. Monotone: never moved here.
     const minTs = new Date(Math.min(...pts.map((p) => p.minuteTs.getTime())));
-    await ctx.client.query(
+    const cutCreated = await ctx.client.query<{ cutover_ts: Date }>(
       `insert into channel_cutovers (subject_id, type_id, cutover_ts, device_id)
        values ($1, $2, date_trunc('minute', $3::timestamptz), $4)
-       on conflict (subject_id, type_id) do nothing`,
+       on conflict (subject_id, type_id) do nothing
+       returning cutover_ts`,
       [ctx.batch.subject_id, typeId, minTs, ctx.batch.device_id]
     );
+    if (cutCreated.rows.length > 0) {
+      // A brand new cutover retroactively excludes every XML record at or after
+      // it from the cumulative truth (architecture §2). Those hours were rolled
+      // up from the raw channel: invalidate them, they are outside this batch.
+      const cutoverTs = cutCreated.rows[0].cutover_ts;
+      bump(ctx.counts, name, 'cutover_created');
+      const { rows } = await ctx.client.query<{ max_ts: Date | null }>(
+        `select max(start_ts) as max_ts from observations
+         where subject_id = $1 and type_id = $2 and origin = 'health_xml'
+           and start_ts >= $3`,
+        [ctx.batch.subject_id, typeId, cutoverTs]
+      );
+      const maxTs = rows[0]?.max_ts ?? null;
+      if (maxTs !== null) {
+        ctx.dirtyRanges.push({
+          typeId,
+          fromTs: cutoverTs,
+          toTs: new Date(maxTs.getTime() + 3_600_000),
+        });
+      }
+    }
     const cut = await ctx.client.query<{ cutover_ts: Date; device_id: string }>(
       'select cutover_ts, device_id from channel_cutovers where subject_id = $1 and type_id = $2',
       [ctx.batch.subject_id, typeId]
@@ -615,7 +652,7 @@ async function normalizeMinuteRegime(ctx: Ctx, points: MinutePoint[]): Promise<v
           const b = 4 + j * 3;
           return `($1, $2::smallint, $${b + 1}::timestamptz, $${b + 2}::float8, $${b + 3}::smallint, $3, $4)`;
         });
-        const res = await ctx.client.query<{ inserted: boolean }>(
+        const res = await ctx.client.query<{ inserted: boolean; minute_ts: Date }>(
           `insert into minute_stats
              (subject_id, type_id, minute_ts, value, source_id, device_id, ingest_batch_id)
            values ${tuples.join(',')}
@@ -624,12 +661,19 @@ async function normalizeMinuteRegime(ctx: Ctx, points: MinutePoint[]): Promise<v
                  device_id = excluded.device_id, ingest_batch_id = excluded.ingest_batch_id,
                  updated_at = now()
              where minute_stats.value is distinct from excluded.value
-           returning (xmax = 0) as inserted`,
+           returning (xmax = 0) as inserted, minute_ts`,
           params
         );
         let ins = 0;
         let upd = 0;
-        for (const r of res.rows) (r.inserted ? ins++ : upd++);
+        // Only rows that actually changed come back (the DO UPDATE ... WHERE
+        // filters re-emissions of an identical value), so a replay dirties
+        // nothing and the rollups are left alone.
+        for (const r of res.rows) {
+          if (r.inserted) ins++;
+          else upd++;
+          markDirtyHour(ctx.dirtyHours, typeId, r.minute_ts);
+        }
         bump(ctx.counts, name, 'minute_inserted', ins);
         bump(ctx.counts, name, 'minute_updated', upd);
         bump(ctx.counts, name, 'minute_duplicate', slice.length - res.rows.length);
@@ -995,6 +1039,8 @@ export async function normalizeHaePayload(
     subjectTimezone: subjRes.rows[0].timezone,
     sourceIds: new Map(),
     unitIds: new Map(),
+    dirtyHours: new Map(),
+    dirtyRanges: [],
   };
 
   const metrics = payload.data.metrics ?? [];
@@ -1180,6 +1226,19 @@ export async function normalizeHaePayload(
   for (const w of workouts) {
     await normalizeWorkout(ctx, w);
   }
+
+  // Rollup invalidation, in this very transaction: the queue can never claim a
+  // change that was rolled back, nor miss one that was committed. Workouts and
+  // sleep_daily are not rolled up (no hourly numeric series), so they enqueue
+  // nothing.
+  const queued = await enqueueDirtyRanges(
+    client,
+    batch.subject_id,
+    batch.id,
+    ctx.dirtyHours,
+    ctx.dirtyRanges
+  );
+  if (queued > 0) counts.dirty_ranges = queued;
 
   return counts;
 }

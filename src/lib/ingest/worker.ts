@@ -6,6 +6,10 @@
 // lease; advisory lock per (subject, type) during normalization (taken inside the
 // normalize transaction); no new claims after SIGTERM; boot-time reconciliation of
 // orphan files and rows whose file is gone.
+// 'rollups_ready' is earned, not declared: the normalize transaction queues the
+// UTC hours it touched (src/lib/rollups.ts) and step 3 rebuilds them all first.
+// When idle the loop drains the ranges queued by everyone else (cutovers, XML
+// backfill).
 import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, rename, stat, unlink } from 'node:fs/promises';
 import { hostname } from 'node:os';
@@ -18,6 +22,7 @@ import {
   readAndValidateBatchFile,
   resolveRawPath,
 } from '@/lib/ingest/normalize-hae';
+import { drainRollupQueue } from '@/lib/rollups';
 
 const LEASE = "interval '5 minutes'";
 const DEFAULT_POLL_MS = 5_000;
@@ -100,7 +105,8 @@ async function setStatus(
     `update ingest_batches
      set status = $2, status_updated_at = now(), error = null,
          locked_until = now() + ${LEASE},
-         counts = coalesce($4::jsonb, counts),
+         counts = case when $4::jsonb is null then counts
+                       else coalesce(counts, '{}'::jsonb) || $4::jsonb end,
          normalized_at = case when $5 then now() else normalized_at end,
          finished_at = case when $6 then now() else finished_at end
      where id = $1 and locked_by = $3`,
@@ -112,6 +118,15 @@ async function setStatus(
       opts.normalized === true,
       opts.finished === true,
     ]
+  );
+}
+
+/** Pushes the lease back while a long step is still making progress. */
+async function renewLease(batchId: string, workerId: string): Promise<void> {
+  await getDb().query(
+    `update ingest_batches set locked_until = now() + ${LEASE}
+     where id = $1 and locked_by = $2`,
+    [batchId, workerId]
   );
 }
 
@@ -197,11 +212,34 @@ async function processBatch(batch: ClaimedBatch, workerId: string): Promise<void
       status = 'normalized';
       console.log(`[worker] batch ${batch.id} normalized`);
     } else {
-      // Step 3: rollups. TODO(rollups): enqueue rollup_dirty_ranges from the batch's
-      // declared_range and let the rollup builder consume them. No-op for now by
-      // design: rollups are derived and rebuildable, never blocking ingestion.
-      await setStatus(batch.id, 'rollups_ready', workerId, { finished: true });
-      console.log(`[worker] batch ${batch.id} rollups_ready`);
+      // Step 3: rollups. The normalize transaction queued the exact UTC hours it
+      // touched in rollup_dirty_ranges, tagged with this batch. Drain them all
+      // before claiming 'rollups_ready': the status means "this batch's data is
+      // in the rollups", not "we decided not to look".
+      let ranges = 0;
+      let hours = 0;
+      let complete = true;
+      for (;;) {
+        const res = await drainRollupQueue({ batchId: batch.id, limit: 100 });
+        ranges += res.ranges;
+        hours += res.hours;
+        if (res.ranges === 0) break;
+        if (s.stopping) {
+          // Shutdown mid-drain: the batch stays 'normalized' (its data is already
+          // visible) and the next process finishes the rollups.
+          complete = false;
+          break;
+        }
+        await renewLease(batch.id, workerId);
+      }
+      if (!complete) break;
+      await setStatus(batch.id, 'rollups_ready', workerId, {
+        counts: { rollups: { ranges, hours } },
+        finished: true,
+      });
+      console.log(
+        `[worker] batch ${batch.id} rollups_ready (${ranges} ranges, ${hours} hours)`
+      );
       break;
     }
   }
@@ -348,6 +386,16 @@ async function runLoop(workerId: string): Promise<void> {
           await markFailure(claimed, workerId, err);
         }
         continue; // drain the queue before sleeping
+      }
+      // Idle: consume the invalidation ranges nobody is waiting on (channel
+      // cutovers, XML backfill, manual rebuild requests). One pass per turn so a
+      // large queue never starves an incoming batch.
+      const rollups = await drainRollupQueue({ limit: 100 });
+      if (rollups.ranges > 0) {
+        console.log(
+          `[worker] rollups: ${rollups.ranges} queued ranges rebuilt (${rollups.hours} hours)`
+        );
+        continue;
       }
     } catch (err) {
       console.error(
