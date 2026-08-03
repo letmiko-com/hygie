@@ -24,6 +24,7 @@ export interface TimeNavLabels {
   from: string;
   to: string;
   apply: string;
+  invalidRange: string;
   prevPeriod: string;
   nextPeriod: string;
   vsWord: string;
@@ -54,6 +55,7 @@ export function TimeNav({
   const router = useRouter();
   const pathname = usePathname();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [rangeError, setRangeError] = useState(false);
   const fromRef = useRef<HTMLInputElement>(null);
   const toRef = useRef<HTMLInputElement>(null);
 
@@ -93,7 +95,11 @@ export function TimeNav({
   function applyCustom() {
     const from = fromRef.current?.value;
     const to = toRef.current?.value;
-    if (!from || !to || from > to) return;
+    if (!from || !to || from > to) {
+      setRangeError(true);
+      return;
+    }
+    setRangeError(false);
     setPickerOpen(false);
     push({ from, to, p: null, a: null });
   }
@@ -207,8 +213,9 @@ export function TimeNav({
             right: 0,
             zIndex: 20,
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'flex-end',
-            gap: 10,
+            gap: 8,
             padding: 12,
             background: 'var(--surface)',
             border: '1px solid var(--border-strong)',
@@ -216,37 +223,50 @@ export function TimeNav({
             boxShadow: 'var(--shadow-2)',
           }}
         >
-          {(
-            [
-              [labels.from, fromRef, range.fromDay],
-              [labels.to, toRef, lastDayOf(range)],
-            ] as const
-          ).map(([label, ref, def]) => (
-            <label key={label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span className="hy-label">{label}</span>
-              <input
-                ref={ref}
-                type="date"
-                defaultValue={def}
-                min={firstDataDay ?? undefined}
-                max={today}
-                className="tnum"
-                style={{
-                  height: 'var(--control-h-md)',
-                  padding: '0 8px',
-                  borderRadius: 'var(--r-md)',
-                  border: '1px solid var(--border-strong)',
-                  background: 'var(--bg)',
-                  color: 'var(--text-1)',
-                  font: '400 var(--text-sm)/1 var(--font-data)',
-                  colorScheme: 'light dark',
-                }}
-              />
-            </label>
-          ))}
-          <button type="button" className="hy-btn" onClick={applyCustom} style={navBtn({ background: 'var(--accent)', color: 'var(--on-accent)', border: '1px solid transparent' })}>
-            {labels.apply}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+            {(
+              [
+                [labels.from, fromRef, range.fromDay],
+                [labels.to, toRef, lastDayOf(range)],
+              ] as const
+            ).map(([label, ref, def]) => (
+              <label key={label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span className="hy-label">{label}</span>
+                <input
+                  ref={ref}
+                  type="date"
+                  defaultValue={def}
+                  min={firstDataDay ?? undefined}
+                  max={today}
+                  className="tnum"
+                  onChange={() => setRangeError(false)}
+                  style={{
+                    height: 'var(--control-h-md)',
+                    padding: '0 8px',
+                    borderRadius: 'var(--r-md)',
+                    border: '1px solid var(--border-strong)',
+                    background: 'var(--bg)',
+                    color: 'var(--text-1)',
+                    font: '400 var(--text-sm)/1 var(--font-data)',
+                    colorScheme: 'light dark',
+                  }}
+                />
+              </label>
+            ))}
+            <button type="button" className="hy-btn" onClick={applyCustom} style={navBtn({ background: 'var(--accent)', color: 'var(--on-accent)', border: '1px solid transparent' })}>
+              {labels.apply}
+            </button>
+          </div>
+          {/* Without this, an end date before the start date made Apply do
+              nothing at all: no navigation, no reason given. */}
+          {rangeError && (
+            <span
+              role="alert"
+              style={{ maxWidth: 260, textAlign: 'right', font: '400 var(--text-xs)/1.3 var(--font-ui)', color: 'var(--danger)' }}
+            >
+              {labels.invalidRange}
+            </span>
+          )}
         </div>
       )}
 
