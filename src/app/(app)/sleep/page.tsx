@@ -98,8 +98,13 @@ function aggregate(nights: SleepNight[], tz: string): Aggregates {
   return {
     durationH: mean(views.map((v) => v.totalH)),
     deepH: mean(views.map((v) => v.deepH)),
+    // A dispersion needs at least two observations. One measured night gives
+    // a mean absolute deviation of exactly 0, which reads as perfect
+    // regularity and is pure artefact: no dispersion is an absence.
     bedtimeMadMin:
-      bedMean === null ? null : mean(bedtimes.map((b) => Math.abs(b - bedMean))),
+      bedMean === null || bedtimes.length < 2
+        ? null
+        : mean(bedtimes.map((b) => Math.abs(b - bedMean))),
     bedtimeMeanMin: bedMean,
   };
 }
