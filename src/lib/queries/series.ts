@@ -45,7 +45,12 @@ interface SeriesRow {
   n: number;
 }
 
-function valueExpr(aggregation: Aggregation): string {
+/**
+ * SQL reducer for one bucket of a raw_discrete metric. Exported so the
+ * explorer's hour/minute buckets stay strictly the same reduction as the
+ * daily series: two implementations would drift.
+ */
+export function valueExpr(aggregation: Aggregation): string {
   switch (aggregation) {
     case 'sum':
       return 'sum(o.value)';
