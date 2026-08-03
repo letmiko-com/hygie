@@ -4,7 +4,6 @@
 // "sync now" button (HAE pushes; the server cannot trigger a sync).
 import type { Metadata } from 'next';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
-import { Icon } from '@/components/ui/Icon';
 import { Panel, PanelLabel } from '@/components/ui/Panel';
 import { DataTable } from '@/components/data/DataTable';
 import { EmptyState } from '@/components/data/EmptyState';
@@ -14,7 +13,6 @@ import { SyncBadge, type SyncState } from '@/components/data/SyncBadge';
 import { TrendChip } from '@/components/data/TrendChip';
 import { BarChart } from '@/components/charts/BarChart';
 import {
-  ABSENT,
   fmtBytes,
   fmtCompact,
   fmtDay,

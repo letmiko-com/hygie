@@ -14,7 +14,6 @@ import { TimeNav } from '@/components/time/TimeNav';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
 import { fmtDay, fmtHoursMinutes, fmtInt, fmtNumber } from '@/lib/format';
 import { getMessages, resolveLocale, type Locale, type Messages } from '@/lib/i18n';
-import { dataColor } from '@/lib/metrics';
 import { getSubjectContext } from '@/lib/queries/context';
 import { sleepNights, type SleepNight } from '@/lib/queries/sleep';
 import { dataTotals } from '@/lib/queries/sync';
@@ -24,7 +23,6 @@ import {
   daysBetween,
   elapsedDays,
   todayInZone,
-  type DayRange,
 } from '@/lib/queries/time';
 import { parseTimeParams, type TimeSearchParams } from '@/lib/queries/time-params';
 import { dayAxisLabels } from '@/lib/time-format';

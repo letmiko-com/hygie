@@ -30,7 +30,6 @@ import { dataTotals } from '@/lib/queries/sync';
 import {
   addDays,
   comparisonRange,
-  daysBetween,
   elapsedDays,
   todayInZone,
   type DayRange,
