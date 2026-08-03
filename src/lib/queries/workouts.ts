@@ -70,10 +70,17 @@ const AVG_HR_LATERAL = `
       and o.start_ts >= w.start_ts and o.start_ts < w.end_ts
   ) hr`;
 
+/**
+ * One page of sessions, newest first. The page is a hard requirement, not a
+ * comfort: an all-time window holds ~1000 sessions, and rendering them at
+ * once produced a 4.7 MB HTML document. The screen's tiles and tab counts
+ * come from aggregates, so they keep covering the whole period.
+ */
 export async function workoutsInRange(
   ctx: SubjectContext,
   range: DayRange,
-  activityType?: string
+  activityType?: string,
+  page?: { limit: number; offset: number }
 ): Promise<WorkoutListItem[]> {
   const hrType = await getMetricType('HKQuantityTypeIdentifierHeartRate');
   const params: unknown[] = [ctx.subjectId, hrType.id, range.fromDay, range.toDayExcl, ctx.timezone];
@@ -81,6 +88,11 @@ export async function workoutsInRange(
   if (activityType) {
     params.push(activityType);
     filter = `and w.activity_type = $${params.length}`;
+  }
+  let paging = '';
+  if (page) {
+    params.push(page.limit, page.offset);
+    paging = `limit $${params.length - 1} offset $${params.length}`;
   }
   const rows = await heavyRead<WorkoutRow>(
     `select w.id, w.activity_type, s.name as source_name, w.start_ts, w.end_ts,
@@ -93,7 +105,8 @@ export async function workoutsInRange(
        and w.start_ts >= ($3::date::timestamp at time zone $5)
        and w.start_ts < ($4::date::timestamp at time zone $5)
        ${filter}
-     order by w.start_ts desc`,
+     order by w.start_ts desc
+     ${paging}`,
     params
   );
   return rows.map(mapItem);

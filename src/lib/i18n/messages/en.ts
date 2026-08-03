@@ -163,6 +163,10 @@ export const en = {
     sessionsPerWeek: 'Sessions / week',
     empty: 'No session on this period',
     emptyHint: 'Workouts appear here once synced or backfilled.',
+    pagination: 'Session pages',
+    prevPage: 'Previous page',
+    nextPage: 'Next page',
+    pageOf: (n: number, total: number) => `Page ${n} of ${total}`,
   },
   session: {
     back: 'Back to the list',
