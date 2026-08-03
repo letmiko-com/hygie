@@ -22,7 +22,6 @@
 // null, never 0.
 import { getDb } from '@/lib/db';
 import type { SubjectContext } from './context';
-import { cached } from './cache';
 import { DERIVED_SLEEP, DERIVED_TRAINING, isDerived } from './catalog';
 import { getMetricType, type Aggregation } from './metric-types';
 import { heavyRead } from './read';
@@ -235,36 +234,22 @@ function daysOf(range: DayRange): string[] {
 }
 
 /**
- * Beyond a year of days the raw scan leaves the 500ms budget (measured: 2.7s
- * for 14 years of heart rate), exactly like the dashboard's all-time series.
- * Same answer while rollups are being built: memoize per subject, series,
- * window and local day. The key does NOT embed the channel cutover, unlike
- * the dashboard cache: on an exploration screen a window that lags a cutover
- * move by at most the TTL is acceptable, a 3-second page is not.
+ * Wide windows used to leave the 500ms budget here (measured: 2.7s for 14
+ * years of heart rate) and were memoized for want of anything better. They now
+ * read rollup_hourly, like every other daily series past the threshold
+ * (queries/series.ts): no cache, no TTL, no window lagging a cutover move.
  */
-const LONG_RANGE_DAYS = 370;
-const LONG_RANGE_TTL_MS = 30 * 60_000;
-
-function fetchDailyValues(
+async function fetchDailyValues(
   ctx: SubjectContext,
   key: string,
-  combined: DayRange,
-  today: string
+  combined: DayRange
 ): Promise<{ values: Array<number | null>; unit: string | null; aggregation: Aggregation }> {
-  const compute = async () => {
-    const full = await dailySeries(ctx, key, combined);
-    return {
-      values: full.points.map((p) => p.value),
-      unit: full.unit,
-      aggregation: full.aggregation,
-    };
+  const full = await dailySeries(ctx, key, combined);
+  return {
+    values: full.points.map((p) => p.value),
+    unit: full.unit,
+    aggregation: full.aggregation,
   };
-  if (daysBetween(combined.fromDay, combined.toDayExcl) <= LONG_RANGE_DAYS) return compute();
-  return cached(
-    `explore:${ctx.subjectId}:${key}:${combined.fromDay}:${combined.toDayExcl}:${today}`,
-    LONG_RANGE_TTL_MS,
-    compute
-  );
 }
 
 /**
@@ -278,8 +263,7 @@ export async function exploreChart(
   keys: string[],
   range: DayRange,
   previous: DayRange,
-  elapsed: number,
-  today: string
+  elapsed: number
 ): Promise<ExploreChart> {
   const granularity = chooseGranularity(range);
   const combined: DayRange = { fromDay: previous.fromDay, toDayExcl: range.toDayExcl };
@@ -311,7 +295,7 @@ export async function exploreChart(
             ...extremes(values),
           };
         }
-        const full = await fetchDailyValues(ctx, key, combined, today);
+        const full = await fetchDailyValues(ctx, key, combined);
         const all = full.values;
         const values = all.slice(offset);
         const prevValues = all.slice(0, prevDays.length);
