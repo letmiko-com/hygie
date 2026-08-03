@@ -9,7 +9,10 @@
 // Pre-cutover dedup: one winning source per UTC hour (source_priorities rank,
 // else the watch, else the higher value). Summing every source overcounts by
 // ~80% on real data; a per-day winner loses the hours where only the phone
-// counted. UTC-hour granularity is exactly the rollup_hourly shape.
+// counted. UTC-hour granularity is exactly the rollup_hourly shape. The group
+// is really (UTC hour, local day): identical to the UTC hour alone wherever
+// the zone offset is a whole number of hours, and the exact rule elsewhere
+// (see edge 2 below).
 // "No data != zero": days come from generate_series over DATES (a timestamptz
 // series would drift on DST), missing buckets are null, never 0.
 //
@@ -40,9 +43,12 @@
 //   2. THE TWO PARTIAL HOURS OF EACH LOCAL DAY, in a zone whose offset is not a
 //      whole number of hours (India +5:30, Nepal +5:45, Chatham +12:45). There
 //      the UTC hour containing local midnight belongs to two local days at
-//      once and a rollup hour cannot be split, so that hour is read from the
-//      sources on both sides. In a whole-hour zone the set is empty and the
-//      query degenerates to "rollup + today".
+//      once and a rollup row cannot be cut in half, so that hour is read from
+//      the sources on both sides of the midnight. In a whole-hour zone the set
+//      is empty and the query degenerates to "rollup + today".
+//      The sources-only path splits the same hour the same way (its dedup
+//      group is (UTC hour, local day)), so a day does not change value when
+//      the window it is looked at through crosses the threshold.
 //
 // Only 'sum' and 'average' can be rebuilt from a rollup hour (it carries n,
 // sum, min and max): 'latest' and 'duration' stay on the sources whatever the
@@ -178,6 +184,11 @@ select days.day::text as day, agg.value, agg.vmin, agg.vmax, coalesce(agg.n, 0) 
 from days left join agg using (day)
 order by days.day`;
 
+// The pre-cutover dedup group is (UTC hour, local day), not the UTC hour
+// alone. The two are the same thing in a whole-hour zone; where they differ,
+// the pair is what keeps this path and the rollup path on the same answer, and
+// it is the "two partial hours from raw" rule of architecture 4 applied at the
+// only place it can be applied — a rollup row cannot be cut in half.
 const CUMULATIVE_SQL = `
 with bounds as (
   select ($3::date::timestamp at time zone $5) as from_ts,
@@ -191,30 +202,32 @@ days as (
   from generate_series($3::date, $4::date - 1, interval '1 day') d
 ),
 raw_hourly as (
-  select date_trunc('hour', o.start_ts) as hour_utc, o.source_id, sum(o.value) as v
+  select date_trunc('hour', o.start_ts) as hour_utc,
+         (o.start_ts at time zone $5)::date as day,
+         o.source_id, sum(o.value) as v
   from observations o, bounds b
   where o.subject_id = $1 and o.type_id = $2 and o.origin = 'health_xml'
     and o.value is not null
     and o.start_ts >= b.from_ts and o.start_ts < least(b.to_ts, b.cutover_ts)
-  group by 1, 2
+  group by 1, 2, 3
 ),
 raw_winner as (
-  select distinct on (h.hour_utc) h.hour_utc as ts, h.v
+  select distinct on (h.hour_utc, h.day) h.day, h.v
   from raw_hourly h
   join sources s on s.id = h.source_id
   left join source_priorities p
     on p.subject_id = $1 and p.type_id = $2 and p.source_id = h.source_id
-  order by h.hour_utc, p.rank asc nulls last, (s.name ~* 'watch') desc, h.v desc
+  order by h.hour_utc, h.day, p.rank asc nulls last, (s.name ~* 'watch') desc, h.v desc
 ),
 minute as (
-  select m.minute_ts as ts, m.value as v
+  select (m.minute_ts at time zone $5)::date as day, m.value as v
   from minute_stats m, bounds b
   where m.subject_id = $1 and m.type_id = $2
     and m.minute_ts >= greatest(b.from_ts, b.cutover_ts) and m.minute_ts < b.to_ts
 ),
 agg as (
-  select (u.ts at time zone $5)::date as day, sum(u.v) as value, count(*)::int as n
-  from (select ts, v from raw_winner union all select ts, v from minute) u
+  select u.day, sum(u.v) as value, count(*)::int as n
+  from (select day, v from raw_winner union all select day, v from minute) u
   group by 1
 )
 select days.day::text as day, agg.value,
@@ -361,7 +374,7 @@ edge_src as (
   ) x
 ),
 edge_winner as (
-  select distinct on (h.iv_from) h.iv_from as ts, h.v
+  select distinct on (h.iv_from) (h.iv_from at time zone $5)::date as day, h.v
   from edge_src h
   join sources s on s.id = h.source_id
   left join source_priorities p
@@ -369,44 +382,46 @@ edge_winner as (
   order by h.iv_from, p.rank asc nulls last, (s.name ~* 'watch') desc, h.v desc
 ),
 edge_minute as (
-  select x.ts, x.v
+  select x.day, x.v
   from edges e
   cross join cut c
   cross join lateral (
-    select m.minute_ts as ts, m.value as v
+    select (m.minute_ts at time zone $5)::date as day, m.value as v
     from minute_stats m
     where m.subject_id = $1 and m.type_id = $2
       and m.minute_ts >= greatest(e.iv_from, c.cutover_ts) and m.minute_ts < e.iv_to
   ) x
 ),
 live_src as (
-  select date_trunc('hour', o.start_ts) as hour_utc, o.source_id, sum(o.value) as v
+  select date_trunc('hour', o.start_ts) as hour_utc,
+         (o.start_ts at time zone $5)::date as day,
+         o.source_id, sum(o.value) as v
   from observations o, bounds b, cut c
   where o.subject_id = $1 and o.type_id = $2 and o.origin = 'health_xml'
     and o.value is not null
     and o.start_ts >= b.live_from and o.start_ts < least(b.to_ts, c.cutover_ts)
-  group by 1, 2
+  group by 1, 2, 3
 ),
 live_winner as (
-  select distinct on (h.hour_utc) h.hour_utc as ts, h.v
+  select distinct on (h.hour_utc, h.day) h.day, h.v
   from live_src h
   join sources s on s.id = h.source_id
   left join source_priorities p
     on p.subject_id = $1 and p.type_id = $2 and p.source_id = h.source_id
-  order by h.hour_utc, p.rank asc nulls last, (s.name ~* 'watch') desc, h.v desc
+  order by h.hour_utc, h.day, p.rank asc nulls last, (s.name ~* 'watch') desc, h.v desc
 ),
 live_minute as (
-  select m.minute_ts as ts, m.value as v
+  select (m.minute_ts at time zone $5)::date as day, m.value as v
   from minute_stats m, bounds b, cut c
   where m.subject_id = $1 and m.type_id = $2
     and m.minute_ts >= greatest(b.live_from, c.cutover_ts) and m.minute_ts < b.to_ts
 ),
 raw_part as (
-  select (u.ts at time zone $5)::date as day, sum(u.v) as s, count(*)::bigint as n
-  from (select ts, v from edge_winner
-        union all select ts, v from edge_minute
-        union all select ts, v from live_winner
-        union all select ts, v from live_minute) u
+  select u.day, sum(u.v) as s, count(*)::bigint as n
+  from (select day, v from edge_winner
+        union all select day, v from edge_minute
+        union all select day, v from live_winner
+        union all select day, v from live_minute) u
   group by 1
 ),
 merged as (
