@@ -3,31 +3,25 @@
 // rate chart (7-day rolling mean, dashed same-color comparison), today
 // panel (gauge against the 90-day mean: a reference, never a goal), weekly
 // training volume, 52-week regularity heatmap (null and 0 are different
-// facts), recent sessions. The whole temporal state lives in the URL.
+// facts), recent activity timeline. The whole temporal state lives in the URL.
 import type { Metadata } from 'next';
+import Link from 'next/link';
+import { Suspense } from 'react';
+import { TimelinePanel, TimelineSkeleton, TIMELINE_LOOKBACK_DAYS } from './timeline-panel';
 import { CalendarHeatmap } from '@/components/charts/CalendarHeatmap';
 import { Gauge } from '@/components/charts/Gauge';
 import { BarChart } from '@/components/charts/BarChart';
 import { LineChart } from '@/components/charts/LineChart';
 import { MetricCard } from '@/components/data/MetricCard';
-import { SessionRow } from '@/components/data/SessionRow';
 import { StatTile } from '@/components/data/StatTile';
 import { TrendChip } from '@/components/data/TrendChip';
+import { Icon } from '@/components/ui/Icon';
 import { Panel, PanelLabel } from '@/components/ui/Panel';
 import { TimeNav } from '@/components/time/TimeNav';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
-import {
-  fmtDay,
-  fmtDuration,
-  fmtHoursMinutes,
-  fmtInt,
-  fmtKm,
-  fmtNumber,
-  kjToKcal,
-} from '@/lib/format';
+import { fmtDay, fmtHoursMinutes, fmtInt, fmtNumber, kjToKcal } from '@/lib/format';
 import { getMessages, resolveLocale, type Locale } from '@/lib/i18n';
 import { dataColor, type DataFamily } from '@/lib/metrics';
-import { sportDisplay, sportLabel } from '@/lib/sports';
 import { getSubjectContext, type SubjectContext } from '@/lib/queries/context';
 import { allTimeDailySeries, dailySeries, type DailyPoint } from '@/lib/queries/series';
 import { seriesWithTrend, type Trend } from '@/lib/queries/trends';
@@ -44,7 +38,6 @@ import {
 import { parseTimeParams, type TimeSearchParams } from '@/lib/queries/time-params';
 import {
   monthlyTrainingSilhouette,
-  recentWorkouts,
   weeklyVolume,
   workoutMinutesPerDay,
   workoutSummary,
@@ -177,7 +170,6 @@ export default async function DashboardPage({
     heatWorkouts,
     heatSummary,
     heatSummaryPrev,
-    recent,
     silhouette,
   ] = await Promise.all([
     Promise.all(cardSpecs.map((spec) => metricCardData(ctx, spec, range, preset, isAll, totals.firstDay))),
@@ -196,7 +188,6 @@ export default async function DashboardPage({
     workoutMinutesPerDay(ctx, heatRange),
     workoutSummary(ctx, heatRange),
     workoutSummary(ctx, prev52),
-    recentWorkouts(ctx, 5),
     monthlyTrainingSilhouette(ctx),
   ]);
 
@@ -263,9 +254,6 @@ export default async function DashboardPage({
   });
   const heatDelta =
     heatSummaryPrev.count > 0 ? ((heatSummary.count - heatSummaryPrev.count) / heatSummaryPrev.count) * 100 : null;
-
-  // --- recent sessions -----------------------------------------------------------
-  const recent5 = recent.slice(0, 5);
 
   const gridPanel = { display: 'grid', gap: 12 } as const;
 
@@ -419,7 +407,9 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      <div style={{ ...gridPanel, gridTemplateColumns: 'minmax(0, auto) minmax(320px, 1fr)' }}>
+      {/* alignItems start: each panel keeps its own height, the heatmap is
+          not stretched to the length of the timeline next to it. */}
+      <div style={{ ...gridPanel, gridTemplateColumns: 'minmax(0, auto) minmax(320px, 1fr)', alignItems: 'start' }}>
         <Panel style={{ overflowX: 'auto', minWidth: 0 }}>
           <PanelLabel
             trailing={
@@ -447,48 +437,38 @@ export default async function DashboardPage({
           </div>
         </Panel>
 
-        <Panel padding="8px 6px">
+        <Panel padding="8px 6px" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <div style={{ padding: '4px 8px 0' }}>
-            <PanelLabel>{m.dash.recentSessions}</PanelLabel>
+            <PanelLabel
+              trailing={
+                <Link
+                  href="/sport"
+                  className="hy-ghost"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '2px 6px',
+                    borderRadius: 'var(--r-sm)',
+                    textDecoration: 'none',
+                    color: 'var(--text-2)',
+                    font: '500 var(--text-xs)/1 var(--font-ui)',
+                  }}
+                >
+                  {m.dash.seeAll}
+                  <Icon name="arrow_forward" size={13} />
+                </Link>
+              }
+            >
+              {m.timeline.title}
+              <span style={{ font: '400 var(--text-2xs)/1 var(--font-ui)', color: 'var(--text-3)', marginLeft: 8, textTransform: 'none', letterSpacing: 0 }}>
+                {m.timeline.window(TIMELINE_LOOKBACK_DAYS)}
+              </span>
+            </PanelLabel>
           </div>
-          {recent5.length === 0 ? (
-            <p style={{ font: 'italic 400 var(--text-sm)/1.4 var(--font-ui)', color: 'var(--text-3)', padding: '0 8px 8px', margin: 0 }}>
-              {m.dash.noSessions}
-            </p>
-          ) : (
-            recent5.map((w) => {
-              const sport = sportDisplay(w.activityType);
-              const dayFmt = new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', {
-                weekday: 'short',
-                day: 'numeric',
-                month: 'short',
-                timeZone: ctx.timezone,
-              });
-              return (
-                <SessionRow
-                  key={w.id}
-                  icon={sport.icon}
-                  color={dataColor(sport.family)}
-                  title={sportLabel(w.activityType, locale)}
-                  meta={[
-                    dayFmt.format(w.startTs),
-                    fmtDuration(w.durationS),
-                    w.distanceM === null ? null : fmtKm(w.distanceM, locale),
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                  stats={[
-                    {
-                      label: 'FC',
-                      value: w.avgHrBpm === null ? null : fmtInt(w.avgHrBpm, locale),
-                      color: 'var(--data-heart)',
-                    },
-                  ]}
-                  sourceName={w.sourceName}
-                />
-              );
-            })
-          )}
+          <Suspense fallback={<TimelineSkeleton label={m.timeline.loading} />}>
+            <TimelinePanel ctx={ctx} range={range} today={today} />
+          </Suspense>
         </Panel>
       </div>
     </div>
