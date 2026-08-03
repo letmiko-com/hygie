@@ -34,6 +34,40 @@ interface ContextRow {
   week_start: number;
 }
 
+export interface SessionUser {
+  userId: string;
+  email: string;
+  isAdmin: boolean;
+  locale: string;
+}
+
+/**
+ * The signed-in account itself, with NO health scope attached. Exists for the
+ * pure-admin case: an account without a grant has no SubjectContext, and
+ * reading its language from a context that is null silently drops it back to
+ * English. Preferences belong to the account, health data belongs to the
+ * grant — losing one because the other is absent is a bug, not a safeguard.
+ */
+export async function getSessionUser(): Promise<SessionUser | null> {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email) return null;
+
+  const { rows } = await getDb().query<{
+    id: string;
+    email: string;
+    is_admin: boolean;
+    locale: string;
+  }>(
+    `select id, email, is_admin, locale
+     from users where email = $1 and disabled_at is null`,
+    [email]
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return { userId: row.id, email: row.email, isAdmin: row.is_admin, locale: row.locale };
+}
+
 /**
  * Resolves the current session to its granted subject, or null when the
  * session is absent, the user is disabled, or no live subject is granted.
