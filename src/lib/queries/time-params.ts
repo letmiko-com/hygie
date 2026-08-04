@@ -29,6 +29,23 @@ function one(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;
 }
 
+/** The keys parseTimeParams reads, and nothing else. */
+const TIME_KEYS = ['p', 'a', 'from', 'to', 'compare'] as const;
+
+/**
+ * The time state of a search-param bag, re-serialised. Lets a link carry the
+ * window the reader is looking at over to another screen without dragging that
+ * screen's own state along (the explorer's ?m, a page number, a sport filter).
+ */
+export function timeQuery(sp: TimeSearchParams): string {
+  const q = new URLSearchParams();
+  for (const key of TIME_KEYS) {
+    const v = one(sp[key]);
+    if (v !== undefined && v !== '') q.set(key, v);
+  }
+  return q.toString();
+}
+
 export function parseTimeParams(
   sp: TimeSearchParams,
   today: string,
