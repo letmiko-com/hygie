@@ -11,6 +11,12 @@
 // Allowlist: only metric_types.supported = true is inserted; everything else is counted
 // per type in import_runs.counts. Records nested inside Correlation or Workout elements
 // are duplicates of top-level records (per the export DTD) and are skipped.
+//
+// Growing the taxonomy: --only-missing-types replays the same file for the types that
+// have no XML rows yet for this subject, and only those. The set is computed from the
+// database, not typed by hand, which is what makes the replay idempotent: a type that
+// already holds health_xml rows is never selected, so COPY cannot duplicate it. Run it
+// twice and the second run selects nothing.
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -29,7 +35,7 @@ function usage(msg) {
   if (msg) console.error(msg);
   console.error(
     'usage: node scripts/backfill/import-xml.mjs <export.zip|export.xml> --subject <uuid> ' +
-      '[--database-url <url>] [--only-types <hk1,hk2,...>]'
+      '[--database-url <url>] [--only-types <hk1,hk2,...> | --only-missing-types]'
   );
   process.exit(2);
 }
@@ -39,14 +45,17 @@ let input = null;
 let subjectId = null;
 let databaseUrl = process.env.DATABASE_URL;
 let onlyTypes = null; // Set<hk_identifier> | null
+let onlyMissing = false; // fill onlyTypes from the database instead of the CLI
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--subject') subjectId = args[++i];
   else if (args[i] === '--database-url') databaseUrl = args[++i];
   else if (args[i] === '--only-types') onlyTypes = new Set((args[++i] ?? '').split(',').filter(Boolean));
+  else if (args[i] === '--only-missing-types') onlyMissing = true;
   else if (!input) input = args[i];
   else usage(`unexpected argument: ${args[i]}`);
 }
 if (onlyTypes !== null && onlyTypes.size === 0) usage('--only-types needs a comma-separated list');
+if (onlyTypes !== null && onlyMissing) usage('--only-types and --only-missing-types are exclusive');
 if (!input || !subjectId) usage();
 if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subjectId)) {
   usage('--subject must be a uuid');
@@ -203,6 +212,34 @@ try {
   const subject = await meta.query('select 1 from subjects where id = $1', [subjectId]);
   if (subject.rowCount === 0) throw new Error(`subject ${subjectId} not found`);
 
+  if (onlyMissing) {
+    // A supported type this subject has no XML rows for cannot be duplicated by a
+    // replay, whatever the file. Dedup is per origin (architecture.md §2), so HAE
+    // rows do not protect a type: only health_xml rows do. Sleep stages land in
+    // sleep_segments (XML-only by construction), never in observations, so that type
+    // is judged on its own table or every replay would double the nights.
+    const { rows } = await meta.query(
+      `select mt.hk_identifier from metric_types mt
+        where mt.supported
+          and not exists (select 1 from observations o
+                           where o.subject_id = $1 and o.type_id = mt.id
+                             and o.origin = 'health_xml')
+          and (mt.hk_identifier <> 'HKCategoryTypeIdentifierSleepAnalysis'
+               or not exists (select 1 from sleep_segments s where s.subject_id = $1))
+        order by mt.hk_identifier`,
+      [subjectId]
+    );
+    onlyTypes = new Set(rows.map((r) => r.hk_identifier));
+    console.log(
+      `--only-missing-types: ${onlyTypes.size} supported type(s) with no XML rows for this subject` +
+        (onlyTypes.size === 0 ? '' : `:\n  ${[...onlyTypes].join('\n  ')}`)
+    );
+    if (onlyTypes.size === 0) {
+      console.log('nothing to import; leaving the database untouched');
+      process.exit(0);
+    }
+  }
+
   console.log('computing sha256 of input file');
   const checksum = await sha256File(input);
 
@@ -287,6 +324,9 @@ try {
   }
 
   const counts = {
+    // What this run was allowed to write, so an operator reading import_runs later can
+    // tell a full backfill from a taxonomy catch-up without guessing from the numbers.
+    only_types: onlyTypes === null ? null : [...onlyTypes],
     records_seen: 0,
     observations_inserted: 0,
     sleep_segments_inserted: 0,
