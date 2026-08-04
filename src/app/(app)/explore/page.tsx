@@ -13,6 +13,7 @@
 // never asked; the chosen grain is displayed so no one mistakes an hourly
 // mean for a raw sample.
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { MultiLineChart, planScale, type OverlaySeries } from '@/components/charts/MultiLineChart';
 import { DataTable, type Column } from '@/components/data/DataTable';
 import { EmptyState } from '@/components/data/EmptyState';
@@ -21,9 +22,9 @@ import { Panel, PanelLabel } from '@/components/ui/Panel';
 import { Badge } from '@/components/ui/Badge';
 import { TimeNav } from '@/components/time/TimeNav';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
-import { fmtDay, fmtInt, fmtNumber, kjToKcal } from '@/lib/format';
+import { displayUnit, fmtDay, fmtInt, magnitudeFormat, type UnitDisplay } from '@/lib/format';
 import { getMessages, resolveLocale, type Locale, type Messages } from '@/lib/i18n';
-import { dataColor, metricFamily, metricLabel, METRIC_DISPLAY, type DataFamily } from '@/lib/metrics';
+import { dataColor, metricFamily, metricHref, metricIcon, metricLabel, type DataFamily } from '@/lib/metrics';
 import { getSubjectContext, type SubjectContext } from '@/lib/queries/context';
 import {
   DERIVED_SLEEP,
@@ -34,7 +35,7 @@ import {
 } from '@/lib/queries/catalog';
 import { chooseGranularity, exploreChart, type ExploreSeries, type Granularity } from '@/lib/queries/explore';
 import { comparisonRange, elapsedDays, todayInZone } from '@/lib/queries/time';
-import { parseTimeParams, type TimeSearchParams } from '@/lib/queries/time-params';
+import { parseTimeParams, timeQuery, type TimeSearchParams } from '@/lib/queries/time-params';
 import { dataTotals } from '@/lib/queries/sync';
 import { monthlyTrainingSilhouette } from '@/lib/queries/workouts';
 import { MetricPicker, ScaleToggle, type PickerOption } from './ui';
@@ -75,23 +76,6 @@ function assignColors(keys: string[], familyOf: (key: string) => DataFamily): Ma
   return out;
 }
 
-interface UnitDisplay {
-  unit: string | null;
-  convert: (v: number) => number;
-}
-
-/**
- * Canonical units live in the database, display units belong to the UI
- * (architecture): energy is stored in kJ and read in kcal everywhere else in
- * the app, so it reads in kcal here too.
- */
-function displayOf(unit: string | null): UnitDisplay {
-  if (unit === 'kJ') return { unit: 'kcal', convert: (v) => kjToKcal(v) ?? v };
-  if (unit === 'km/hr') return { unit: 'km/h', convert: (v) => v };
-  if (unit === 'count/min') return { unit: '/min', convert: (v) => v };
-  return { unit, convert: (v) => v };
-}
-
 function labelOf(key: string, locale: Locale, m: Messages): string {
   if (key === DERIVED_SLEEP) return m.explore.derivedSleep;
   if (key === DERIVED_TRAINING) return m.explore.derivedTraining;
@@ -107,15 +91,7 @@ function familyOf(key: string): DataFamily {
 function iconOf(key: string): string {
   if (key === DERIVED_SLEEP) return 'bedtime';
   if (key === DERIVED_TRAINING) return 'exercise';
-  return METRIC_DISPLAY[key]?.icon ?? 'query_stats';
-}
-
-/** Value formatter picked from the magnitude: 4 digits of resolution, no more. */
-function formatter(maxAbs: number, locale: Locale): (v: number) => string {
-  if (maxAbs >= 1000) return (v) => fmtInt(v, locale);
-  if (maxAbs >= 100) return (v) => fmtNumber(v, locale, 0);
-  if (maxAbs >= 10) return (v) => fmtNumber(v, locale, 1);
-  return (v) => fmtNumber(v, locale, 2);
+  return metricIcon(key);
 }
 
 /** Five evenly spaced ticks, formatted for the grain being charted. */
@@ -200,6 +176,11 @@ export default async function ExplorePage({
   const elapsed = elapsedDays(range, today);
   const prevRange = comparisonRange(preset, range, elapsed);
 
+  // A charted series is a metric: its name in the stats table opens its own
+  // page, on the same window. Derived series (sleep, training time) are facts
+  // the app computes, not types in the taxonomy, so they carry no link.
+  const windowQuery = timeQuery(sp);
+
   const rawScale = Array.isArray(sp.scale) ? sp.scale[0] : sp.scale;
   const scale: 'auto' | 'normalized' = rawScale === 'normalized' ? 'normalized' : 'auto';
 
@@ -224,7 +205,7 @@ export default async function ExplorePage({
       label: labelOf(entry.key, locale, m),
       icon: iconOf(entry.key),
       color: dataColor(familyOf(entry.key)),
-      unit: displayOf(entry.unit).unit,
+      unit: displayUnit(entry.unit).unit,
       group: m.explore.families[familyOf(entry.key)] ?? familyOf(entry.key),
       dailyOnly: entry.dailyOnly,
       disabled: entry.dailyOnly && granularity !== 'day',
@@ -239,7 +220,7 @@ export default async function ExplorePage({
 
   const converted: Array<{ series: ExploreSeries; display: UnitDisplay; values: Array<number | null> }> =
     (chart?.series ?? []).map((series) => {
-      const display = displayOf(series.unit);
+      const display = displayUnit(series.unit);
       return {
         series,
         display,
@@ -257,7 +238,7 @@ export default async function ExplorePage({
   }));
 
   const plan = planScale(overlay, scale === 'normalized' ? 'normalized' : null);
-  const makeFormat = (maxAbs: number) => formatter(maxAbs, locale);
+  const makeFormat = (maxAbs: number) => magnitudeFormat(maxAbs, locale);
 
   const statRows: StatRow[] = converted.map(({ series, display, values }) => {
     const isTotal = series.aggregation === 'sum' || series.aggregation === 'duration';
@@ -265,7 +246,7 @@ export default async function ExplorePage({
     const current = convert(series.current);
     // Each row is formatted on its own magnitude: 6.2 h of sleep must not be
     // rounded to 6 because another series counts in thousands of kcal.
-    const format = formatter(
+    const format = magnitudeFormat(
       Math.max(1, ...values.filter((v): v is number => v !== null).map(Math.abs), Math.abs(current ?? 0)),
       locale
     );
@@ -291,7 +272,17 @@ export default async function ExplorePage({
       render: (row) => (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <span aria-hidden style={{ width: 10, height: 2, background: row.color, flex: 'none' }} />
-          {row.label}
+          {isDerived(row.key) ? (
+            row.label
+          ) : (
+            <Link
+              href={metricHref(row.key, windowQuery)}
+              title={m.common.seeDetail}
+              style={{ color: 'var(--text-1)', textDecoration: 'none', borderBottom: '1px dotted var(--border-strong)' }}
+            >
+              {row.label}
+            </Link>
+          )}
         </span>
       ),
     },
