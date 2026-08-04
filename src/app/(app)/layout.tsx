@@ -35,6 +35,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         { href: '/records', icon: 'trophy', label: m.nav.records },
         { href: '/sleep', icon: 'bedtime', label: m.nav.sleep },
         { href: '/explore', icon: 'query_stats', label: m.nav.explore },
+        { href: '/metrics', icon: 'database', label: m.nav.allData },
       ],
     },
     {
