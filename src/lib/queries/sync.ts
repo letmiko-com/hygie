@@ -295,6 +295,40 @@ export async function observationCount(ctx: SubjectContext): Promise<number> {
   return rows.reduce((acc, r) => acc + Number(r.n), 0);
 }
 
+/**
+ * Rows recorded per type FOR THIS SUBJECT, both storage regimes summed, keyed
+ * by HK identifier. Reuses the cached sweep above, so the catalogue screen and
+ * the sync screen count the same thing and neither pays it twice.
+ *
+ * minute_stats is counted too, and it has to be: a minute_cumulative type that
+ * only ever arrived through Health Auto Export has no observations row at all,
+ * and reporting it as "0 measures" next to a chart full of data would be a
+ * plain lie. Its own group-by is a 4 ms index scan (the table holds thousands
+ * of rows, not millions), cached alongside the sweep.
+ */
+export async function typeMeasureCounts(ctx: SubjectContext): Promise<Map<string, number>> {
+  const key = `typecounts:minute:${ctx.subjectId}:${todayInZone(ctx.timezone)}`;
+  const [obs, minute] = await Promise.all([
+    typeCounts(ctx),
+    cached(key, 24 * 60 * 60_000, () =>
+      getDb()
+        .query<TypeCountRow>(
+          `select t.hk_identifier, count(*) as n
+           from minute_stats m join metric_types t on t.id = m.type_id
+           where m.subject_id = $1
+           group by 1`,
+          [ctx.subjectId]
+        )
+        .then((r) => r.rows)
+    ),
+  ]);
+  const out = new Map<string, number>();
+  for (const r of [...obs, ...minute]) {
+    out.set(r.hk_identifier, (out.get(r.hk_identifier) ?? 0) + Number(r.n));
+  }
+  return out;
+}
+
 export async function topTypes(ctx: SubjectContext, limit = 8): Promise<TypeCount[]> {
   const all = await typeCounts(ctx);
   const total = all.reduce((acc, r) => acc + Number(r.n), 0);
