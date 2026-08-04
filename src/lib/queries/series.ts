@@ -149,7 +149,10 @@ export function valueExpr(aggregation: Aggregation): string {
     case 'latest':
       return '(array_agg(o.value order by o.start_ts desc))[1]';
     case 'duration':
-      return "sum(extract(epoch from coalesce(o.end_ts, o.start_ts) - o.start_ts))";
+      // ::float8 because extract(epoch ...) is numeric, which node-postgres
+      // returns as a string: it would flow all the way to a formatter and
+      // render as an absence.
+      return "sum(extract(epoch from coalesce(o.end_ts, o.start_ts) - o.start_ts))::float8";
     case 'none':
       throw new Error('metric has no aggregation');
   }

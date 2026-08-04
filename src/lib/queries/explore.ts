@@ -76,7 +76,18 @@ export interface ExploreChart {
   series: ExploreSeries[];
 }
 
+// A 'latest' type is a state that persists between measurements (body mass,
+// height, a goal, per db/taxonomy.md), so its figure for a window is the last
+// reading in it, not the mean of the window. Same rule as the metric detail
+// screen: the two must not disagree on a weight.
 function reduce(values: Array<number | null>, aggregation: Aggregation): number | null {
+  if (aggregation === 'latest') {
+    for (let i = values.length - 1; i >= 0; i--) {
+      const v = values[i];
+      if (v !== null) return v;
+    }
+    return null;
+  }
   let acc = 0;
   let n = 0;
   for (const v of values) {
