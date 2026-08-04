@@ -10,23 +10,31 @@ import type { Locale } from '@/lib/i18n';
  * inverted: a green downward arrow is a good decrease. The NUMBER carries
  * the amplitude, explicit sign, locale decimal. Null delta renders nothing:
  * a missing comparison window is not a flat trend.
+ *
+ * `neutral` switches the quality channel OFF: direction and amplitude are
+ * still stated, in --text-3. It is for the metrics where no direction is an
+ * improvement (a body temperature, a blood pressure, a height, a nutrient
+ * intake). Painting those green or red would be an opinion dressed as a
+ * measure, which is exactly what an instrument must not do.
  */
 export function TrendChip({
   deltaPct,
   invert = false,
+  neutral = false,
   label,
   locale,
 }: {
   deltaPct: number | null;
   invert?: boolean;
+  neutral?: boolean;
   label?: string;
   locale: Locale;
 }) {
   if (deltaPct === null || !Number.isFinite(deltaPct)) return null;
   const up = deltaPct > 0;
   const flat = Math.abs(deltaPct) < 0.5;
-  const good = flat ? null : invert ? !up : up;
-  const color = flat ? 'var(--text-3)' : good ? 'var(--ok)' : 'var(--danger)';
+  const good = flat || neutral ? null : invert ? !up : up;
+  const color = flat || neutral ? 'var(--text-3)' : good ? 'var(--ok)' : 'var(--danger)';
   const icon = flat ? 'remove' : up ? 'arrow_drop_up' : 'arrow_drop_down';
   const amount = `${up ? '+' : ''}${fmtNumber(deltaPct, locale, 1)} %`;
 
