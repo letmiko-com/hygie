@@ -21,7 +21,7 @@ import { TimeNav } from '@/components/time/TimeNav';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
 import { fmtDay, fmtHoursMinutes, fmtInt, fmtNumber, kjToKcal } from '@/lib/format';
 import { getMessages, resolveLocale, type Locale } from '@/lib/i18n';
-import { dataColor, type DataFamily } from '@/lib/metrics';
+import { dataColor, metricHref, type DataFamily } from '@/lib/metrics';
 import { getSubjectContext, type SubjectContext } from '@/lib/queries/context';
 import { allTimeDailySeries, dailySeries, type DailyPoint } from '@/lib/queries/series';
 import { seriesWithTrend, type Trend } from '@/lib/queries/trends';
@@ -34,7 +34,7 @@ import {
   todayInZone,
   type DayRange,
 } from '@/lib/queries/time';
-import { parseTimeParams, type TimeSearchParams } from '@/lib/queries/time-params';
+import { parseTimeParams, timeQuery, type TimeSearchParams } from '@/lib/queries/time-params';
 import { dayAxisLabels } from '@/lib/time-format';
 import {
   monthlyTrainingSilhouette,
@@ -135,6 +135,9 @@ export default async function DashboardPage({
   const totals = await dataTotals(ctx);
   const sp = await searchParams;
   const { preset, range, compare } = parseTimeParams(sp, today, totals.firstDay);
+  // Cards open the metric's own page on the window being looked at: a figure
+  // on a dashboard that cannot be opened is a dead end.
+  const windowQuery = timeQuery(sp);
   const isAll = preset === 'all';
   const elapsed = elapsedDays(range, today);
   const prevRange = comparisonRange(preset, range, elapsed);
@@ -304,6 +307,7 @@ export default async function DashboardPage({
               color={dataColor(spec.family)}
               locale={locale}
               emptyLabel={m.common.noDataOnPeriod}
+              href={metricHref(spec.hk, windowQuery)}
             />
           );
         })}
@@ -317,6 +321,7 @@ export default async function DashboardPage({
           color={dataColor('sleep')}
           locale={locale}
           emptyLabel={m.common.noDataOnPeriod}
+          href={windowQuery === '' ? '/sleep' : `/sleep?${windowQuery}`}
         />
       </div>
 
@@ -324,9 +329,28 @@ export default async function DashboardPage({
         <Panel>
           <PanelLabel
             trailing={
-              hrTrend ? (
-                <TrendChip deltaPct={hrTrend.deltaPct} invert label={m.dash.avgOnPeriod} locale={locale} />
-              ) : undefined
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+                {hrTrend && (
+                  <TrendChip deltaPct={hrTrend.deltaPct} invert label={m.dash.avgOnPeriod} locale={locale} />
+                )}
+                <Link
+                  href={metricHref(HK.hr, windowQuery)}
+                  className="hy-ghost"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    padding: '2px 5px',
+                    borderRadius: 'var(--r-sm)',
+                    textDecoration: 'none',
+                    color: 'var(--text-3)',
+                    font: '500 var(--text-2xs)/1 var(--font-ui)',
+                  }}
+                >
+                  {m.common.seeDetail}
+                  <Icon name="arrow_forward" size={12} />
+                </Link>
+              </span>
             }
           >
             {m.dash.hrChartTitle}
