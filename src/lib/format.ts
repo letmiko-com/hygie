@@ -94,6 +94,119 @@ export function fmtPace(secPerKm: number | null): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} /km`;
 }
 
+export interface MetricWriter {
+  /** Unit written after a value; null when dimensionless or self-describing. */
+  unit: string | null;
+  /** Canonical -> display conversion. Charts plot converted values. */
+  convert: (v: number) => number;
+  /** Writes a CANONICAL value: converts, formats, appends the unit. */
+  write: (v: number | null) => string | null;
+  /** Writes an ALREADY-CONVERTED value, for chart labels and tooltips. */
+  writeDisplay: (v: number | null) => string | null;
+}
+
+/**
+ * Value writer for one metric type. Everything a screen needs to print a
+ * figure of that type: the canonical-to-display conversion, the precision its
+ * magnitude deserves, and the unit after it. Null in, absence glyph out.
+ *
+ * `magnitude` is given in CANONICAL units (the largest absolute value the
+ * screen will print) and converted here, which is the only order that works:
+ * the precision depends on the displayed magnitude, and the conversion is what
+ * produces it.
+ *
+ * A `duration` aggregation carries seconds and reads as "1 h 12". Printing
+ * 4 320 with no unit, or "4 320 s", would be technically true and useless.
+ */
+export function metricWriter(
+  aggregation: string,
+  canonicalUnit: string | null,
+  magnitude: number,
+  locale: Locale
+): MetricWriter {
+  if (aggregation === 'duration') {
+    const write = (v: number | null) => (v === null ? null : fmtHoursMinutes(v));
+    return { unit: null, convert: (v) => v, write, writeDisplay: write };
+  }
+  // 'none' means "not reducible": what a screen shows for such a type is a
+  // count of occurrences, and half an alert does not exist.
+  if (aggregation === 'none') {
+    const write = (v: number | null) => (v === null ? null : fmtInt(v, locale));
+    return { unit: null, convert: (v) => v, write, writeDisplay: write };
+  }
+  const display = displayUnit(canonicalUnit);
+  const format = magnitudeFormat(Math.abs(display.convert(magnitude)), locale);
+  const writeDisplay = (v: number | null): string | null => {
+    if (v === null) return null;
+    const written = format(v);
+    return display.unit === null ? written : `${written} ${display.unit}`;
+  };
+  return {
+    unit: display.unit,
+    convert: display.convert,
+    write: (v) => (v === null ? null : writeDisplay(display.convert(v))),
+    writeDisplay,
+  };
+}
+
+export interface UnitDisplay {
+  /** Unit as written next to a value; null when the quantity is dimensionless. */
+  unit: string | null;
+  convert: (v: number) => number;
+}
+
+/**
+ * Canonical unit (database) -> display unit (UI). The architecture keeps one
+ * canonical unit per type in Postgres and leaves presentation to the UI, so
+ * this table is the single place the two vocabularies meet: energy is stored
+ * in kJ and read in kcal everywhere, `count` is not a unit but the absence of
+ * one, and HealthKit's ASCII compounds (`km/hr`, `mL/min·kg`) are written the
+ * way a French or English reader expects.
+ *
+ * An unknown unit passes through unchanged: a type promoted tomorrow with a
+ * unit nobody mapped still displays its real unit, never a blank.
+ */
+export function displayUnit(unit: string | null): UnitDisplay {
+  switch (unit) {
+    case 'kJ':
+      return { unit: 'kcal', convert: (v) => v * KCAL_PER_KJ };
+    case 'count':
+      return { unit: null, convert: (v) => v };
+    case 'appleEffortScore':
+      return { unit: null, convert: (v) => v };
+    case 'count/min':
+      return { unit: '/min', convert: (v) => v };
+    case 'km/hr':
+      return { unit: 'km/h', convert: (v) => v };
+    case 'degC':
+      return { unit: '°C', convert: (v) => v };
+    case 'dBASPL':
+      return { unit: 'dB', convert: (v) => v };
+    case 'mcg':
+      return { unit: 'µg', convert: (v) => v };
+    case 'hr':
+      return { unit: 'h', convert: (v) => v };
+    case 'mL/min·kg':
+      return { unit: 'mL/min/kg', convert: (v) => v };
+    case 'kcal/hr·kg':
+      return { unit: 'kcal/h/kg', convert: (v) => v };
+    default:
+      return { unit, convert: (v) => v };
+  }
+}
+
+/**
+ * Formatter picked from the magnitude of what it will print: four significant
+ * digits, never more. A step count must not read "12 483,00" and a wrist
+ * temperature must not read "36".
+ */
+export function magnitudeFormat(maxAbs: number, locale: Locale): (v: number) => string {
+  if (maxAbs >= 1000) return (v) => fmtInt(v, locale);
+  if (maxAbs >= 100) return (v) => fmtNumber(v, locale, 0);
+  if (maxAbs >= 10) return (v) => fmtNumber(v, locale, 1);
+  return (v) => fmtNumber(v, locale, 2);
+}
+
 /** 'YYYY-MM-DD' local day -> localized date; the string carries no zone. */
 export function fmtDay(
   day: string | null,
@@ -106,11 +219,23 @@ export function fmtDay(
   );
 }
 
-export function fmtDateTime(date: Date | null, locale: Locale, timeZone: string): string {
+/**
+ * `withYear` is not decoration: on a screen whose window is arbitrary, an
+ * all-time table of timestamps printed "18 janv., 23:13" for a row from 2024
+ * and one from 2016. Screens with a bounded window (a session) keep the short
+ * form, which is why this is a flag and not a change of default.
+ */
+export function fmtDateTime(
+  date: Date | null,
+  locale: Locale,
+  timeZone: string,
+  withYear = false
+): string {
   if (!date) return ABSENT;
   return new Intl.DateTimeFormat(intlLocale(locale), {
     day: 'numeric',
     month: 'short',
+    ...(withYear ? { year: 'numeric' } : {}),
     hour: '2-digit',
     minute: '2-digit',
     timeZone,
