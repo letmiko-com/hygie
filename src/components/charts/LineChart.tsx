@@ -165,7 +165,10 @@ export function LineChart({
     max += 1;
   }
   const pad = (max - min) * 0.08;
-  min -= pad;
+  // Padding below the minimum must not invent a negative graduation on a
+  // quantity that cannot be negative: a chart of daily step totals was
+  // graduated "-620", which is not a number of steps.
+  min = min >= 0 ? Math.max(0, min - pad) : min - pad;
   max += pad;
 
   const n = Math.max(...rolled.map((s) => s.data.length));
