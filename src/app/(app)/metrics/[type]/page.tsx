@@ -575,6 +575,11 @@ export default async function MetricDetailPage({
   const plotted = asBars ? chartValues : downsample(chartValues, MAX_CHART_POINTS);
   const plottedPrev = downsample(prevValues, MAX_CHART_POINTS);
   const rolling = asBars ? undefined : rollingWindow(plotted.length);
+  // The area fill closes each CONTINUOUS run of the curve down to the axis, so
+  // on a sparse series (a weight every few days) it paints one thin vertical
+  // sliver per measure and the chart reads as a spiky signal it is not. Filled
+  // only where the series is actually continuous.
+  const dense = stats.daysTotal > 0 && stats.daysMeasured / stats.daysTotal >= 0.6;
 
   const xLabels =
     buckets && buckets.buckets
@@ -725,7 +730,7 @@ export default async function MetricDetailPage({
                 color,
                 label: compare && granularity === 'day' ? m.dash.currentPeriod : undefined,
                 rolling,
-                area: true,
+                area: dense,
               },
               ...(compare && granularity === 'day' && prevValues.some((v) => v !== null)
                 ? [
