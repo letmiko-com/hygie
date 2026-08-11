@@ -21,14 +21,14 @@ daily summary shapes.
 | apple_sleeping_wrist_temperature | HKQuantityTypeIdentifierAppleSleepingWristTemperature | degC | raw | |
 | breathing_disturbances | HKQuantityTypeIdentifierAppleSleepingBreathingDisturbances | count | raw | |
 | headphone_audio_exposure | HKQuantityTypeIdentifierHeadphoneAudioExposure | dBASPL | raw | |
-| physical_effort | HKQuantityTypeIdentifierPhysicalEffort | kcal/hr·kg | raw | |
+| physical_effort | HKQuantityTypeIdentifierPhysicalEffort | kcal/hr·kg | raw | Per-minute RE-AGGREGATION: one point per minute carrying the minute's average of the HealthKit samples (measured 2026-08-11), not the samples. Line-level XML matching impossible; interval rule applies (see architecture §2) |
 | stair_speed_up | HKQuantityTypeIdentifierStairAscentSpeed | m/s | raw | |
 | stair_speed_down | HKQuantityTypeIdentifierStairDescentSpeed | m/s | raw | |
 | walking_speed | HKQuantityTypeIdentifierWalkingSpeed | km/hr | raw | |
 | walking_step_length | HKQuantityTypeIdentifierWalkingStepLength | cm | raw | |
 | walking_asymmetry_percentage | HKQuantityTypeIdentifierWalkingAsymmetryPercentage | % | raw | |
 | walking_double_support_percentage | HKQuantityTypeIdentifierWalkingDoubleSupportPercentage | % | raw | |
-| time_in_daylight | HKQuantityTypeIdentifierTimeInDaylight | min | raw | |
+| time_in_daylight | HKQuantityTypeIdentifierTimeInDaylight | min | raw | Per-minute RE-AGGREGATION: the XML's five-minute intervals re-sliced into one-minute points (measured 2026-08-11); summing both channels doubles the day. Line-level XML matching impossible; interval rule applies (see architecture §2) |
 | dietary_water | HKQuantityTypeIdentifierDietaryWater | mL | raw | |
 | alcohol_consumption | HKQuantityTypeIdentifierNumberOfAlcoholicBeverages | count | raw | |
 | step_count | HKQuantityTypeIdentifierStepCount | count | minute | Apple-deduplicated (watch+iPhone), composite source `A\|B` |

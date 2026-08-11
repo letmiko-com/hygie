@@ -393,9 +393,20 @@ async function stageRawPoints(ctx: Ctx, staged: StagedRaw[]): Promise<void> {
 
 /**
  * One-to-one multiset matching between staged HAE points and existing XML
- * observations at ±1s, closest first. Returns matched staging idx values and
+ * observations, closest first. Returns matched staging idx values and
  * ambiguous idx values (ties at equal distance competing for the same row are
  * journalized, never resolved arbitrarily and never silently dropped).
+ *
+ * Match window: ±1s, plus the HAE truncation rule. HAE truncates seconds to
+ * :00 for every raw type except heart_rate (docs/hae-mapping.md, measured),
+ * so a staged point sitting exactly on a minute covers the whole minute it
+ * opens: it matches an XML timestamp in [ts_hae, ts_hae + 60s). Under ±1s
+ * alone those types never matched anything and the overlap days doubled.
+ *
+ * The XML backfill applies the same rule facing the other way
+ * (scripts/backfill/match-multiset.mjs, used by import-xml.mjs and
+ * dedup-channels.mjs): whichever channel reaches the database second has its
+ * duplicates refused. Keep the implementations in sync.
  */
 function matchXmlMultiset(
   staged: Array<{ idx: number; typeId: number; sourceId: number; ts: number; valueKey: string }>,
@@ -426,7 +437,8 @@ function matchXmlMultiset(
     for (const s of g.s) {
       for (const x of g.x) {
         const dt = Math.abs(s.ts - x.ts);
-        if (dt <= 1000) pairs.push({ dt, sIdx: s.idx, xId: x.id });
+        const truncated = s.ts % 60_000 === 0 && x.ts >= s.ts && x.ts - s.ts < 60_000;
+        if (dt <= 1000 || truncated) pairs.push({ dt, sIdx: s.idx, xId: x.id });
       }
     }
     pairs.sort((a, b) => a.dt - b.dt || a.sIdx - b.sIdx || (a.xId < b.xId ? -1 : 1));
@@ -458,6 +470,24 @@ function matchXmlMultiset(
   }
   return { matched, ambiguous };
 }
+
+/**
+ * Raw types whose HAE points are per-minute RE-AGGREGATIONS of the HealthKit
+ * samples, not the samples themselves (measured 2026-08-11, noted in
+ * docs/hae-mapping.md): physical_effort arrives as the minute's average,
+ * time_in_daylight as one-minute slices of the XML's five-minute intervals.
+ * Line-level XML matching is structurally impossible for them — no value_key
+ * can pair a re-aggregate with its samples — so they follow the interval rule
+ * instead: the channel that covered a time range first owns it, and the other
+ * channel's points inside that range are dropped and counted. Kept in sync
+ * with MINUTE_AGGREGATED_HK in scripts/backfill/import-xml.mjs and
+ * dedup-channels.mjs. A cleaner end state would reclassify them as a minute
+ * regime with a cutover; that is a taxonomy migration for another day.
+ */
+const MINUTE_AGGREGATED_HK: ReadonlySet<string> = new Set([
+  'HKQuantityTypeIdentifierPhysicalEffort',
+  'HKQuantityTypeIdentifierTimeInDaylight',
+]);
 
 async function normalizeRawRegime(ctx: Ctx, staged: StagedRaw[]): Promise<void> {
   if (staged.length === 0) return;
@@ -495,7 +525,30 @@ async function normalizeRawRegime(ctx: Ctx, staged: StagedRaw[]): Promise<void> 
     bump(ctx.counts, nameByTypeId.get(row.type_id) ?? String(row.type_id), 'deduped_hae');
   }
 
-  // One-to-one XML<->HAE matching at ±1s.
+  // Interval rule for per-minute re-aggregated types: a staged point landing
+  // inside the XML-covered range of its type re-describes content the backfill
+  // already owns, in a shape no line-level match can pair. Dropped and counted.
+  const minuteAggIds = [...MINUTE_AGGREGATED_HK]
+    .map((hk) => ctx.types.get(hk)?.id)
+    .filter((id): id is number => id !== undefined);
+  if (minuteAggIds.length > 0) {
+    const covered = await ctx.client.query<{ type_id: number }>(
+      `delete from staging_hae s
+       using (select o.type_id, min(o.start_ts) as lo, max(o.start_ts) as hi
+                from observations o
+               where o.subject_id = $1 and o.origin = 'health_xml'
+                 and o.type_id = any($2::smallint[])
+               group by o.type_id) x
+       where s.type_id = x.type_id and s.start_ts >= x.lo and s.start_ts <= x.hi
+       returning s.type_id`,
+      [ctx.batch.subject_id, minuteAggIds]
+    );
+    for (const row of covered.rows) {
+      bump(ctx.counts, nameByTypeId.get(row.type_id) ?? String(row.type_id), 'covered_by_xml');
+    }
+  }
+
+  // One-to-one XML<->HAE matching (±1s, plus the minute-truncation window).
   const remaining = await ctx.client.query<{
     idx: number;
     type_id: number;
