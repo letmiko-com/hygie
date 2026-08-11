@@ -4,8 +4,8 @@
 // never here: day strings go through Date.UTC, which involves no timezone,
 // so no date library is needed.
 
-export type Preset = '24h' | '7d' | '1m' | '6m' | '1y' | 'all';
-export const PRESETS: readonly Preset[] = ['24h', '7d', '1m', '6m', '1y', 'all'];
+export type Preset = '24h' | '7d' | '30d' | '6m' | '1y' | 'all';
+export const PRESETS: readonly Preset[] = ['24h', '7d', '30d', '6m', '1y', 'all'];
 
 export interface DayRange {
   fromDay: string;
@@ -85,10 +85,11 @@ export function presetRange(preset: Preset, anchorDay: string, firstDataDay: str
       return { fromDay: anchorDay, toDayExcl: addDays(anchorDay, 1) };
     case '7d':
       return { fromDay: addDays(anchorDay, -6), toDayExcl: addDays(anchorDay, 1) };
-    case '1m': {
-      const from = firstOfMonth(anchorDay);
-      return { fromDay: from, toDayExcl: addMonths(from, 1) };
-    }
+    // Rolling 30 days, not the calendar month: the default view opens on it,
+    // and a calendar month is mostly empty for most of the month. 30 stays
+    // under the 31-day rollup threshold, so the default view is always fresh.
+    case '30d':
+      return { fromDay: addDays(anchorDay, -29), toDayExcl: addDays(anchorDay, 1) };
     case '6m': {
       const monthEnd = addMonths(firstOfMonth(anchorDay), 1);
       return { fromDay: addMonths(monthEnd, -6), toDayExcl: monthEnd };
@@ -107,8 +108,6 @@ export function shiftRange(preset: Preset, range: DayRange, dir: -1 | 1): DayRan
   switch (preset) {
     case 'all':
       return null;
-    case '1m':
-      return { fromDay: addMonths(range.fromDay, dir), toDayExcl: addMonths(range.toDayExcl, dir) };
     case '6m':
       return { fromDay: addMonths(range.fromDay, dir * 6), toDayExcl: addMonths(range.toDayExcl, dir * 6) };
     case '1y':
@@ -148,7 +147,7 @@ export function previousRange(range: DayRange, elapsed?: number): DayRange {
  * combined series. Null preset = custom range.
  */
 export function comparisonRange(preset: Preset | null, range: DayRange, elapsed?: number): DayRange {
-  if (preset === '1m' || preset === '6m' || preset === '1y') {
+  if (preset === '6m' || preset === '1y') {
     const prev = shiftRange(preset, range, -1) as DayRange;
     if (elapsed === undefined) return prev;
     const length = daysBetween(prev.fromDay, prev.toDayExcl);

@@ -43,9 +43,6 @@ export function rangeLabel(preset: Preset | null, range: DayRange, locale: Local
   if (preset === '24h' || range.fromDay === last) {
     return fmt(range.fromDay, locale, { day: 'numeric', month: 'short', year: 'numeric' });
   }
-  if (preset === '1m') {
-    return fmt(range.fromDay, locale, { month: 'long', year: 'numeric' });
-  }
   if (preset === '1y' && range.fromDay.endsWith('-01-01')) {
     return range.fromDay.slice(0, 4);
   }

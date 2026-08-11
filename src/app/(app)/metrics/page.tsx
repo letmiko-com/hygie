@@ -163,7 +163,7 @@ function toRow(entry: InventoryEntry, locale: Locale, today: string, m: Messages
     hk: entry.hkIdentifier,
     // The link opens the detail on the window this row already draws, anchored
     // on the type's OWN last day. Without it the detail screen would open on
-    // the default calendar month, which for a type last recorded in February
+    // the default rolling 30 days, which for a type last recorded in February
     // is an empty page reached by clicking a row full of values.
     href: metricHref(
       entry.hkIdentifier,

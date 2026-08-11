@@ -43,7 +43,7 @@ export const fr: Messages = {
     presets: {
       '24h': '24 h',
       '7d': '7 j',
-      '1m': '1 m',
+      '30d': '30 j',
       '6m': '6 m',
       '1y': '1 an',
       all: 'Tout',

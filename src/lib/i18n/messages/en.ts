@@ -43,7 +43,7 @@ export const en = {
     presets: {
       '24h': '24 h',
       '7d': '7 d',
-      '1m': '1 m',
+      '30d': '30 d',
       '6m': '6 m',
       '1y': '1 y',
       all: 'All',
