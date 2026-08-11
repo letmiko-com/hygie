@@ -3,7 +3,7 @@
 // picker (native date inputs, no dependency) and the compare toggle. The
 // whole state lives in the URL (?p&a, ?from&to, &compare=1): the server
 // resolves it with parseTimeParams, this component only builds URLs.
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import type { Locale } from '@/lib/i18n';
@@ -54,14 +54,19 @@ export function TimeNav({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [rangeError, setRangeError] = useState(false);
   const fromRef = useRef<HTMLInputElement>(null);
   const toRef = useRef<HTMLInputElement>(null);
 
+  // Every navigation starts from the CURRENT query: the screen's own state
+  // (the explorer's ?m and ?scale, sport's ?sport filter) must survive a
+  // time-window change. Only the keys passed in are rewritten. Rebuilding the
+  // query from scratch here silently wiped a five-metric composition the
+  // moment the reader touched a preset chip.
   function push(params: Record<string, string | null>) {
-    const q = new URLSearchParams();
-    if (compare) q.set('compare', '1');
+    const q = new URLSearchParams(searchParams.toString());
     for (const [k, v] of Object.entries(params)) {
       if (v === null) q.delete(k);
       else q.set(k, v);
@@ -70,7 +75,9 @@ export function TimeNav({
   }
 
   function selectPreset(p: Preset) {
-    push({ p, a: null, from: null, to: null });
+    // page: a new window is a new list; a stale page number would dump the
+    // reader at an arbitrary depth of it.
+    push({ p, a: null, from: null, to: null, page: null });
   }
 
   function chevron(dir: -1 | 1) {
@@ -78,13 +85,13 @@ export function TimeNav({
       const shifted = shiftRange(preset, range, dir);
       if (!shifted) return;
       // The shifted range's last day re-anchors every preset correctly.
-      push({ p: preset, a: lastDayOf(shifted), from: null, to: null });
+      push({ p: preset, a: lastDayOf(shifted), from: null, to: null, page: null });
     } else if (!preset) {
       const span = daysBetween(range.fromDay, range.toDayExcl);
       const shift = dir * span;
       const from = addDaysStr(range.fromDay, shift);
       const to = addDaysStr(lastDayOf(range), shift);
-      push({ from, to, p: null, a: null });
+      push({ from, to, p: null, a: null, page: null });
     }
   }
 
@@ -101,7 +108,7 @@ export function TimeNav({
     }
     setRangeError(false);
     setPickerOpen(false);
-    push({ from, to, p: null, a: null });
+    push({ from, to, p: null, a: null, page: null });
   }
 
   const chevronsDisabled = preset === 'all';
@@ -276,16 +283,10 @@ export function TimeNav({
         title={labels.compare}
         aria-pressed={compare}
         onClick={() => {
-          const q = new URLSearchParams();
-          if (preset) {
-            q.set('p', preset);
-          } else {
-            q.set('from', range.fromDay);
-            q.set('to', lastDayOf(range));
-          }
-          if (preset && lastDayOf(range) !== today) q.set('a', lastDayOf(range));
-          if (!compare) q.set('compare', '1');
-          router.push(`${pathname}?${q.toString()}`);
+          // A pure toggle on the current query: the window keys are already
+          // in the URL under their canonical form, and the screen's own state
+          // must survive (same rule as push above).
+          push({ compare: compare ? null : '1' });
         }}
         style={navBtn(
           compare
