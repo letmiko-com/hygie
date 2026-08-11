@@ -24,8 +24,9 @@ import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import { matchMultiset } from './match-multiset.mjs';
 
-const IMPORTER_VERSION = '0.1.0';
+const IMPORTER_VERSION = '0.2.0';
 const KCAL_TO_KJ = 4.184;
 const DIST_TO_M = { km: 1000, m: 1, mi: 1609.344, yd: 0.9144, cm: 0.01, ft: 0.3048 };
 
@@ -200,6 +201,123 @@ function startCopy(client, sql) {
   };
 }
 
+// --- fresh-XML vs HAE dedup --------------------------------------------------------------
+// The HAE worker already refuses to stage a point that matches an existing XML
+// observation at ±1s (normalize-hae.ts, matched_xml). This is the same rule facing
+// the other way: a fresh XML row matching an existing HAE observation is the same
+// physical measurement recorded twice, and the row already in the database wins.
+// Without it, replaying the export on a subject with live HAE history doubles every
+// discrete value on the overlap days (--only-missing-types is the setup: the
+// selected types have no XML rows by definition, but may well have HAE ones).
+// Runs inside the COPY transaction, so a failed run still leaves zero rows behind.
+//
+// Two dedup shapes, per type:
+//   - line-level multiset matching (match-multiset.mjs) for types whose HAE
+//     points are the HealthKit samples themselves;
+//   - the INTERVAL rule for types whose HAE points are per-minute
+//     re-aggregations (MINUTE_AGGREGATED_HK): no value can pair a re-aggregate
+//     with its samples, so the channel that covered a range first owns it and
+//     fresh XML rows inside the HAE-covered range are dropped (covered_by_hae).
+// Keep MINUTE_AGGREGATED_HK in sync with normalize-hae.ts and dedup-channels.mjs.
+const MINUTE_AGGREGATED_HK = new Set([
+  'HKQuantityTypeIdentifierPhysicalEffort',
+  'HKQuantityTypeIdentifierTimeInDaylight',
+]);
+
+async function dedupFreshXmlAgainstHae(client, subjectId, runId, counts, nameOfTypeId) {
+  // Without a single HAE row for the subject there is nothing to match: the
+  // initial backfill on a fresh database skips all of this.
+  const probe = await client.query(
+    "select 1 from observations where subject_id = $1 and origin = 'hae' limit 1",
+    [subjectId]
+  );
+  if (probe.rowCount === 0) return 0;
+
+  const ranges = await client.query(
+    `select type_id, min(start_ts) as lo, max(start_ts) as hi
+       from observations
+      where subject_id = $1 and import_run_id = $2 and value_key is not null
+      group by type_id`,
+    [subjectId, runId]
+  );
+
+  let dropped = 0;
+  for (const r of ranges.rows) {
+    const name = nameOfTypeId.get(r.type_id) ?? String(r.type_id);
+
+    if (MINUTE_AGGREGATED_HK.has(name)) {
+      const covered = await client.query(
+        `delete from observations o
+         using (select min(start_ts) as lo, max(start_ts) as hi
+                  from observations
+                 where subject_id = $1 and type_id = $2 and origin = 'hae') x
+         where o.subject_id = $1 and o.type_id = $2 and o.import_run_id = $3
+           and o.start_ts >= x.lo and o.start_ts <= x.hi`,
+        [subjectId, r.type_id, runId]
+      );
+      if (covered.rowCount > 0) {
+        (counts.deduped_against_hae.covered_by_hae ??= {})[name] = covered.rowCount;
+        dropped += covered.rowCount;
+      }
+      continue;
+    }
+
+    // Intersection of the run's range with the type's HAE range, widened by the
+    // ±1s match window. Empty intersection = nothing to load for this type.
+    const bounds = await client.query(
+      `select greatest(min(start_ts), $3::timestamptz) - interval '1 second' as lo,
+              least(max(start_ts), $4::timestamptz) + interval '1 second' as hi
+         from observations
+        where subject_id = $1 and type_id = $2 and origin = 'hae' and value_key is not null`,
+      [subjectId, r.type_id, r.lo, r.hi]
+    );
+    const { lo, hi } = bounds.rows[0];
+    if (lo === null || hi === null || lo > hi) continue;
+
+    const fresh = await client.query(
+      `select id::text as id, source_id, start_ts, value_key::text as value_key
+         from observations
+        where subject_id = $1 and type_id = $2 and origin = 'health_xml'
+          and import_run_id = $5 and value_key is not null
+          and start_ts >= $3 and start_ts <= $4`,
+      [subjectId, r.type_id, lo, hi, runId]
+    );
+    if (fresh.rowCount === 0) continue;
+    const hae = await client.query(
+      `select id::text as id, source_id, start_ts, value_key::text as value_key
+         from observations
+        where subject_id = $1 and type_id = $2 and origin = 'hae' and value_key is not null
+          and start_ts >= $3 and start_ts <= $4`,
+      [subjectId, r.type_id, lo, hi]
+    );
+    if (hae.rowCount === 0) continue;
+
+    const toPts = (rows) =>
+      rows.map((o) => ({
+        id: o.id,
+        typeId: r.type_id,
+        sourceId: o.source_id,
+        ts: o.start_ts.getTime(),
+        valueKey: o.value_key,
+      }));
+    const { matched, ambiguous } = matchMultiset(toPts(fresh.rows), toPts(hae.rows), {
+      haeSide: 'existing',
+    });
+    const toDrop = [...matched, ...ambiguous];
+    if (toDrop.length === 0) continue;
+
+    await client.query('delete from observations where id = any($1::bigint[])', [toDrop]);
+    if (matched.size > 0) {
+      (counts.deduped_against_hae.matched ??= {})[name] = matched.size;
+    }
+    if (ambiguous.size > 0) {
+      (counts.deduped_against_hae.ambiguous ??= {})[name] = ambiguous.size;
+    }
+    dropped += toDrop.length;
+  }
+  return dropped;
+}
+
 // --- main ------------------------------------------------------------------------------
 
 const meta = new pg.Client({ connectionString: databaseUrl }); // run bookkeeping + lookups
@@ -341,6 +459,11 @@ try {
       unit_mismatch: {},           // record unit differs from the taxonomy's expected XML unit
       invalid: {},                 // unparsable dates/offsets, non-finite values, bad workouts
     },
+    // Fresh XML rows removed again before commit because an existing HAE
+    // observation already carries the same measurement (±1s one-to-one match,
+    // see dedupFreshXmlAgainstHae). 'ambiguous' are ties dropped rather than
+    // resolved arbitrarily, mirroring normalize-hae.ts.
+    deduped_against_hae: { matched: {}, ambiguous: {} },
   };
 
   const t0 = Date.now();
@@ -521,6 +644,10 @@ try {
   console.log(`parse done in ${((Date.now() - t0) / 1000).toFixed(1)}s, finishing COPYs`);
 
   await obsCopy.end();
+  // Same measurement, two channels: fresh XML rows matching an existing HAE
+  // observation are dropped before commit, counted, never silent.
+  const nameOfTypeId = new Map([...types.entries()].map(([name, t]) => [t.id, name]));
+  const dedupDropped = await dedupFreshXmlAgainstHae(copy, subjectId, runId, counts, nameOfTypeId);
   const sleepCopy = startCopy(
     copy,
     'copy sleep_segments (subject_id, source_id, stage, start_ts, end_ts, tz_offset_min) from stdin'
@@ -557,6 +684,12 @@ try {
     `${counts.workouts_inserted} workouts; ${skippedTotal} records skipped ` +
     `(detail per type in import_runs.counts, run ${runId})`
   );
+  if (dedupDropped > 0) {
+    console.log(
+      `${dedupDropped} of those observations removed again before commit: an existing HAE ` +
+      `observation already carries the same measurement (deduped_against_hae in import_runs.counts)`
+    );
+  }
   // A bulk COPY writes behind the rollups' back: nothing invalidated them.
   if (counts.observations_inserted > 0) {
     console.log(
