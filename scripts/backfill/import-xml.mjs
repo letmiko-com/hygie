@@ -458,6 +458,7 @@ try {
       category_without_contract: {}, // category value missing from metric_category_values
       unit_mismatch: {},           // record unit differs from the taxonomy's expected XML unit
       invalid: {},                 // unparsable dates/offsets, non-finite values, bad workouts
+      duplicate_workout_in_file: {}, // strictly identical <Workout> exported twice by Apple
     },
     // Fresh XML rows removed again before commit because an existing HAE
     // observation already carries the same measurement (±1s one-to-one match,
@@ -476,6 +477,12 @@ try {
 
   const sleepRows = [];   // small (thousands): buffered, COPYed after the stream
   const workoutRows = []; // small (hundreds)
+  // Apple's export can contain the same <Workout> element twice (three known
+  // pairs in the 2024 history). Two identical COPY lines are one workout:
+  // the duplicate is counted (skipped.duplicate_workout_in_file, by activity
+  // type), never inserted and never dropped silently. The id column is not in
+  // the COPY line, so line equality really is strict workout equality.
+  const workoutSeen = new Set();
 
   // Streaming parse. The export is line-structured: one element start tag per line, all
   // attributes on that line. We only track enough state to (a) skip Records nested in
@@ -574,11 +581,18 @@ try {
       if (m) elevationUpM = Number(m[1]) * (m[2] === 'cm' ? 0.01 : 1);
     }
     const source = await sourceIdOf(normSource(w.sourceName ?? '?'));
-    workoutRows.push(
+    const row =
       `${subjectId}\t${esc(w.activityType ?? '?')}\t${source}\t${w.startDate}\t${w.endDate}\t${tz}\t` +
       `${w.isIndoor === null ? N : w.isIndoor ? 't' : 'f'}\t${durationS}\t${distanceM ?? N}\t${energyKj ?? N}\t` +
-      `${elevationUpM ?? N}\t${esc(JSON.stringify({ statistics: stats }))}\n`
-    );
+      `${elevationUpM ?? N}\t${esc(JSON.stringify({ statistics: stats }))}\n`;
+    if (workoutSeen.has(row)) {
+      const key = w.activityType ?? '?';
+      counts.skipped.duplicate_workout_in_file[key] =
+        (counts.skipped.duplicate_workout_in_file[key] ?? 0) + 1;
+      continue;
+    }
+    workoutSeen.add(row);
+    workoutRows.push(row);
     counts.workouts_inserted++;
   }
 
