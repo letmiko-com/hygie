@@ -63,7 +63,9 @@ export function parseTimeParams(
   }
 
   const rawPreset = one(sp.p);
-  const preset: Preset = rawPreset && isPreset(rawPreset) ? rawPreset : '1m';
+  // '1m' (the old calendar-month preset) falls through isPreset to the
+  // default, so a bookmarked ?p=1m degrades to the nearly identical window.
+  const preset: Preset = rawPreset && isPreset(rawPreset) ? rawPreset : '30d';
   const rawAnchor = one(sp.a);
   let anchorDay = rawAnchor && isDay(rawAnchor) ? rawAnchor : today;
   // An anchor in the future or absurdly old is a typo, not a view.
