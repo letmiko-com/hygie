@@ -16,7 +16,16 @@ const taxonomy = JSON.parse(
   await readFile(join(here, '..', 'db', 'taxonomy.json'), 'utf8')
 );
 
-const supported = taxonomy.metric_types.filter((t) => t.supported);
+// Types iOS refuses in a read-authorization request: requestAuthorization
+// throws NSInvalidArgumentException ("Authorization to read the following
+// types is disallowed") and kills the app. Found the hard way at the first
+// real pairing, 2026-08-12. The sleep duration goal is a system setting,
+// not a measurement; the XML backfill still carries it server-side.
+const AUTH_DISALLOWED = new Set(['HKDataTypeSleepDurationGoal']);
+
+const supported = taxonomy.metric_types.filter(
+  (t) => t.supported && !AUTH_DISALLOWED.has(t.hk_identifier)
+);
 const minute = supported.filter(
   (t) => t.kind === 'quantity' && t.hae_regime === 'minute_cumulative'
 );
