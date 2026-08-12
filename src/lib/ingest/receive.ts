@@ -14,6 +14,7 @@ import { getDb } from '@/lib/db';
 
 export const HAE_FORMAT_VERSION = 'hae-v2';
 export const HAE_ADAPTER_VERSION = '0.1.0';
+export const NATIVE_ADAPTER_VERSION = '0.1.0';
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024 * 1024;
 
 export function getDataDir(): string {
@@ -156,6 +157,20 @@ function parseBooleanHeader(value: string | null): boolean | null {
 }
 
 export async function receiveHaeBatch(req: Request): Promise<Response> {
+  return receiveBatch(req, HAE_FORMAT_VERSION, HAE_ADAPTER_VERSION);
+}
+
+/** Native channel (hygie-native/1): same receive contract, another format tag. */
+export async function receiveNativeBatch(req: Request): Promise<Response> {
+  const { NATIVE_FORMAT_VERSION } = await import('@/lib/ingest/normalize-native');
+  return receiveBatch(req, NATIVE_FORMAT_VERSION, NATIVE_ADAPTER_VERSION);
+}
+
+async function receiveBatch(
+  req: Request,
+  formatVersion: string,
+  adapterVersion: string
+): Promise<Response> {
   // 1. Authentication first: never touch the body for an unknown key.
   const key = req.headers.get('x-hygie-device-key');
   if (!key) {
@@ -236,8 +251,8 @@ export async function receiveHaeBatch(req: Request): Promise<Response> {
         streamed.bytes,
         streamed.sha256,
         rawPath,
-        HAE_FORMAT_VERSION,
-        HAE_ADAPTER_VERSION,
+        formatVersion,
+        adapterVersion,
       ]
     );
     // Best effort, outside the durability contract.
