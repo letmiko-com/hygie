@@ -1,7 +1,8 @@
 // Devices screen (design reference: design/ui_kits/app/Devices.jsx, adapted
-// to reality: HAE is configured by hand, so pairing means creating a key
-// shown once with copy-ready instructions; the mock's short-code + QR flow
-// belongs to the future Hygie Sync app). Devices are revoked, never deleted.
+// to reality: pairing means creating a key shown once, entered with the
+// server URL in the Hygie Sync app (or wired by hand into a Health Auto
+// Export REST automation); the mock's short-code + QR flow comes later).
+// Devices are revoked, never deleted.
 import type { Metadata } from 'next';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
@@ -39,8 +40,8 @@ export default async function DevicesPage() {
     (acc, d) => (d.lastSeenAt && (!acc || d.lastSeenAt > acc) ? d.lastSeenAt : acc),
     null
   );
-  const base = process.env.HYGIE_BASE_URL ?? '';
-  const ingestUrl = `${base.replace(/\/$/, '')}/api/v1/ingest/hae`;
+  const serverUrl = (process.env.HYGIE_BASE_URL ?? '').replace(/\/$/, '');
+  const ingestUrl = `${serverUrl}/api/v1/ingest/hae`;
 
   const dateFmt = new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', {
     day: 'numeric',
@@ -75,6 +76,7 @@ export default async function DevicesPage() {
       </div>
 
       <PairPanel
+        serverUrl={serverUrl}
         ingestUrl={ingestUrl}
         labels={{
           pairButton: m.devices.pairButton,
@@ -86,6 +88,8 @@ export default async function DevicesPage() {
           keyTitle: m.devices.keyTitle,
           keyOnce: m.devices.keyOnce,
           instructions: m.devices.instructions,
+          serverUrlLabel: m.devices.serverUrlLabel,
+          altInstructions: m.devices.altInstructions,
           ingestUrlLabel: m.devices.ingestUrlLabel,
           headerLabel: m.devices.headerLabel,
           copy: m.devices.copy,

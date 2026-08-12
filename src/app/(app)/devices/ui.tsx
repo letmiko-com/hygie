@@ -16,6 +16,8 @@ export interface PairLabels {
   keyTitle: string;
   keyOnce: string;
   instructions: string;
+  serverUrlLabel: string;
+  altInstructions: string;
   ingestUrlLabel: string;
   headerLabel: string;
   copy: string;
@@ -65,7 +67,15 @@ function CopyButton({ value, copyLabel, copiedLabel }: { value: string; copyLabe
   );
 }
 
-export function PairPanel({ ingestUrl, labels }: { ingestUrl: string; labels: PairLabels }) {
+export function PairPanel({
+  serverUrl,
+  ingestUrl,
+  labels,
+}: {
+  serverUrl: string;
+  ingestUrl: string;
+  labels: PairLabels;
+}) {
   const [open, setOpen] = useState(false);
   const [result, formAction, pending] = useActionState<PairResult | null, FormData>(pairDeviceAction, null);
 
@@ -198,15 +208,23 @@ export function PairPanel({ ingestUrl, labels }: { ingestUrl: string; labels: Pa
             <CopyButton value={result.rawKey} copyLabel={labels.copy} copiedLabel={labels.copied} />
           </div>
           <p style={{ margin: 0, font: '400 var(--text-sm)/1.5 var(--font-ui)', color: 'var(--text-2)' }}>{labels.instructions}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span className="hy-label">{labels.serverUrlLabel}</span>
+            <code className="tnum" style={{ font: '400 var(--text-xs)/1 var(--font-data)' }}>{serverUrl}</code>
+            <CopyButton value={serverUrl} copyLabel={labels.copy} copiedLabel={labels.copied} />
+          </div>
+          <p style={{ margin: 0, font: '400 var(--text-2xs)/1.5 var(--font-ui)', color: 'var(--text-3)' }}>
+            {labels.altInstructions}
+          </p>
           <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               <span className="hy-label">{labels.ingestUrlLabel}</span>
-              <code className="tnum" style={{ font: '400 var(--text-xs)/1 var(--font-data)' }}>{ingestUrl}</code>
+              <code className="tnum" style={{ font: '400 var(--text-2xs)/1 var(--font-data)', color: 'var(--text-3)' }}>{ingestUrl}</code>
               <CopyButton value={ingestUrl} copyLabel={labels.copy} copiedLabel={labels.copied} />
             </span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               <span className="hy-label">{labels.headerLabel}</span>
-              <code className="tnum" style={{ font: '400 var(--text-xs)/1 var(--font-data)' }}>X-Hygie-Device-Key</code>
+              <code className="tnum" style={{ font: '400 var(--text-2xs)/1 var(--font-data)', color: 'var(--text-3)' }}>X-Hygie-Device-Key</code>
             </span>
           </div>
         </div>
