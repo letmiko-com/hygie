@@ -22,6 +22,11 @@ import {
   readAndValidateBatchFile,
   resolveRawPath,
 } from '@/lib/ingest/normalize-hae';
+import {
+  NATIVE_FORMAT_VERSION,
+  normalizeNativePayload,
+  readAndValidateNativeBatchFile,
+} from '@/lib/ingest/normalize-native';
 import { drainRollupQueue } from '@/lib/rollups';
 
 const LEASE = "interval '5 minutes'";
@@ -36,6 +41,7 @@ interface ClaimedBatch {
   attempt_count: number;
   raw_path: string;
   body_sha256: Buffer;
+  format_version: string;
 }
 
 interface WorkerState {
@@ -89,7 +95,7 @@ async function claimNext(workerId: string): Promise<ClaimedBatch | null> {
        for update skip locked
      )
      returning b.id, b.subject_id, b.device_id, b.status, b.attempt_count,
-               b.raw_path, b.body_sha256`,
+               b.raw_path, b.body_sha256, b.format_version`,
     [workerId, maxAttempts()]
   );
   return rows[0] ?? null;
@@ -179,13 +185,17 @@ async function processBatch(batch: ClaimedBatch, workerId: string): Promise<void
   const s = state();
   let status: ClaimedBatch['status'] = batch.status;
 
+  // Format dispatch: one pipeline, two wire formats (architecture §3,
+  // docs/native-format.md). Everything downstream of validation/normalization
+  // (statuses, rollup drain, retries) is format-blind.
+  const native = batch.format_version === NATIVE_FORMAT_VERSION;
+
   while (!s.stopping) {
     if (status === 'received') {
       // Step 1: validate (parse, checksum, shape) and record the observed range.
-      const { declaredRange } = await readAndValidateBatchFile(
-        batch.raw_path,
-        batch.body_sha256
-      );
+      const { declaredRange } = native
+        ? await readAndValidateNativeBatchFile(batch.raw_path, batch.body_sha256)
+        : await readAndValidateBatchFile(batch.raw_path, batch.body_sha256);
       await getDb().query(
         `update ingest_batches
          set declared_range = case
@@ -200,14 +210,16 @@ async function processBatch(batch: ClaimedBatch, workerId: string): Promise<void
       console.log(`[worker] batch ${batch.id} validated`);
     } else if (status === 'validated') {
       // Step 2: normalize inside one transaction (advisory locks taken within).
-      const { payload } = await readAndValidateBatchFile(batch.raw_path, batch.body_sha256);
-      const counts = await withTransaction((client) =>
-        normalizeHaePayload(
-          client,
-          { id: batch.id, subject_id: batch.subject_id, device_id: batch.device_id },
-          payload
-        )
-      );
+      const forNormalize = { id: batch.id, subject_id: batch.subject_id, device_id: batch.device_id };
+      const counts = native
+        ? await (async () => {
+            const { payload } = await readAndValidateNativeBatchFile(batch.raw_path, batch.body_sha256);
+            return withTransaction((client) => normalizeNativePayload(client, forNormalize, payload));
+          })()
+        : await (async () => {
+            const { payload } = await readAndValidateBatchFile(batch.raw_path, batch.body_sha256);
+            return withTransaction((client) => normalizeHaePayload(client, forNormalize, payload));
+          })();
       await setStatus(batch.id, 'normalized', workerId, { counts, normalized: true });
       status = 'normalized';
       console.log(`[worker] batch ${batch.id} normalized`);

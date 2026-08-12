@@ -256,7 +256,7 @@ export async function readAndValidateBatchFile(
 // ---------------------------------------------------------------------------
 // Normalization context and counters
 
-interface MetricTypeRow {
+export interface MetricTypeRow {
   id: number;
   hk_identifier: string;
   kind: 'quantity' | 'category';
@@ -275,7 +275,7 @@ export interface NormalizeCounts {
   dirty_ranges?: number;
 }
 
-function bump(counts: NormalizeCounts, name: string, key: string, by = 1): void {
+export function bump(counts: NormalizeCounts, name: string, key: string, by = 1): void {
   if (by === 0) return;
   const c = (counts.metrics[name] ??= {});
   c[key] = (c[key] ?? 0) + by;
@@ -287,7 +287,7 @@ export interface BatchForNormalize {
   device_id: string;
 }
 
-interface Ctx {
+export interface Ctx {
   client: pg.PoolClient;
   batch: BatchForNormalize;
   counts: NormalizeCounts;
@@ -302,7 +302,7 @@ interface Ctx {
   dirtyRanges: DirtyRange[];
 }
 
-async function getSourceId(ctx: Ctx, rawName: string | undefined): Promise<number> {
+export async function getSourceId(ctx: Ctx, rawName: string | undefined): Promise<number> {
   const name = normalizeSourceName(rawName);
   const cached = ctx.sourceIds.get(name);
   if (cached !== undefined) return cached;
@@ -316,7 +316,7 @@ async function getSourceId(ctx: Ctx, rawName: string | undefined): Promise<numbe
   return rows[0].id;
 }
 
-async function getUnitId(ctx: Ctx, rawName: string): Promise<number | null> {
+export async function getUnitId(ctx: Ctx, rawName: string): Promise<number | null> {
   const name = rawName.trim();
   if (name === '') return null;
   const cached = ctx.unitIds.get(name);
@@ -346,7 +346,7 @@ interface StagedRaw {
   originalUnitId: number | null;
 }
 
-function quantize(value: number, scale: number | null): string | null {
+export function quantize(value: number, scale: number | null): string | null {
   if (scale === null) return null;
   return String(Math.round(value * scale));
 }
@@ -630,7 +630,7 @@ async function normalizeRawRegime(ctx: Ctx, staged: StagedRaw[]): Promise<void> 
 // ---------------------------------------------------------------------------
 // Minute regime: upsert under device authority (channel_cutovers)
 
-interface MinutePoint {
+export interface MinutePoint {
   haeName: string;
   typeId: number;
   sourceId: number;
@@ -638,7 +638,7 @@ interface MinutePoint {
   value: number;
 }
 
-async function normalizeMinuteRegime(ctx: Ctx, points: MinutePoint[]): Promise<void> {
+export async function normalizeMinuteRegime(ctx: Ctx, points: MinutePoint[]): Promise<void> {
   if (points.length === 0) return;
   const byType = new Map<number, MinutePoint[]>();
   for (const p of points) {
@@ -1055,13 +1055,16 @@ async function normalizeWorkout(ctx: Ctx, w: HaeWorkout): Promise<void> {
  * plus one for the workout namespace, so two workers can never interleave writes
  * for the same series. Returns detailed per-type counters for ingest_batches.counts.
  */
-export async function normalizeHaePayload(
+/**
+ * Loads everything a normalizer needs into a fresh context: the taxonomy,
+ * the subject's opt-outs and timezone, empty caches and an empty rollup
+ * invalidation queue. Shared by the HAE and native normalizers so the two
+ * channels cannot drift on what a context means.
+ */
+export async function buildNormalizeCtx(
   client: pg.PoolClient,
-  batch: BatchForNormalize,
-  payload: HaePayload
-): Promise<NormalizeCounts> {
-  const counts: NormalizeCounts = { metrics: {} };
-
+  batch: BatchForNormalize
+): Promise<Ctx> {
   const typesRes = await client.query<MetricTypeRow>(
     `select mt.id, mt.hk_identifier, mt.kind, mt.hae_regime,
             u.name as canonical_unit, mt.quantize_scale, mt.supported
@@ -1083,10 +1086,10 @@ export async function normalizeHaePayload(
   );
   if (subjRes.rows.length === 0) throw new Error('subject not found');
 
-  const ctx: Ctx = {
+  return {
     client,
     batch,
-    counts,
+    counts: { metrics: {} },
     types,
     optOut,
     subjectTimezone: subjRes.rows[0].timezone,
@@ -1095,6 +1098,15 @@ export async function normalizeHaePayload(
     dirtyHours: new Map(),
     dirtyRanges: [],
   };
+}
+
+export async function normalizeHaePayload(
+  client: pg.PoolClient,
+  batch: BatchForNormalize,
+  payload: HaePayload
+): Promise<NormalizeCounts> {
+  const ctx = await buildNormalizeCtx(client, batch);
+  const { counts, types, optOut } = ctx;
 
   const metrics = payload.data.metrics ?? [];
   const workouts = payload.data.workouts ?? [];
