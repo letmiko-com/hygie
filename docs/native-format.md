@@ -76,9 +76,10 @@ One entry per HKSample, straight from `HKAnchoredObjectQuery`:
    last HAE batch and the pairing is backfilled by the next XML import,
    whose own guard (import-xml ≥ 0.2.0) handles that overlap.
 
-Deleted objects reported by anchored queries are counted
-(`deleted_reported`) and NOT applied: Hygie never deletes health data on a
-device's say-so; reconciliation happens at the next XML backfill.
+Deleted objects reported by anchored queries are ignored by the app (the
+wire format carries no deletion field) and therefore never applied: Hygie
+never deletes health data on a device's say-so; reconciliation happens at
+the next XML backfill.
 
 ## minutes — cumulative types
 
