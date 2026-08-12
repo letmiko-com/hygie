@@ -1,7 +1,8 @@
 // Sync status screen (design reference: design/ui_kits/app/Sync.jsx).
 // Adapted to the real MVP data: the mock's "detected gaps" panel is replaced
 // by the recent batches table (gap detection is post-MVP), and there is no
-// "sync now" button (HAE pushes; the server cannot trigger a sync).
+// "sync now" button (the companion app pushes; the server cannot trigger
+// a sync).
 import type { Metadata } from 'next';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Panel, PanelLabel } from '@/components/ui/Panel';
@@ -37,7 +38,7 @@ import { dayInZone } from '@/lib/queries/time';
 export const metadata: Metadata = { title: 'Synchronisation · Hygie' };
 export const dynamic = 'force-dynamic';
 
-/** Data older than this is flagged behind (HAE pushes at least daily). */
+/** Data older than this is flagged behind (the companion app pushes at least daily). */
 const STALE_AFTER_MS = 26 * 60 * 60 * 1000;
 
 function freshness(lastSeen: Date | null, failed: boolean, pending: boolean): SyncState {
@@ -308,6 +309,12 @@ export default async function SyncPage() {
                 render: (r) => fmtRelative(r.receivedAt as Date, locale, tz),
               },
               { key: 'deviceName', label: m.sync.batchDevice, muted: true },
+              {
+                key: 'formatVersion',
+                label: m.sync.batchChannel,
+                muted: true,
+                render: (r) => m.sync.channelNames[String(r.formatVersion)] ?? String(r.formatVersion),
+              },
               {
                 key: 'status',
                 label: m.sync.batchStatusCol,

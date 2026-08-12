@@ -95,6 +95,8 @@ export interface BatchInfo {
   bodyBytes: number;
   /** Points made visible by this batch (inserted raw + minute + daily rows). */
   pointsIngested: number | null;
+  /** Wire format of the batch ('hae-v2', 'hygie-native-v1'): tells the channel apart. */
+  formatVersion: string;
   errorCode: string | null;
   errorStep: string | null;
 }
@@ -108,12 +110,13 @@ export async function recentBatches(ctx: SubjectContext, limit = 20): Promise<Ba
     attempt_count: number;
     body_bytes: string;
     points: string | null;
+    format_version: string;
     error_code: string | null;
     error_step: string | null;
   }
   const { rows } = await getDb().query<Row>(
     `select b.id, d.name as device_name, b.received_at, b.status, b.attempt_count,
-            b.body_bytes,
+            b.body_bytes, b.format_version,
             (select sum(coalesce((v->>'inserted')::bigint, 0)
                       + coalesce((v->>'minute_inserted')::bigint, 0)
                       + coalesce((v->>'daily_upserted')::bigint, 0))
@@ -136,6 +139,7 @@ export async function recentBatches(ctx: SubjectContext, limit = 20): Promise<Ba
     attemptCount: r.attempt_count,
     bodyBytes: Number(r.body_bytes),
     pointsIngested: r.points === null ? null : Number(r.points),
+    formatVersion: r.format_version,
     errorCode: r.error_code,
     errorStep: r.error_step,
   }));
