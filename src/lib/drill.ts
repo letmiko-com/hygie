@@ -9,7 +9,12 @@ export interface DaySpan {
   toDay: string;
 }
 
-/** A clickable zone over one chart bucket. */
+/**
+ * A clickable zone over one chart bucket. Renderers MUST pass
+ * prefetch={false} to the Link: a chart carries hundreds of zones, and the
+ * default viewport prefetch would fire one dynamic SSR request per zone
+ * (enough to trip the Cloudflare per-IP rate limit on its own).
+ */
 export interface DrillZone {
   href: string;
   label: string;

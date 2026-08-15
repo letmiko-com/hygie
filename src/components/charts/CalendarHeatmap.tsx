@@ -83,6 +83,7 @@ export function CalendarHeatmap({
             <Link
               key={i}
               href={zone.href}
+              prefetch={false}
               className="hy-drill"
               aria-label={zone.label}
               title={title ? `${title} · ${zone.label}` : zone.label}
