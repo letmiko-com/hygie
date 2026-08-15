@@ -1,4 +1,6 @@
+import Link from 'next/link';
 import { ABSENT } from '@/lib/format';
+import type { DrillZone } from '@/lib/drill';
 
 /**
  * Bar chart in pure flex divs (server-renderable, no chart dependency).
@@ -13,6 +15,7 @@ export function BarChart({
   ariaLabel,
   noDataLabel,
   format = (v: number) => String(Math.round(v)),
+  drill,
 }: {
   data: Array<number | null>;
   /** Sparse axis labels rendered space-between under the bars. */
@@ -22,13 +25,20 @@ export function BarChart({
   ariaLabel: string;
   noDataLabel: string;
   format?: (v: number) => string;
+  /**
+   * One clickable zone per bar (same indexing as data): the whole column
+   * becomes the link, not just the bar. Null entries stay inert.
+   */
+  drill?: Array<DrillZone | null>;
 }) {
   const max = Math.max(1, ...data.filter((v): v is number => v !== null));
   // A fixed 6% gap only works for a handful of bars; 30 bars would eat the
   // whole width in gaps.
   const gap = data.length > 12 ? 2 : '6%';
   return (
-    <div role="img" aria-label={ariaLabel}>
+    // With drill links inside, role="img" would flatten them out of the
+    // accessibility tree: the group role keeps them reachable.
+    <div role={drill ? 'group' : 'img'} aria-label={ariaLabel}>
       <div
         style={{
           display: 'flex',
@@ -39,32 +49,53 @@ export function BarChart({
           paddingBottom: 0,
         }}
       >
-        {data.map((v, i) =>
-          v === null ? (
-            <span
+        {data.map((v, i) => {
+          const bar =
+            v === null ? (
+              <span
+                title={drill?.[i] ? undefined : noDataLabel}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  height: 1,
+                  borderTop: '2px dotted var(--text-3)',
+                  background: 'transparent',
+                }}
+              />
+            ) : (
+              <span
+                title={drill?.[i] ? undefined : format(v)}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  height: `${Math.max(1.5, (v / max) * 100)}%`,
+                  background: color,
+                  borderRadius: '2px 2px 0 0',
+                }}
+              />
+            );
+          const zone = drill?.[i] ?? null;
+          if (zone === null) {
+            return (
+              <span key={i} style={{ flex: 1, minWidth: 1, alignSelf: 'stretch', display: 'flex', alignItems: 'flex-end' }}>
+                {bar}
+              </span>
+            );
+          }
+          const value = v === null ? noDataLabel : format(v);
+          return (
+            <Link
               key={i}
-              title={noDataLabel}
-              style={{
-                flex: 1,
-                height: 1,
-                borderTop: '2px dotted var(--text-3)',
-                background: 'transparent',
-              }}
-            />
-          ) : (
-            <span
-              key={i}
-              title={format(v)}
-              style={{
-                flex: 1,
-                height: `${Math.max(1.5, (v / max) * 100)}%`,
-                background: color,
-                borderRadius: '2px 2px 0 0',
-                minWidth: 1,
-              }}
-            />
-          )
-        )}
+              href={zone.href}
+              className="hy-drill"
+              aria-label={zone.label}
+              title={`${value} · ${zone.label}`}
+              style={{ flex: 1, minWidth: 1, alignSelf: 'stretch', display: 'flex', alignItems: 'flex-end' }}
+            >
+              {bar}
+            </Link>
+          );
+        })}
       </div>
       {labels.length > 0 && (
         <div

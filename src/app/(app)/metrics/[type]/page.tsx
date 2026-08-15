@@ -50,6 +50,7 @@ import {
   fmtPercent,
   metricWriter,
 } from '@/lib/format';
+import { bucketSpans, drillZone, spanQuery } from '@/lib/drill';
 import { getMessages, resolveLocale, type Locale, type Messages } from '@/lib/i18n';
 import {
   dataColor,
@@ -418,6 +419,10 @@ export default async function MetricDetailPage({
     const writeOcc = (v: number | null): string | null =>
       v === null ? null : duration ? fmtHoursMinutes(v) : fmtInt(v, locale);
     const values = downsample(stats.counts, MAX_CHART_POINTS);
+    // Each bar drills into the exact day span it aggregates, on this page.
+    const occDrill = bucketSpans(stats.days, MAX_CHART_POINTS).map((s) =>
+      drillZone(s, metricHref(hk, spanQuery(s)), locale, m)
+    );
     const xLabels = dayAxisLabels(
       stats.days,
       locale,
@@ -516,6 +521,7 @@ export default async function MetricDetailPage({
             ariaLabel={`${label} — ${m.metric.chartTitle}`}
             noDataLabel={m.common.noData}
             format={(v) => writeOcc(v) ?? ABSENT}
+            drill={occDrill}
           />
           <p style={{ font: '400 var(--text-2xs)/1.5 var(--font-ui)', color: 'var(--text-3)', margin: '10px 0 0' }}>
             {m.metric.timelineNote}
@@ -574,6 +580,14 @@ export default async function MetricDetailPage({
   const asBars = cumulative && granularity === 'day' && chartValues.length <= MAX_BARS;
   const plotted = asBars ? chartValues : downsample(chartValues, MAX_CHART_POINTS);
   const plottedPrev = downsample(prevValues, MAX_CHART_POINTS);
+  // Day buckets drill into the exact day span they cover, on this page. Hour
+  // and minute buckets do not: the URL time model only carries whole days.
+  const chartDrill =
+    granularity === 'day'
+      ? (asBars ? stats.days.map((d) => ({ fromDay: d, toDay: d })) : bucketSpans(stats.days, MAX_CHART_POINTS)).map(
+          (s) => drillZone(s, metricHref(hk, spanQuery(s)), locale, m)
+        )
+      : undefined;
   const rolling = asBars ? undefined : rollingWindow(plotted.length);
   // The area fill closes each CONTINUOUS run of the curve down to the axis, so
   // on a sparse series (a weight every few days) it paints one thin vertical
@@ -716,6 +730,7 @@ export default async function MetricDetailPage({
             ariaLabel={`${label} — ${m.metric.chartTitle}`}
             noDataLabel={m.common.noData}
             format={(v) => writer.writeDisplay(v) ?? ABSENT}
+            drill={chartDrill}
           />
         ) : (
           <LineChart
@@ -724,6 +739,7 @@ export default async function MetricDetailPage({
             emptyLabel={m.common.noDataOnPeriod}
             yFormat={(v, digits) => fmtNumber(v, locale, digits)}
             xLabels={xLabels}
+            drill={chartDrill}
             series={[
               {
                 data: plotted,
@@ -774,6 +790,9 @@ export default async function MetricDetailPage({
               color={color}
               dayLabels={m.dash.dayInitials}
               ariaLabel={`${label} — ${m.metric.heatmapTitle}`}
+              drill={heatmap.days.map((d) =>
+                d === '' ? null : drillZone({ fromDay: d, toDay: d }, metricHref(hk, `from=${d}&to=${d}`), locale, m)
+              )}
             />
           </div>
           <p style={{ font: '400 var(--text-2xs)/1.5 var(--font-ui)', color: 'var(--text-3)', margin: '10px 0 0' }}>
@@ -815,22 +834,25 @@ function buildHeatmap(
   locale: Locale,
   withUnit: (v: number | null) => string | null,
   m: Messages
-): { values: Array<number | null>; titles: string[] } {
+): { values: Array<number | null>; titles: string[]; days: string[] } {
   const first = days[0];
-  if (!first) return { values: [], titles: [] };
+  if (!first) return { values: [], titles: [], days: [] };
   const pad = Math.round(
     (Date.parse(`${first}T00:00:00Z`) - Date.parse(`${mondayOf(first)}T00:00:00Z`)) / 86_400_000
   );
   const cells: Array<number | null> = Array.from({ length: pad }, () => null);
   const titles: string[] = Array.from({ length: pad }, () => '');
+  const cellDays: string[] = Array.from({ length: pad }, () => '');
   days.forEach((day, i) => {
     const v = values[i];
     cells.push(v);
+    cellDays.push(day);
     titles.push(v === null ? `${fmtDay(day, locale)} · ${m.common.noData}` : `${fmtDay(day, locale)} · ${withUnit(v)}`);
   });
   while (cells.length % 7 !== 0) {
     cells.push(null);
     titles.push('');
+    cellDays.push('');
   }
-  return { values: cells, titles };
+  return { values: cells, titles, days: cellDays };
 }

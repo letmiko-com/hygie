@@ -4,6 +4,7 @@
 // dashed placeholder everywhere, never a zero. Stage detail bars only render
 // for periods up to 100 days; longer windows keep the rolling-mean chart.
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { LineChart } from '@/components/charts/LineChart';
 import { MetricCard } from '@/components/data/MetricCard';
 import { StatTile } from '@/components/data/StatTile';
@@ -12,6 +13,7 @@ import { EmptyState } from '@/components/data/EmptyState';
 import { Panel, PanelLabel } from '@/components/ui/Panel';
 import { TimeNav } from '@/components/time/TimeNav';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
+import { bucketSpans, drillZone, spanQuery } from '@/lib/drill';
 import { fmtDay, fmtHoursMinutes, fmtInt, fmtNumber } from '@/lib/format';
 import { getMessages, resolveLocale, type Locale, type Messages } from '@/lib/i18n';
 import { getSubjectContext } from '@/lib/queries/context';
@@ -142,8 +144,10 @@ function NightBars({
   const plotMaxW = days.length * BAR_MAX_W + (days.length - 1) * gap;
   return (
     <div>
+      {/* The night columns are drill links: the group role keeps them in the
+          accessibility tree, which role="img" would flatten away. */}
       <div
-        role="img"
+        role="group"
         aria-label={m.sleep.nightsTitle}
         style={{
           display: 'flex',
@@ -169,8 +173,11 @@ function NightBars({
               }}
             />
           ) : (
-            <span
+            <Link
               key={i}
+              href={`/sleep?from=${days[i]}&to=${days[i]}`}
+              className="hy-drill"
+              aria-label={m.common.drillDay(fmtDay(days[i], locale))}
               title={`${fmtDay(days[i], locale)} · ${fmtHoursMinutes(v.totalH * 3600)}`}
               style={{ flex: 1, display: 'flex', flexDirection: 'column-reverse', height: '100%' }}
             >
@@ -189,7 +196,7 @@ function NightBars({
                   />
                 );
               })}
-            </span>
+            </Link>
           )
         )}
       </div>
@@ -429,6 +436,7 @@ export default async function SleepPage({
                 emptyLabel={m.common.noDataOnPeriod}
                 yFormat={(v, digits) => fmtNumber(v, locale, Math.max(1, digits))}
                 xLabels={chartXLabels}
+                drill={bucketSpans(days, 366).map((s) => drillZone(s, `/sleep?${spanQuery(s)}`, locale, m))}
                 series={[
                   {
                     data: downsample(hoursPerDay, 366),
