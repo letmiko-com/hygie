@@ -9,6 +9,8 @@ export const fr: Messages = {
     sourceLink: 'Source',
     seeDetail: 'Détail',
     loading: 'Chargement',
+    drillDay: (day: string) => `Voir le détail du ${day}`,
+    drillSpan: (from: string, to: string) => `Voir le détail du ${from} au ${to}`,
   },
   nav: {
     dashboard: 'Dashboard',

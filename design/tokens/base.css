@@ -8,5 +8,7 @@ a:hover{color:var(--accent-strong);text-decoration:underline}
 .hy-ghost:hover:not(:disabled){background:var(--surface-2);filter:none}
 .hy-row{transition:background var(--dur) var(--ease)}
 .hy-row:hover{background:var(--surface-2)}
+.hy-drill{display:block;transition:background var(--dur) var(--ease)}
+.hy-drill:hover,.hy-drill:focus-visible{background:color-mix(in oklab,var(--text-1) 8%,transparent)}
 @keyframes hy-shimmer{0%{opacity:0.55}50%{opacity:1}100%{opacity:0.55}}
 @keyframes hy-spin{to{transform:rotate(360deg)}}

@@ -15,6 +15,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MultiLineChart, planScale, type OverlaySeries } from '@/components/charts/MultiLineChart';
+import { drillZone } from '@/lib/drill';
 import { DataTable, type Column } from '@/components/data/DataTable';
 import { EmptyState } from '@/components/data/EmptyState';
 import { TrendChip } from '@/components/data/TrendChip';
@@ -240,6 +241,23 @@ export default async function ExplorePage({
   const plan = planScale(overlay, scale === 'normalized' ? 'normalized' : null);
   const makeFormat = (maxAbs: number) => magnitudeFormat(maxAbs, locale);
 
+  // Day buckets drill into that single day, keeping the metric selection and
+  // scale: on a one-day window the granularity switches to minute by itself.
+  const chartDrill =
+    chart !== null && chart.granularity === 'day' && chart.days !== null
+      ? chart.days.map((d) => {
+          const q = new URLSearchParams();
+          for (const [k, v] of Object.entries(sp)) {
+            if (['p', 'a', 'from', 'to', 'compare'].includes(k)) continue;
+            const val = Array.isArray(v) ? v[0] : v;
+            if (val !== undefined && val !== '') q.set(k, val);
+          }
+          q.set('from', d);
+          q.set('to', d);
+          return drillZone({ fromDay: d, toDay: d }, `/explore?${q.toString()}`, locale, m);
+        })
+      : undefined;
+
   const statRows: StatRow[] = converted.map(({ series, display, values }) => {
     const isTotal = series.aggregation === 'sum' || series.aggregation === 'duration';
     const convert = (v: number | null): number | null => (v === null ? null : display.convert(v));
@@ -416,6 +434,7 @@ export default async function ExplorePage({
               ariaLabel={m.explore.chartTitle}
               emptyLabel={m.explore.noData}
               makeFormat={makeFormat}
+              drill={chartDrill}
             />
             <p style={{ font: '400 var(--text-2xs)/1.5 var(--font-ui)', color: 'var(--text-3)', margin: '10px 0 0' }}>
               {scaleNote}

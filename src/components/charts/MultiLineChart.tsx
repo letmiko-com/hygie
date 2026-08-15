@@ -15,6 +15,8 @@
 //
 // Gaps are gaps: a null breaks the line, it is never bridged and never 0.
 import type { ReactNode } from 'react';
+import Link from 'next/link';
+import type { DrillZone } from '@/lib/drill';
 
 export interface OverlaySeries {
   key: string;
@@ -155,6 +157,7 @@ export function MultiLineChart({
   makeFormat,
   ariaLabel,
   emptyLabel,
+  drill,
 }: {
   series: OverlaySeries[];
   plan: ScalePlan;
@@ -170,6 +173,11 @@ export function MultiLineChart({
   makeFormat: (maxAbs: number) => (v: number) => string;
   ariaLabel: string;
   emptyLabel: string;
+  /**
+   * One clickable zone per bucket (same indexing as the values): a
+   * full-height band opening that bucket's day span. Null entries stay inert.
+   */
+  drill?: Array<DrillZone | null>;
 }) {
   const prepared = series.map((s) => ({
     ...s,
@@ -259,7 +267,9 @@ export function MultiLineChart({
 
   return (
     <div>
-      <div role="img" aria-label={ariaLabel} style={{ display: 'flex', gap: 8 }}>
+      {/* With drill bands inside, role="img" would flatten the links out of
+          the accessibility tree: the group role keeps them reachable. */}
+      <div role={drill ? 'group' : 'img'} aria-label={ariaLabel} style={{ display: 'flex', gap: 8 }}>
         <AxisColumn
           ticks={leftTicks}
           format={plan.mode === 'normalized' ? (v) => `${Math.round(v)}%` : formatLeft}
@@ -349,6 +359,31 @@ export function MultiLineChart({
                 />
               ));
           })}
+          {/* Drill bands: one full-height link per bucket, spanning to the
+              midpoints with its neighbours. The wrapper clips the half-slot
+              overhang of the edge bands. */}
+          {drill && (
+            <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+              {drill.slice(0, n).map((zone, i) =>
+                zone === null ? null : (
+                  <Link
+                    key={i}
+                    href={zone.href}
+                    className="hy-drill"
+                    aria-label={zone.label}
+                    title={zone.label}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      bottom: 0,
+                      left: n <= 1 ? '0%' : `${((i - 0.5) / (n - 1)) * 100}%`,
+                      width: n <= 1 ? '100%' : `${100 / (n - 1)}%`,
+                    }}
+                  />
+                )
+              )}
+            </div>
+          )}
         </div>
         {rightTicks.length > 0 && (
           <AxisColumn ticks={rightTicks} format={formatRight} unit={plan.axisUnits[1]} height={height} align="right" />

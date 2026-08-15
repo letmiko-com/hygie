@@ -9,6 +9,8 @@ export const en = {
     sourceLink: 'Source',
     seeDetail: 'Details',
     loading: 'Loading',
+    drillDay: (day: string) => `Open ${day} in detail`,
+    drillSpan: (from: string, to: string) => `Open ${from} to ${to} in detail`,
   },
   nav: {
     dashboard: 'Dashboard',

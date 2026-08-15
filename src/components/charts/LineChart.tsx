@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import Link from 'next/link';
+import type { DrillZone } from '@/lib/drill';
 
 export interface LineSeries {
   data: Array<number | null>;
@@ -121,6 +123,7 @@ export function LineChart({
   gridLines = 3,
   ariaLabel,
   emptyLabel,
+  drill,
 }: {
   series: LineSeries[];
   xLabels?: string[];
@@ -131,6 +134,12 @@ export function LineChart({
   ariaLabel: string;
   /** Rendered instead of an empty frame when nothing can be plotted. */
   emptyLabel?: string;
+  /**
+   * One clickable zone per point of the longest series (same indexing as the
+   * data): a full-height band opening that point's day span. Null entries
+   * render no band.
+   */
+  drill?: Array<DrillZone | null>;
 }) {
   const rolled = series.map((s) => ({
     ...s,
@@ -195,8 +204,10 @@ export function LineChart({
       </span>
     ));
 
+  // With drill bands inside, role="img" would flatten the links out of the
+  // accessibility tree: the group role keeps them reachable.
   return (
-    <div role="img" aria-label={ariaLabel}>
+    <div role={drill ? 'group' : 'img'} aria-label={ariaLabel}>
       <div style={{ display: 'flex', gap: 8 }}>
         <div
           className="tnum"
@@ -280,6 +291,31 @@ export function LineChart({
                   }}
                 />
               ))
+          )}
+          {/* Drill bands: one full-height link per point, spanning to the
+              midpoints with its neighbours. The wrapper clips the half-slot
+              overhang of the edge bands. */}
+          {drill && (
+            <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+              {drill.slice(0, n).map((zone, i) =>
+                zone === null ? null : (
+                  <Link
+                    key={i}
+                    href={zone.href}
+                    className="hy-drill"
+                    aria-label={zone.label}
+                    title={zone.label}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      bottom: 0,
+                      left: n <= 1 ? '0%' : `${((i - 0.5) / (n - 1)) * 100}%`,
+                      width: n <= 1 ? '100%' : `${100 / (n - 1)}%`,
+                    }}
+                  />
+                )
+              )}
+            </div>
           )}
         </div>
       </div>

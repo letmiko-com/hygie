@@ -19,6 +19,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Panel, PanelLabel } from '@/components/ui/Panel';
 import { TimeNav } from '@/components/time/TimeNav';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
+import { bucketSpans, drillZone, spanQuery } from '@/lib/drill';
 import { fmtDay, fmtHoursMinutes, fmtInt, fmtNumber, kjToKcal } from '@/lib/format';
 import { getMessages, resolveLocale, type Locale } from '@/lib/i18n';
 import { dataColor, metricHref, type DataFamily } from '@/lib/metrics';
@@ -223,6 +224,11 @@ export default async function DashboardPage({
     5,
     chartLen > 366 ? { month: 'short', year: '2-digit' } : { day: 'numeric', month: 'short' }
   );
+  // Each plotted point drills into the exact day span it averages.
+  const hrDrill = bucketSpans(
+    hrCur.points.map((p) => p.day),
+    366
+  ).map((s) => drillZone(s, metricHref(HK.hr, spanQuery(s)), locale, m));
 
   // --- today panel -------------------------------------------------------------
   const todayKj = todayEnergy.points[0]?.value ?? null;
@@ -361,6 +367,7 @@ export default async function DashboardPage({
             emptyLabel={m.common.noDataOnPeriod}
             yFormat={(v, digits) => fmtNumber(v, locale, digits)}
             xLabels={chartXLabels}
+            drill={hrDrill}
             series={[
               {
                 data: hrDown,
@@ -429,6 +436,10 @@ export default async function DashboardPage({
               ariaLabel={m.dash.weeklyVolumeTitle}
               noDataLabel={m.common.noData}
               format={(v) => fmtNumber(v, locale, 1)}
+              drill={weeks.map((w) => {
+                const span = { fromDay: w.weekStart, toDay: addDays(w.weekStart, 6) };
+                return drillZone(span, `/sport?${spanQuery(span)}`, locale, m);
+              })}
             />
           </Panel>
         </div>
@@ -456,6 +467,9 @@ export default async function DashboardPage({
             color={dataColor('activity')}
             dayLabels={m.dash.dayInitials}
             ariaLabel={m.dash.regularityTitle}
+            drill={heatDays.map((d) =>
+              d === '' ? null : drillZone({ fromDay: d, toDay: d }, `/sport?from=${d}&to=${d}`, locale, m)
+            )}
           />
           </div>
           <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
