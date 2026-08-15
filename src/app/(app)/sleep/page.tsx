@@ -176,6 +176,7 @@ function NightBars({
             <Link
               key={i}
               href={`/sleep?from=${days[i]}&to=${days[i]}`}
+              prefetch={false}
               className="hy-drill"
               aria-label={m.common.drillDay(fmtDay(days[i], locale))}
               title={`${fmtDay(days[i], locale)} · ${fmtHoursMinutes(v.totalH * 3600)}`}

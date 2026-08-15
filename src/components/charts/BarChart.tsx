@@ -87,6 +87,7 @@ export function BarChart({
             <Link
               key={i}
               href={zone.href}
+              prefetch={false}
               className="hy-drill"
               aria-label={zone.label}
               title={`${value} · ${zone.label}`}
