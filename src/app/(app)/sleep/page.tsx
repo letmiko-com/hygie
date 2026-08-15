@@ -124,11 +124,13 @@ function NightBars({
   days,
   byDate,
   locale,
+  tz,
   m,
 }: {
   days: string[];
   byDate: Map<string, SleepNight>;
   locale: Locale;
+  tz: string;
   m: Messages;
 }) {
   const views = days.map((d) => {
@@ -136,6 +138,14 @@ function NightBars({
     return n ? toView(n) : null;
   });
   const maxH = Math.max(9, ...views.filter((v): v is NightView => v !== null).map((v) => v.totalH + v.awakeH));
+  // The scale tops at a whole tick so the axis graduates in round hours.
+  const axisMax = Math.ceil(maxH / 3) * 3;
+  const ticks = Array.from({ length: axisMax / 3 + 1 }, (_, i) => axisMax - i * 3);
+  const timeFmt = new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: tz,
+  });
   // A few nights must stay bars: stretched to fill the panel, a single night
   // read as one sleep spanning the whole window. The cap applies to the plot
   // AND to the date axis below it, otherwise the labels stop sitting under
@@ -144,62 +154,148 @@ function NightBars({
   const plotMaxW = days.length * BAR_MAX_W + (days.length - 1) * gap;
   return (
     <div>
-      {/* The night columns are drill links: the group role keeps them in the
-          accessibility tree, which role="img" would flatten away. */}
-      <div
-        role="group"
-        aria-label={m.sleep.nightsTitle}
-        style={{
-          display: 'flex',
-          alignItems: 'flex-end',
-          gap,
-          height: 170,
-          maxWidth: plotMaxW,
-          borderBottom: '1px solid var(--border-strong)',
-        }}
-      >
-        {views.map((v, i) =>
-          v === null ? (
-            <span
-              key={i}
-              title={`${fmtDay(days[i], locale)} · ${m.common.noData}`}
-              style={{
-                flex: 1,
-                height: '40%',
-                border: '1px dashed var(--border-strong)',
-                borderBottom: 'none',
-                borderRadius: '2px 2px 0 0',
-                boxSizing: 'border-box',
-              }}
-            />
-          ) : (
-            <Link
-              key={i}
-              href={`/sleep?from=${days[i]}&to=${days[i]}`}
-              prefetch={false}
-              className="hy-drill"
-              aria-label={m.common.drillDay(fmtDay(days[i], locale))}
-              title={`${fmtDay(days[i], locale)} · ${fmtHoursMinutes(v.totalH * 3600)}`}
-              style={{ flex: 1, display: 'flex', flexDirection: 'column-reverse', height: '100%' }}
-            >
-              {PHASES.map((p) => {
-                const hours =
-                  p.key === 'deep' ? v.deepH : p.key === 'core' ? v.coreH : p.key === 'rem' ? v.remH : v.awakeH;
+      <div style={{ display: 'flex', gap: 8 }}>
+        <div
+          className="tnum"
+          style={{
+            width: 34,
+            flex: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            textAlign: 'right',
+            font: '400 10px/1 var(--font-data)',
+            color: 'var(--chart-axis)',
+            height: 170,
+          }}
+        >
+          {ticks.map((t) => (
+            <span key={t}>{t === 0 ? '0' : `${t} h`}</span>
+          ))}
+        </div>
+        <div style={{ position: 'relative', flex: 1, maxWidth: plotMaxW, height: 170 }}>
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+            }}
+          >
+            {ticks.map((t) => (
+              <div key={t} style={{ borderTop: '1px solid var(--chart-grid)' }} />
+            ))}
+          </div>
+          {/* The night columns are drill links: the group role keeps them in
+              the accessibility tree, which role="img" would flatten away. */}
+          <div
+            role="group"
+            aria-label={m.sleep.nightsTitle}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'flex-end',
+              gap,
+              borderBottom: '1px solid var(--border-strong)',
+            }}
+          >
+            {views.map((v, i) => {
+              if (v === null) {
                 return (
                   <span
-                    key={p.key}
+                    key={i}
+                    title={`${fmtDay(days[i], locale)} · ${m.common.noData}`}
                     style={{
-                      height: `${(hours / maxH) * 100}%`,
-                      background: p.color,
-                      opacity: p.opacity,
-                      borderRadius: p.key === 'awake' ? '2px 2px 0 0' : 0,
+                      flex: 1,
+                      height: '40%',
+                      border: '1px dashed var(--border-strong)',
+                      borderBottom: 'none',
+                      borderRadius: '2px 2px 0 0',
+                      boxSizing: 'border-box',
                     }}
                   />
                 );
-              })}
-            </Link>
-          )
-        )}
+              }
+              const night = byDate.get(days[i]);
+              return (
+                <Link
+                  key={i}
+                  href={`/sleep?from=${days[i]}&to=${days[i]}`}
+                  prefetch={false}
+                  className="hy-drill hy-tipwrap"
+                  aria-label={m.common.drillDay(fmtDay(days[i], locale))}
+                  style={{ flex: 1, display: 'flex', flexDirection: 'column-reverse', height: '100%' }}
+                >
+                  {PHASES.map((p) => {
+                    const hours =
+                      p.key === 'deep' ? v.deepH : p.key === 'core' ? v.coreH : p.key === 'rem' ? v.remH : v.awakeH;
+                    return (
+                      <span
+                        key={p.key}
+                        style={{
+                          height: `${(hours / axisMax) * 100}%`,
+                          background: p.color,
+                          opacity: p.opacity,
+                          borderRadius: p.key === 'awake' ? '2px 2px 0 0' : 0,
+                        }}
+                      />
+                    );
+                  })}
+                  <span className="hy-tip" aria-hidden>
+                    <span style={{ display: 'block', font: '600 var(--text-xs)/1.5 var(--font-ui)', color: 'var(--text-1)' }}>
+                      {fmtDay(days[i], locale, { weekday: 'short', day: 'numeric', month: 'short' })} ·{' '}
+                      {fmtHoursMinutes(v.totalH * 3600)}
+                    </span>
+                    {night?.sleepStart && night?.sleepEnd && (
+                      <span
+                        className="tnum"
+                        style={{ display: 'block', font: '400 var(--text-2xs)/1.6 var(--font-data)', color: 'var(--text-3)' }}
+                      >
+                        {timeFmt.format(night.sleepStart)} → {timeFmt.format(night.sleepEnd)}
+                      </span>
+                    )}
+                    {PHASES.map((p) => {
+                      const hours =
+                        p.key === 'deep' ? v.deepH : p.key === 'core' ? v.coreH : p.key === 'rem' ? v.remH : v.awakeH;
+                      if (hours <= 0) return null;
+                      return (
+                        <span
+                          key={p.key}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            font: '400 var(--text-xs)/1.6 var(--font-ui)',
+                            color: 'var(--text-2)',
+                          }}
+                        >
+                          <span
+                            aria-hidden
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: 2,
+                              background: p.color,
+                              opacity: p.opacity,
+                              flex: 'none',
+                            }}
+                          />
+                          <span style={{ flex: 1, paddingRight: 14 }}>{m.sleep.phases[p.key]}</span>
+                          <span className="tnum" style={{ fontFamily: 'var(--font-data)', color: 'var(--text-1)' }}>
+                            {fmtHoursMinutes(hours * 3600)}
+                          </span>
+                        </span>
+                      );
+                    })}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
       </div>
       <div
         className="tnum"
@@ -207,6 +303,7 @@ function NightBars({
           display: 'flex',
           justifyContent: 'space-between',
           marginTop: 5,
+          marginLeft: 42,
           maxWidth: plotMaxW,
           font: '400 var(--text-2xs)/1 var(--font-data)',
           color: 'var(--chart-axis)',
@@ -420,7 +517,7 @@ export default async function SleepPage({
               >
                 {m.sleep.nightsTitle}
               </PanelLabel>
-              <NightBars days={days} byDate={byDate} locale={locale} m={m} />
+              <NightBars days={days} byDate={byDate} locale={locale} tz={ctx.timezone} m={m} />
             </Panel>
           ) : (
             <p style={{ font: '400 var(--text-xs)/1.4 var(--font-ui)', color: 'var(--text-3)', margin: 0 }}>

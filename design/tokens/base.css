@@ -10,5 +10,9 @@ a:hover{color:var(--accent-strong);text-decoration:underline}
 .hy-row:hover{background:var(--surface-2)}
 .hy-drill{display:block;transition:background var(--dur) var(--ease)}
 .hy-drill:hover,.hy-drill:focus-visible{background:color-mix(in oklab,var(--text-1) 8%,transparent)}
+.hy-tipwrap{position:relative}
+.hy-tipwrap:hover,.hy-tipwrap:focus-visible{z-index:6}
+.hy-tip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);z-index:6;display:none;pointer-events:none;white-space:nowrap;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-md);padding:8px 11px;box-shadow:var(--shadow-2);text-align:left}
+.hy-tipwrap:hover .hy-tip,.hy-tipwrap:focus-visible .hy-tip{display:block}
 @keyframes hy-shimmer{0%{opacity:0.55}50%{opacity:1}100%{opacity:0.55}}
 @keyframes hy-spin{to{transform:rotate(360deg)}}
