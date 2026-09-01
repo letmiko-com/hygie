@@ -1,6 +1,7 @@
 // Human labels for day ranges. Client-safe (pure Intl, no server imports):
 // TimeNav renders these labels in the browser.
 import type { Locale } from '@/lib/i18n';
+import type { Granularity } from '@/lib/queries/explore';
 import type { DayRange, Preset } from '@/lib/queries/time';
 
 const intlLocale = (locale: Locale) => (locale === 'fr' ? 'fr-FR' : 'en-GB');
@@ -59,4 +60,32 @@ export function comparisonLabel(prev: DayRange, locale: Locale, vsWord: string):
     return `${vsWord} ${fmt(prev.fromDay, locale, { month: 'short', year: 'numeric' })}`;
   }
   return `${vsWord} ${fmt(prev.fromDay, locale, { day: 'numeric', month: 'short' })} → ${fmt(last, locale, { day: 'numeric', month: 'short' })}`;
+}
+
+/**
+ * Five evenly spaced labels for a dense bucket axis (hour and minute grains,
+ * one bucket per grain from the first instant). Labels sit on BUCKET
+ * BOUNDARIES, not on the nearest bucket start: the slot at 75 % of a
+ * 1440-minute day is the boundary between 17:59 and 18:00, and an axis
+ * graduated "17:59" reads as an off-by-one. The last label is therefore the
+ * end of the window (00:00 of the next day for one day at minute grain), the
+ * usual convention for a time axis. A window cut at "now" has a span that is
+ * not a multiple of four grains and gets non-round labels: that is the window.
+ */
+export function bucketAxisLabels(
+  buckets: Date[],
+  granularity: Granularity,
+  locale: Locale,
+  timeZone: string
+): string[] {
+  if (buckets.length === 0) return [];
+  const grainMs = granularity === 'minute' ? 60_000 : 3_600_000;
+  const start = buckets[0].getTime();
+  const span = buckets.length * grainMs;
+  const options: Intl.DateTimeFormatOptions =
+    granularity === 'minute'
+      ? { hour: '2-digit', minute: '2-digit', hour12: false, timeZone }
+      : { day: 'numeric', month: 'short', hour: '2-digit', hour12: false, timeZone };
+  const format = new Intl.DateTimeFormat(intlLocale(locale), options);
+  return [0, 0.25, 0.5, 0.75, 1].map((f) => format.format(new Date(start + Math.round(f * span))));
 }

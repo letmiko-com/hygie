@@ -62,7 +62,7 @@ import {
   type MetricQuality,
 } from '@/lib/metrics';
 import { getSubjectContext, type SubjectContext } from '@/lib/queries/context';
-import { chooseGranularity, exploreChart, type Granularity } from '@/lib/queries/explore';
+import { chooseGranularity, exploreChart } from '@/lib/queries/explore';
 import { subjectTypeIdentifiers } from '@/lib/queries/inventory';
 import {
   isChartable,
@@ -79,7 +79,7 @@ import { getMetricType } from '@/lib/queries/metric-types';
 import { dataTotals } from '@/lib/queries/sync';
 import { comparisonRange, elapsedDays, todayInZone, type DayRange } from '@/lib/queries/time';
 import { parseTimeParams, type TimeSearchParams } from '@/lib/queries/time-params';
-import { dayAxisLabels } from '@/lib/time-format';
+import { bucketAxisLabels, dayAxisLabels } from '@/lib/time-format';
 import { sportDisplay, sportLabel } from '@/lib/sports';
 import { monthlyTrainingSilhouette } from '@/lib/queries/workouts';
 
@@ -116,25 +116,6 @@ function mondayOf(day: string): string {
   const t = Date.parse(`${day}T00:00:00Z`);
   const dow = new Date(t).getUTCDay(); // 0 = Sunday
   return new Date(t - ((dow + 6) % 7) * 86_400_000).toISOString().slice(0, 10);
-}
-
-/** Five evenly spaced labels for a bucket axis (hour and minute grains). */
-function bucketAxisLabels(
-  buckets: Date[],
-  granularity: Granularity,
-  locale: Locale,
-  timeZone: string
-): string[] {
-  if (buckets.length === 0) return [];
-  const options: Intl.DateTimeFormatOptions =
-    granularity === 'minute'
-      ? { hour: '2-digit', minute: '2-digit', hour12: false, timeZone }
-      : { day: 'numeric', month: 'short', hour: '2-digit', hour12: false, timeZone };
-  const fmt = new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', options);
-  return [0, 0.25, 0.5, 0.75, 1].map((f) => {
-    const b = buckets[Math.min(buckets.length - 1, Math.round(f * (buckets.length - 1)))];
-    return b ? fmt.format(b) : '';
-  });
 }
 
 function trendProps(quality: MetricQuality): { invert: boolean; neutral: boolean } {
