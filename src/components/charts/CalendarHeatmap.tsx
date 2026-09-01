@@ -32,7 +32,7 @@ export function CalendarHeatmap({
     <div role={drill ? 'group' : 'img'} aria-label={ariaLabel} style={{ display: 'flex', gap: 6 }}>
       {dayLabels.length > 0 && (
         <div
-          className="tnum"
+          className="tnum hy-heat-days"
           style={{
             display: 'grid',
             gridTemplateRows: 'repeat(7, 11px)',
@@ -48,6 +48,7 @@ export function CalendarHeatmap({
         </div>
       )}
       <div
+        className="hy-heat"
         style={{
           display: 'grid',
           gridTemplateRows: 'repeat(7, 11px)',
