@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import Link from '@/components/ui/Link';
-import type { DrillZone } from '@/lib/drill';
+import type { DrillSet } from '@/lib/drill';
+import { DrillBands } from './DrillBands';
 
 export interface LineSeries {
   data: Array<number | null>;
@@ -136,10 +136,10 @@ export function LineChart({
   emptyLabel?: string;
   /**
    * One clickable zone per point of the longest series (same indexing as the
-   * data): a full-height band opening that point's day span. Null entries
-   * render no band.
+   * data): a full-height band opening that point's day span, bands merged when
+   * too thin to hit (DrillBands). Null entries render no band.
    */
-  drill?: Array<DrillZone | null>;
+  drill?: DrillSet;
 }) {
   const rolled = series.map((s) => ({
     ...s,
@@ -292,31 +292,7 @@ export function LineChart({
                 />
               ))
           )}
-          {/* Drill bands: one full-height link per point, spanning to the
-              midpoints with its neighbours. The wrapper clips the half-slot
-              overhang of the edge bands. */}
-          {drill && (
-            <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-              {drill.slice(0, n).map((zone, i) =>
-                zone === null ? null : (
-                  <Link
-                    key={i}
-                    href={zone.href}
-                    className="hy-drill"
-                    aria-label={zone.label}
-                    title={zone.label}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      bottom: 0,
-                      left: n <= 1 ? '0%' : `${((i - 0.5) / (n - 1)) * 100}%`,
-                      width: n <= 1 ? '100%' : `${100 / (n - 1)}%`,
-                    }}
-                  />
-                )
-              )}
-            </div>
-          )}
+          {drill && <DrillBands set={drill} n={n} align="point" />}
         </div>
       </div>
       {(xLabels.length > 0 || legend.length > 0) && (

@@ -15,7 +15,7 @@
 import type { Metadata } from 'next';
 import Link from '@/components/ui/Link';
 import { MultiLineChart, planScale, type OverlaySeries } from '@/components/charts/MultiLineChart';
-import { drillZone } from '@/lib/drill';
+import { drillSet, drillZone } from '@/lib/drill';
 import { DataTable, type Column } from '@/components/data/DataTable';
 import { EmptyState } from '@/components/data/EmptyState';
 import { TrendChip } from '@/components/data/TrendChip';
@@ -235,7 +235,8 @@ export default async function ExplorePage({
   // scale: on a one-day window the granularity switches to minute by itself.
   const chartDrill =
     chart !== null && chart.granularity === 'day' && chart.days !== null
-      ? chart.days.map((d) => {
+      ? drillSet(
+          chart.days.map((d) => {
           const q = new URLSearchParams();
           for (const [k, v] of Object.entries(sp)) {
             if (['p', 'a', 'from', 'to', 'compare'].includes(k)) continue;
@@ -245,7 +246,10 @@ export default async function ExplorePage({
           q.set('from', d);
           q.set('to', d);
           return drillZone({ fromDay: d, toDay: d }, `/explore?${q.toString()}`, locale, m);
-        })
+          }),
+          locale,
+          m
+        )
       : undefined;
 
   const statRows: StatRow[] = converted.map(({ series, display, values }) => {
