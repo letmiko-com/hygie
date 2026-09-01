@@ -5,7 +5,7 @@
 // training volume, 52-week regularity heatmap (null and 0 are different
 // facts), recent activity timeline. The whole temporal state lives in the URL.
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { Suspense } from 'react';
 import { TimelinePanel, TimelineSkeleton, TIMELINE_LOOKBACK_DAYS } from './timeline-panel';
 import { CalendarHeatmap } from '@/components/charts/CalendarHeatmap';

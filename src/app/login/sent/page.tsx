@@ -1,6 +1,6 @@
 // Post-request confirmation (mock Login.jsx, step "sent"), deliberately
 // neutral: same page and same words whether the account exists or not.
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { IconBadge, LoginShell, PanelHeading, panelStyle } from '../ui';
 
 export const metadata = { title: 'Lien envoyé — Hygie' };

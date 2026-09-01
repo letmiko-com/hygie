@@ -20,7 +20,7 @@
 // too — status line included — and notFound() there could no longer answer 404
 // on an unknown type. Measured: it answered 200.
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { Suspense } from 'react';
 import { EmptyState } from '@/components/data/EmptyState';
 import { Skeleton, SkeletonLines } from '@/components/data/Skeleton';

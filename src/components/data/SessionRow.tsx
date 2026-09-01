@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { Icon } from '@/components/ui/Icon';
 import { SourceBadge } from '@/components/data/SourceBadge';
 import { ABSENT } from '@/lib/format';

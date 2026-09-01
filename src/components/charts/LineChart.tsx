@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import type { DrillZone } from '@/lib/drill';
 
 export interface LineSeries {
@@ -302,7 +302,6 @@ export function LineChart({
                   <Link
                     key={i}
                     href={zone.href}
-                    prefetch={false}
                     className="hy-drill"
                     aria-label={zone.label}
                     title={zone.label}

@@ -9,7 +9,7 @@
 // a search box is a way of looking through a list, not a view worth sharing.
 // The group filter is in the same state for the same reason. The window and
 // everything else remain URL state on the detail screen.
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { useMemo, useState } from 'react';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { EmptyState } from '@/components/data/EmptyState';

@@ -7,7 +7,7 @@
 // entries. An entry that has a detail screen is a link, the others are inert
 // rows; nothing is a clickable div. Null stats render the absence glyph, and
 // a day with nothing in it never reaches this component at all.
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { Icon } from '@/components/ui/Icon';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { ABSENT } from '@/lib/format';
