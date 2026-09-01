@@ -11,7 +11,10 @@
  */
 
 @media (max-width: 900px) {
-  /* Shell: nav above the content instead of beside it. */
+  /* Shell: nav above the content instead of beside it. The banner is two
+     rows: logo and identity on the first, the nav alone on the second. On
+     one row the nav was left 198 px of a 390 px screen (three destinations
+     visible, five behind a horizontal scroll). */
   .hy-shell {
     flex-direction: column;
   }
@@ -21,6 +24,7 @@
     height: auto !important;
     position: static !important;
     flex-direction: row !important;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     padding: 8px 10px !important;
@@ -28,14 +32,21 @@
     border-bottom: 1px solid var(--border);
   }
 
-  /* The nav becomes one horizontal, scrollable strip. Section titles go: a
-     row of seven destinations does not need the word "Instance" above it. */
+  .hy-logo {
+    padding: 0 !important;
+    display: flex;
+  }
+
+  /* The nav becomes one horizontal, scrollable strip on its own full-width
+     row. Section titles go: a row of eight destinations does not need the
+     word "Instance" above it. */
   .hy-nav {
+    order: 1;
+    flex: 1 1 100% !important;
     flex-direction: row !important;
     align-items: center;
     overflow-x: auto;
     overflow-y: hidden;
-    flex: 1;
     scrollbar-width: none;
   }
 
@@ -51,8 +62,10 @@
     display: none !important;
   }
 
+  /* 30 px rows are a mouse size; a finger needs more. */
   .hy-nav a {
     white-space: nowrap;
+    height: 40px !important;
   }
 
   /* Identity: initials and sign-out stay reachable, the address does not fit. */
@@ -60,6 +73,7 @@
     border-top: none !important;
     padding: 0 !important;
     flex: none;
+    margin-left: auto;
   }
 
   .hy-user-text {

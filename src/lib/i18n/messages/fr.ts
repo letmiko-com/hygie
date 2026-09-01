@@ -361,7 +361,7 @@ export const fr: Messages = {
     avgBedtime: 'Coucher moyen',
     nightsTitle: 'Nuits, phases détaillées',
     deepVsPrev: 'profond, vs période préc.',
-    phases: { deep: 'Profond', core: 'Core', rem: 'REM', awake: 'Éveil' } as Record<string, string>,
+    phases: { deep: 'Profond', core: 'Essentiel', rem: 'REM', awake: 'Éveil' } as Record<string, string>,
     noDataLegend: 'Pas de donnée, jamais compté comme 0',
     durationChart: 'Durée de sommeil (h), moyenne glissante 7 nuits',
     distributionTitle: 'Répartition moyenne des phases',

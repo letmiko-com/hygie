@@ -3,7 +3,7 @@
 // Sidebar.jsx). Client component only for the active-route state; all data
 // (items, user, i18n labels) comes from the server layout as props, and the
 // logout form posts the server action passed down.
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { usePathname } from 'next/navigation';
 import { Icon } from '@/components/ui/Icon';
 import { Logo } from '@/components/ui/Logo';
@@ -63,7 +63,7 @@ export function Sidebar({
         height: '100vh',
       }}
     >
-      <div style={{ padding: '0 8px 14px' }}>
+      <div className="hy-logo" style={{ padding: '0 8px 14px' }}>
         <Link href="/" style={{ textDecoration: 'none' }}>
           <Logo size={22} />
         </Link>

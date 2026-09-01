@@ -4,7 +4,7 @@
 // encodes quality (a green downward pace is an improvement). Clicking a
 // record opens the session that set it.
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { LineChart } from '@/components/charts/LineChart';
 import { DataTable } from '@/components/data/DataTable';

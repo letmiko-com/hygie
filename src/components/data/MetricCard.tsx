@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { TrendChip } from '@/components/data/TrendChip';
 import { Icon } from '@/components/ui/Icon';
