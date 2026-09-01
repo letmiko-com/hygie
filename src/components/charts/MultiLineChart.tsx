@@ -15,8 +15,8 @@
 //
 // Gaps are gaps: a null breaks the line, it is never bridged and never 0.
 import type { ReactNode } from 'react';
-import Link from '@/components/ui/Link';
-import type { DrillZone } from '@/lib/drill';
+import type { DrillSet } from '@/lib/drill';
+import { DrillBands } from './DrillBands';
 
 export interface OverlaySeries {
   key: string;
@@ -175,9 +175,10 @@ export function MultiLineChart({
   emptyLabel: string;
   /**
    * One clickable zone per bucket (same indexing as the values): a
-   * full-height band opening that bucket's day span. Null entries stay inert.
+   * full-height band opening that bucket's day span, bands merged when too
+   * thin to hit (DrillBands). Null entries stay inert.
    */
-  drill?: Array<DrillZone | null>;
+  drill?: DrillSet;
 }) {
   const prepared = series.map((s) => ({
     ...s,
@@ -359,31 +360,7 @@ export function MultiLineChart({
                 />
               ));
           })}
-          {/* Drill bands: one full-height link per bucket, spanning to the
-              midpoints with its neighbours. The wrapper clips the half-slot
-              overhang of the edge bands. */}
-          {drill && (
-            <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-              {drill.slice(0, n).map((zone, i) =>
-                zone === null ? null : (
-                  <Link
-                    key={i}
-                    href={zone.href}
-                    className="hy-drill"
-                    aria-label={zone.label}
-                    title={zone.label}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      bottom: 0,
-                      left: n <= 1 ? '0%' : `${((i - 0.5) / (n - 1)) * 100}%`,
-                      width: n <= 1 ? '100%' : `${100 / (n - 1)}%`,
-                    }}
-                  />
-                )
-              )}
-            </div>
-          )}
+          {drill && <DrillBands set={drill} n={n} align="point" />}
         </div>
         {rightTicks.length > 0 && (
           <AxisColumn ticks={rightTicks} format={formatRight} unit={plan.axisUnits[1]} height={height} align="right" />
