@@ -1,6 +1,7 @@
 // Drill-down plumbing: a chart bucket that covers one or more whole days can
 // carry a link opening exactly that span (?from=&to= custom range). Pages
-// build the zones; charts only render them as full-height hit bands.
+// build the zones; charts render them as full-height hit bands (DrillBands),
+// merged on the fly when a band would be too thin to hit.
 import { fmtDay } from '@/lib/format';
 import type { Locale, Messages } from '@/lib/i18n';
 
@@ -10,14 +11,33 @@ export interface DaySpan {
 }
 
 /**
- * A clickable zone over one chart bucket. Charts render hundreds of them as
- * Links: the shared Link (components/ui/Link) never prefetches, which is what
- * keeps a chart from firing one dynamic SSR request per zone (enough to trip
- * the Cloudflare per-IP rate limit on its own).
+ * A clickable zone over one chart bucket. `href` MUST carry the span as
+ * `from=` and `to=` query parameters: when bands are merged for a finger, the
+ * merged band reuses its first zone's href with both parameters rewritten
+ * (drill-groups.ts). The shared Link never prefetches, which is what keeps a
+ * chart with hundreds of zones from firing one dynamic SSR request per zone
+ * (enough to trip the Cloudflare per-IP rate limit on its own).
  */
 export interface DrillZone {
+  span: DaySpan;
   href: string;
   label: string;
+}
+
+/**
+ * What a chart needs to render drill bands: the zones, plus what a merged
+ * band's label takes on the client (the locale for the dates, and the
+ * "from … to …" message with `{from}` / `{to}` placeholders, since a message
+ * function cannot cross into a client component).
+ */
+export interface DrillSet {
+  zones: Array<DrillZone | null>;
+  locale: Locale;
+  spanLabel: string;
+}
+
+export function drillSet(zones: Array<DrillZone | null>, locale: Locale, m: Messages): DrillSet {
+  return { zones, locale, spanLabel: m.common.drillSpan('{from}', '{to}') };
 }
 
 /**
@@ -44,5 +64,5 @@ export function drillZone(span: DaySpan, href: string, locale: Locale, m: Messag
     span.fromDay === span.toDay
       ? m.common.drillDay(fmtDay(span.fromDay, locale))
       : m.common.drillSpan(fmtDay(span.fromDay, locale), fmtDay(span.toDay, locale));
-  return { href, label };
+  return { span, href, label };
 }

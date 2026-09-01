@@ -1,6 +1,6 @@
-import Link from '@/components/ui/Link';
 import { ABSENT } from '@/lib/format';
-import type { DrillZone } from '@/lib/drill';
+import type { DrillSet } from '@/lib/drill';
+import { DrillBands } from './DrillBands';
 
 /**
  * Bar chart in pure flex divs (server-renderable, no chart dependency).
@@ -27,20 +27,29 @@ export function BarChart({
   format?: (v: number) => string;
   /**
    * One clickable zone per bar (same indexing as data): the whole column
-   * becomes the link, not just the bar. Null entries stay inert.
+   * becomes the link, not just the bar, columns merged when too thin to hit
+   * (DrillBands). Null entries stay inert.
    */
-  drill?: Array<DrillZone | null>;
+  drill?: DrillSet;
 }) {
   const max = Math.max(1, ...data.filter((v): v is number => v !== null));
   // A fixed 6% gap only works for a handful of bars; 30 bars would eat the
   // whole width in gaps.
   const gap = data.length > 12 ? 2 : '6%';
+  // The band's native tooltip carries the value the column would have shown.
+  const titles = drill
+    ? data.map((v, i) => {
+        const zone = drill.zones[i];
+        return zone ? `${v === null ? noDataLabel : format(v)} · ${zone.label}` : undefined;
+      })
+    : undefined;
   return (
     // With drill links inside, role="img" would flatten them out of the
     // accessibility tree: the group role keeps them reachable.
     <div role={drill ? 'group' : 'img'} aria-label={ariaLabel}>
       <div
         style={{
+          position: 'relative',
           display: 'flex',
           alignItems: 'flex-end',
           gap,
@@ -50,10 +59,11 @@ export function BarChart({
         }}
       >
         {data.map((v, i) => {
+          const linked = drill?.zones[i] != null;
           const bar =
             v === null ? (
               <span
-                title={drill?.[i] ? undefined : noDataLabel}
+                title={linked ? undefined : noDataLabel}
                 style={{
                   display: 'block',
                   width: '100%',
@@ -64,7 +74,7 @@ export function BarChart({
               />
             ) : (
               <span
-                title={drill?.[i] ? undefined : format(v)}
+                title={linked ? undefined : format(v)}
                 style={{
                   display: 'block',
                   width: '100%',
@@ -74,28 +84,13 @@ export function BarChart({
                 }}
               />
             );
-          const zone = drill?.[i] ?? null;
-          if (zone === null) {
-            return (
-              <span key={i} style={{ flex: 1, minWidth: 1, alignSelf: 'stretch', display: 'flex', alignItems: 'flex-end' }}>
-                {bar}
-              </span>
-            );
-          }
-          const value = v === null ? noDataLabel : format(v);
           return (
-            <Link
-              key={i}
-              href={zone.href}
-              className="hy-drill"
-              aria-label={zone.label}
-              title={`${value} · ${zone.label}`}
-              style={{ flex: 1, minWidth: 1, alignSelf: 'stretch', display: 'flex', alignItems: 'flex-end' }}
-            >
+            <span key={i} style={{ flex: 1, minWidth: 1, alignSelf: 'stretch', display: 'flex', alignItems: 'flex-end' }}>
               {bar}
-            </Link>
+            </span>
           );
         })}
+        {drill && <DrillBands set={drill} n={data.length} align="slot" titles={titles} />}
       </div>
       {labels.length > 0 && (
         <div

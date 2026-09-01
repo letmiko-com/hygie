@@ -50,7 +50,7 @@ import {
   fmtPercent,
   metricWriter,
 } from '@/lib/format';
-import { bucketSpans, drillZone, spanQuery } from '@/lib/drill';
+import { bucketSpans, drillSet, drillZone, spanQuery } from '@/lib/drill';
 import { getMessages, resolveLocale, type Locale, type Messages } from '@/lib/i18n';
 import {
   dataColor,
@@ -401,8 +401,10 @@ export default async function MetricDetailPage({
       v === null ? null : duration ? fmtHoursMinutes(v) : fmtInt(v, locale);
     const values = downsample(stats.counts, MAX_CHART_POINTS);
     // Each bar drills into the exact day span it aggregates, on this page.
-    const occDrill = bucketSpans(stats.days, MAX_CHART_POINTS).map((s) =>
-      drillZone(s, metricHref(hk, spanQuery(s)), locale, m)
+    const occDrill = drillSet(
+      bucketSpans(stats.days, MAX_CHART_POINTS).map((s) => drillZone(s, metricHref(hk, spanQuery(s)), locale, m)),
+      locale,
+      m
     );
     const xLabels = dayAxisLabels(
       stats.days,
@@ -565,8 +567,12 @@ export default async function MetricDetailPage({
   // and minute buckets do not: the URL time model only carries whole days.
   const chartDrill =
     granularity === 'day'
-      ? (asBars ? stats.days.map((d) => ({ fromDay: d, toDay: d })) : bucketSpans(stats.days, MAX_CHART_POINTS)).map(
-          (s) => drillZone(s, metricHref(hk, spanQuery(s)), locale, m)
+      ? drillSet(
+          (asBars ? stats.days.map((d) => ({ fromDay: d, toDay: d })) : bucketSpans(stats.days, MAX_CHART_POINTS)).map(
+            (s) => drillZone(s, metricHref(hk, spanQuery(s)), locale, m)
+          ),
+          locale,
+          m
         )
       : undefined;
   const rolling = asBars ? undefined : rollingWindow(plotted.length);
