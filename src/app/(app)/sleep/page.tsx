@@ -36,6 +36,8 @@ export const dynamic = 'force-dynamic';
 const SLEEP_COLOR = 'var(--data-sleep)';
 /** One night must stay a bar, not a block stretched over the whole panel. */
 const BAR_MAX_W = 56;
+/** Hours between two labelled graduations of the night chart. */
+const TICK_H = 2;
 const PHASES = [
   { key: 'deep', opacity: 1, color: SLEEP_COLOR },
   { key: 'core', opacity: 0.55, color: SLEEP_COLOR },
@@ -142,9 +144,12 @@ function NightBars({
     return n ? toView(n) : null;
   });
   const maxH = Math.max(9, ...views.filter((v): v is NightView => v !== null).map((v) => v.totalH + v.awakeH));
-  // The scale tops at a whole tick so the axis graduates in round hours.
-  const axisMax = Math.ceil(maxH / 3) * 3;
-  const ticks = Array.from({ length: axisMax / 3 + 1 }, (_, i) => axisMax - i * 3);
+  // The scale tops at a whole tick so the axis graduates in round hours. Every
+  // hour gets a grid line (a night is read against 7 h or 8 h, not against 6 h
+  // and 9 h), every other hour a label; the labelled lines are the darker ones.
+  const axisMax = Math.ceil(maxH / TICK_H) * TICK_H;
+  const ticks = Array.from({ length: axisMax / TICK_H + 1 }, (_, i) => axisMax - i * TICK_H);
+  const gridHours = Array.from({ length: axisMax + 1 }, (_, i) => axisMax - i);
   const timeFmt = new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', {
     hour: '2-digit',
     minute: '2-digit',
@@ -249,8 +254,13 @@ function NightBars({
               justifyContent: 'space-between',
             }}
           >
-            {ticks.map((t) => (
-              <div key={t} style={{ borderTop: '1px solid var(--chart-grid)' }} />
+            {gridHours.map((h) => (
+              <div
+                key={h}
+                style={{
+                  borderTop: `1px solid ${h % TICK_H === 0 ? 'var(--chart-grid)' : 'color-mix(in oklab, var(--chart-grid) 55%, transparent)'}`,
+                }}
+              />
             ))}
           </div>
           {/* The columns are the picture; the drill bands over them carry the
