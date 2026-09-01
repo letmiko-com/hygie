@@ -63,7 +63,7 @@ export function Sidebar({
         height: '100vh',
       }}
     >
-      <div style={{ padding: '0 8px 14px' }}>
+      <div className="hy-logo" style={{ padding: '0 8px 14px' }}>
         <Link href="/" style={{ textDecoration: 'none' }}>
           <Logo size={22} />
         </Link>
