@@ -13,7 +13,7 @@
 // never asked; the chosen grain is displayed so no one mistakes an hourly
 // mean for a raw sample.
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { MultiLineChart, planScale, type OverlaySeries } from '@/components/charts/MultiLineChart';
 import { drillZone } from '@/lib/drill';
 import { DataTable, type Column } from '@/components/data/DataTable';
@@ -37,6 +37,7 @@ import {
 import { chooseGranularity, exploreChart, type ExploreSeries, type Granularity } from '@/lib/queries/explore';
 import { comparisonRange, elapsedDays, todayInZone } from '@/lib/queries/time';
 import { parseTimeParams, timeQuery, type TimeSearchParams } from '@/lib/queries/time-params';
+import { bucketAxisLabels } from '@/lib/time-format';
 import { dataTotals } from '@/lib/queries/sync';
 import { monthlyTrainingSilhouette } from '@/lib/queries/workouts';
 import { MetricPicker, ScaleToggle, type PickerOption } from './ui';
@@ -103,27 +104,16 @@ function axisLabels(
   locale: Locale,
   timeZone: string
 ): string[] {
-  const intl = locale === 'fr' ? 'fr-FR' : 'en-GB';
-  const fractions = [0, 0.25, 0.5, 0.75, 1];
   if (days) {
     const long = days.length > 366;
-    return fractions.map((f) => {
+    return [0, 0.25, 0.5, 0.75, 1].map((f) => {
       const day = days[Math.min(days.length - 1, Math.round(f * (days.length - 1)))];
       return day
         ? fmtDay(day, locale, long ? { month: 'short', year: '2-digit' } : { day: 'numeric', month: 'short' })
         : '';
     });
   }
-  if (!buckets || buckets.length === 0) return [];
-  const options: Intl.DateTimeFormatOptions =
-    granularity === 'minute'
-      ? { hour: '2-digit', minute: '2-digit', hour12: false, timeZone }
-      : { day: 'numeric', month: 'short', hour: '2-digit', hour12: false, timeZone };
-  const fmt = new Intl.DateTimeFormat(intl, options);
-  return fractions.map((f) => {
-    const bucket = buckets[Math.min(buckets.length - 1, Math.round(f * (buckets.length - 1)))];
-    return bucket ? fmt.format(bucket) : '';
-  });
+  return bucketAxisLabels(buckets ?? [], granularity, locale, timeZone);
 }
 
 /** Smoothing window: enough to read a trajectory, never enough to erase a gap. */

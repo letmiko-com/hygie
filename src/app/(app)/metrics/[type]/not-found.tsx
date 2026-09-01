@@ -8,7 +8,7 @@
 // the page has resolved its slug, and notFound() can no longer turn a 200 into
 // a 404 (measured: it did exactly that). The page answers in 130-440 ms on the
 // real database, so the skeleton was worth less than the status code.
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { EmptyState } from '@/components/data/EmptyState';
 import { Panel } from '@/components/ui/Panel';
 import { getMessages } from '@/lib/i18n';

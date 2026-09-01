@@ -5,7 +5,7 @@
 // a missing distance reads "not measured", a missing elevation "no GPS".
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { LineChart } from '@/components/charts/LineChart';
 import { DataTable } from '@/components/data/DataTable';
 import { SourceBadge } from '@/components/data/SourceBadge';
