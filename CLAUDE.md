@@ -1,7 +1,7 @@
 # Hygie : dashboard web self-hosted pour données Apple Santé
 
 App Next.js 16 (App Router, TypeScript strict, output standalone) + Postgres, EN PRODUCTION
-sur Railway (projet `hygie`, https://app-production-e6f9.up.railway.app). AGPL-3.0, repo privé
+sur Railway (projet `hygie`, https://hygie.letmiko.app). AGPL-3.0, repo privé
 mais open-source-ready : jamais de donnée de santé ni de secret dans le repo (même en fixture),
 config 100 % par variables d'environnement (`.env.example` = contrat).
 
