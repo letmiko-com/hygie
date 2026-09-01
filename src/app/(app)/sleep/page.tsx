@@ -4,7 +4,7 @@
 // dashed placeholder everywhere, never a zero. Stage detail bars only render
 // for periods up to 100 days; longer windows keep the rolling-mean chart.
 import type { Metadata } from 'next';
-import Link from '@/components/ui/Link';
+import { DrillBands } from '@/components/charts/DrillBands';
 import { LineChart } from '@/components/charts/LineChart';
 import { MetricCard } from '@/components/data/MetricCard';
 import { StatTile } from '@/components/data/StatTile';
@@ -13,7 +13,7 @@ import { EmptyState } from '@/components/data/EmptyState';
 import { Panel, PanelLabel } from '@/components/ui/Panel';
 import { TimeNav } from '@/components/time/TimeNav';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
-import { bucketSpans, drillZone, spanQuery } from '@/lib/drill';
+import { bucketSpans, drillSet, drillZone, spanQuery } from '@/lib/drill';
 import { fmtDay, fmtHoursMinutes, fmtInt, fmtNumber } from '@/lib/format';
 import { getMessages, resolveLocale, type Locale, type Messages } from '@/lib/i18n';
 import { getSubjectContext } from '@/lib/queries/context';
@@ -36,6 +36,8 @@ export const dynamic = 'force-dynamic';
 const SLEEP_COLOR = 'var(--data-sleep)';
 /** One night must stay a bar, not a block stretched over the whole panel. */
 const BAR_MAX_W = 56;
+/** Hours between two labelled graduations of the night chart. */
+const TICK_H = 2;
 const PHASES = [
   { key: 'deep', opacity: 1, color: SLEEP_COLOR },
   { key: 'core', opacity: 0.55, color: SLEEP_COLOR },
@@ -43,6 +45,10 @@ const PHASES = [
   { key: 'awake', opacity: 0.8, color: 'var(--warn)' },
 ] as const;
 type PhaseKey = (typeof PHASES)[number]['key'];
+
+function phaseHours(v: NightView, key: PhaseKey): number {
+  return key === 'deep' ? v.deepH : key === 'core' ? v.coreH : key === 'rem' ? v.remH : v.awakeH;
+}
 
 interface NightView {
   deepH: number;
@@ -120,18 +126,6 @@ function fmtBedtime(minSinceNoon: number | null): string | null {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-/**
- * The hover card is centred on its column, which overflows at the panel edges
- * (41 px past the panel on the last night, at 1178 px wide). Columns in the
- * outer 15 % of the axis pin the card to their side instead: on any panel wide
- * enough to show the chart, 15 % covers the half card (about 100 px). Touch
- * screens never show the card, so the narrow mobile plot is not a concern.
- */
-function tipEdge(i: number, n: number): string {
-  const at = (i + 0.5) / n;
-  return at < 0.15 ? 'hy-tip-start' : at > 0.85 ? 'hy-tip-end' : '';
-}
-
 function NightBars({
   days,
   byDate,
@@ -150,9 +144,12 @@ function NightBars({
     return n ? toView(n) : null;
   });
   const maxH = Math.max(9, ...views.filter((v): v is NightView => v !== null).map((v) => v.totalH + v.awakeH));
-  // The scale tops at a whole tick so the axis graduates in round hours.
-  const axisMax = Math.ceil(maxH / 3) * 3;
-  const ticks = Array.from({ length: axisMax / 3 + 1 }, (_, i) => axisMax - i * 3);
+  // The scale tops at a whole tick so the axis graduates in round hours. Every
+  // hour gets a grid line (a night is read against 7 h or 8 h, not against 6 h
+  // and 9 h), every other hour a label; the labelled lines are the darker ones.
+  const axisMax = Math.ceil(maxH / TICK_H) * TICK_H;
+  const ticks = Array.from({ length: axisMax / TICK_H + 1 }, (_, i) => axisMax - i * TICK_H);
+  const gridHours = Array.from({ length: axisMax + 1 }, (_, i) => axisMax - i);
   const timeFmt = new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', {
     hour: '2-digit',
     minute: '2-digit',
@@ -164,6 +161,63 @@ function NightBars({
   // the bars they date. Wide windows exceed it and are unaffected.
   const gap = days.length > 45 ? 1 : 4;
   const plotMaxW = days.length * BAR_MAX_W + (days.length - 1) * gap;
+  // One drill zone per measured night; the hover card rides inside its band
+  // (DrillBands pins it to the panel edge on the outer columns).
+  const zones = days.map((d, i) =>
+    views[i] === null ? null : drillZone({ fromDay: d, toDay: d }, `/sleep?from=${d}&to=${d}`, locale, m)
+  );
+  const tips = views.map((v, i) => {
+    if (v === null) return null;
+    const night = byDate.get(days[i]);
+    return (
+      <span key={days[i]} className="hy-tip" aria-hidden>
+        <span style={{ display: 'block', font: '600 var(--text-xs)/1.5 var(--font-ui)', color: 'var(--text-1)' }}>
+          {fmtDay(days[i], locale, { weekday: 'short', day: 'numeric', month: 'short' })} ·{' '}
+          {fmtHoursMinutes(v.totalH * 3600)}
+        </span>
+        {night?.sleepStart && night?.sleepEnd && (
+          <span
+            className="tnum"
+            style={{ display: 'block', font: '400 var(--text-2xs)/1.6 var(--font-data)', color: 'var(--text-3)' }}
+          >
+            {timeFmt.format(night.sleepStart)} → {timeFmt.format(night.sleepEnd)}
+          </span>
+        )}
+        {PHASES.map((p) => {
+          const hours = phaseHours(v, p.key);
+          if (hours <= 0) return null;
+          return (
+            <span
+              key={p.key}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                font: '400 var(--text-xs)/1.6 var(--font-ui)',
+                color: 'var(--text-2)',
+              }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 2,
+                  background: p.color,
+                  opacity: p.opacity,
+                  flex: 'none',
+                }}
+              />
+              <span style={{ flex: 1, paddingRight: 14 }}>{m.sleep.phases[p.key]}</span>
+              <span className="tnum" style={{ fontFamily: 'var(--font-data)', color: 'var(--text-1)' }}>
+                {fmtHoursMinutes(hours * 3600)}
+              </span>
+            </span>
+          );
+        })}
+      </span>
+    );
+  });
   return (
     <div>
       <div style={{ display: 'flex', gap: 8 }}>
@@ -185,7 +239,11 @@ function NightBars({
             <span key={t}>{t === 0 ? '0' : `${t} h`}</span>
           ))}
         </div>
-        <div style={{ position: 'relative', flex: 1, maxWidth: plotMaxW, height: 170 }}>
+        <div
+          role="group"
+          aria-label={m.sleep.nightsTitle}
+          style={{ position: 'relative', flex: 1, maxWidth: plotMaxW, height: 170 }}
+        >
           <div
             aria-hidden
             style={{
@@ -196,15 +254,19 @@ function NightBars({
               justifyContent: 'space-between',
             }}
           >
-            {ticks.map((t) => (
-              <div key={t} style={{ borderTop: '1px solid var(--chart-grid)' }} />
+            {gridHours.map((h) => (
+              <div
+                key={h}
+                style={{
+                  borderTop: `1px solid ${h % TICK_H === 0 ? 'var(--chart-grid)' : 'color-mix(in oklab, var(--chart-grid) 55%, transparent)'}`,
+                }}
+              />
             ))}
           </div>
-          {/* The night columns are drill links: the group role keeps them in
-              the accessibility tree, which role="img" would flatten away. */}
+          {/* The columns are the picture; the drill bands over them carry the
+              links and their labels (the group role sits on the plot). */}
           <div
-            role="group"
-            aria-label={m.sleep.nightsTitle}
+            aria-hidden
             style={{
               position: 'absolute',
               inset: 0,
@@ -231,18 +293,10 @@ function NightBars({
                   />
                 );
               }
-              const night = byDate.get(days[i]);
               return (
-                <Link
-                  key={i}
-                  href={`/sleep?from=${days[i]}&to=${days[i]}`}
-                  className={`hy-drill hy-tipwrap ${tipEdge(i, views.length)}`.trimEnd()}
-                  aria-label={m.common.drillDay(fmtDay(days[i], locale))}
-                  style={{ flex: 1, display: 'flex', flexDirection: 'column-reverse', height: '100%' }}
-                >
+                <span key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column-reverse', height: '100%' }}>
                   {PHASES.map((p) => {
-                    const hours =
-                      p.key === 'deep' ? v.deepH : p.key === 'core' ? v.coreH : p.key === 'rem' ? v.remH : v.awakeH;
+                    const hours = phaseHours(v, p.key);
                     return (
                       <span
                         key={p.key}
@@ -255,57 +309,11 @@ function NightBars({
                       />
                     );
                   })}
-                  <span className="hy-tip" aria-hidden>
-                    <span style={{ display: 'block', font: '600 var(--text-xs)/1.5 var(--font-ui)', color: 'var(--text-1)' }}>
-                      {fmtDay(days[i], locale, { weekday: 'short', day: 'numeric', month: 'short' })} ·{' '}
-                      {fmtHoursMinutes(v.totalH * 3600)}
-                    </span>
-                    {night?.sleepStart && night?.sleepEnd && (
-                      <span
-                        className="tnum"
-                        style={{ display: 'block', font: '400 var(--text-2xs)/1.6 var(--font-data)', color: 'var(--text-3)' }}
-                      >
-                        {timeFmt.format(night.sleepStart)} → {timeFmt.format(night.sleepEnd)}
-                      </span>
-                    )}
-                    {PHASES.map((p) => {
-                      const hours =
-                        p.key === 'deep' ? v.deepH : p.key === 'core' ? v.coreH : p.key === 'rem' ? v.remH : v.awakeH;
-                      if (hours <= 0) return null;
-                      return (
-                        <span
-                          key={p.key}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            font: '400 var(--text-xs)/1.6 var(--font-ui)',
-                            color: 'var(--text-2)',
-                          }}
-                        >
-                          <span
-                            aria-hidden
-                            style={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: 2,
-                              background: p.color,
-                              opacity: p.opacity,
-                              flex: 'none',
-                            }}
-                          />
-                          <span style={{ flex: 1, paddingRight: 14 }}>{m.sleep.phases[p.key]}</span>
-                          <span className="tnum" style={{ fontFamily: 'var(--font-data)', color: 'var(--text-1)' }}>
-                            {fmtHoursMinutes(hours * 3600)}
-                          </span>
-                        </span>
-                      );
-                    })}
-                  </span>
-                </Link>
+                </span>
               );
             })}
           </div>
+          <DrillBands set={drillSet(zones, locale, m)} n={days.length} align="slot" tips={tips} />
         </div>
       </div>
       <div
@@ -545,7 +553,7 @@ export default async function SleepPage({
                 emptyLabel={m.common.noDataOnPeriod}
                 yFormat={(v, digits) => fmtNumber(v, locale, Math.max(1, digits))}
                 xLabels={chartXLabels}
-                drill={bucketSpans(days, 366).map((s) => drillZone(s, `/sleep?${spanQuery(s)}`, locale, m))}
+                drill={drillSet(bucketSpans(days, 366).map((s) => drillZone(s, `/sleep?${spanQuery(s)}`, locale, m)), locale, m)}
                 series={[
                   {
                     data: downsample(hoursPerDay, 366),

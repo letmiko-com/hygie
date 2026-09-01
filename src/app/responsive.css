@@ -94,4 +94,23 @@
   .hy-scrollx {
     overflow-x: auto;
   }
+
+  /* Heatmap cells grow from 11 to 20 px so a day can be hit with a finger; the
+     plot already scrolls sideways inside its panel. Sizes are inline in the
+     component, hence the !important. */
+  .hy-heat {
+    grid-template-rows: repeat(7, 20px) !important;
+    grid-auto-columns: 20px !important;
+  }
+
+  .hy-heat > * {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  .hy-heat-days {
+    grid-template-rows: repeat(7, 20px) !important;
+    font-size: 11px !important;
+    line-height: 20px !important;
+  }
 }
