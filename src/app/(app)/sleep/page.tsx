@@ -120,6 +120,18 @@ function fmtBedtime(minSinceNoon: number | null): string | null {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
+/**
+ * The hover card is centred on its column, which overflows at the panel edges
+ * (41 px past the panel on the last night, at 1178 px wide). Columns in the
+ * outer 15 % of the axis pin the card to their side instead: on any panel wide
+ * enough to show the chart, 15 % covers the half card (about 100 px). Touch
+ * screens never show the card, so the narrow mobile plot is not a concern.
+ */
+function tipEdge(i: number, n: number): string {
+  const at = (i + 0.5) / n;
+  return at < 0.15 ? 'hy-tip-start' : at > 0.85 ? 'hy-tip-end' : '';
+}
+
 function NightBars({
   days,
   byDate,
@@ -224,7 +236,7 @@ function NightBars({
                 <Link
                   key={i}
                   href={`/sleep?from=${days[i]}&to=${days[i]}`}
-                  className="hy-drill hy-tipwrap"
+                  className={`hy-drill hy-tipwrap ${tipEdge(i, views.length)}`.trimEnd()}
                   aria-label={m.common.drillDay(fmtDay(days[i], locale))}
                   style={{ flex: 1, display: 'flex', flexDirection: 'column-reverse', height: '100%' }}
                 >

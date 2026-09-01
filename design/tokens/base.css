@@ -14,5 +14,8 @@ a:hover{color:var(--accent-strong);text-decoration:underline}
 .hy-tipwrap:hover,.hy-tipwrap:focus-visible{z-index:6}
 .hy-tip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);z-index:6;display:none;pointer-events:none;white-space:nowrap;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-md);padding:8px 11px;box-shadow:var(--shadow-2);text-align:left}
 .hy-tipwrap:hover .hy-tip,.hy-tipwrap:focus-visible .hy-tip{display:block}
+/* Columns near a panel edge pin the card to that edge instead of centring it: a centred card on the last night of the sleep chart overflowed the panel by 41 px. */
+.hy-tipwrap.hy-tip-start .hy-tip{left:0;transform:none}
+.hy-tipwrap.hy-tip-end .hy-tip{left:auto;right:0;transform:none}
 @keyframes hy-shimmer{0%{opacity:0.55}50%{opacity:1}100%{opacity:0.55}}
 @keyframes hy-spin{to{transform:rotate(360deg)}}
