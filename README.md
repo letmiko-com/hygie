@@ -50,8 +50,10 @@ never run automatically at boot. Read `docs/architecture.md` first: it is the co
 The short version, until the guide exists: PostgreSQL 16+, `cp .env.example .env` and fill it,
 `npm run migrate && npm run seed`, build and run the Dockerfile (or `npm run build && npm start`).
 Backfill your history with `npm run backfill -- export.zip --subject <uuid>`, then
-`npm run rollups -- --subject <uuid>`. Open an issue if you get stuck: real-world reports are
-exactly what pre-1.0 needs.
+`npm run rollups -- --subject <uuid>`. When you replace the phone that feeds Hygie, run
+`npm run cutover -- --device <new device name>` so the new device becomes the authority for
+the minute channel (otherwise its data is logged as conflicts and never written). Open an
+issue if you get stuck: real-world reports are exactly what pre-1.0 needs.
 
 ## License
 

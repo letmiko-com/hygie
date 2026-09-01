@@ -13,7 +13,8 @@
     "migrate": "node scripts/migrate.mjs",
     "seed": "node scripts/seed-taxonomy.mjs",
     "backfill": "node scripts/backfill/import-xml.mjs",
-    "rollups": "node scripts/rebuild-rollups.mjs"
+    "rollups": "node scripts/rebuild-rollups.mjs",
+    "cutover": "node scripts/cutover.mjs"
   },
   "dependencies": {
     "next": "^16.0.0",

@@ -105,9 +105,18 @@ secondary indexes → first full backup → then enable PITR.
   it. The worker drains its batch's ranges before the batch reaches `rollups_ready`, and
   drains everyone else's when idle. Category types are never rolled up (no numeric value);
   `min`/`max` are meaningful for raw types only.
-- Bulk writes that bypass the worker (XML backfill, hand-moved cutover) invalidate
+- Bulk writes that bypass the worker (XML backfill, hand-moved `cutover_ts`) invalidate
   nothing on their own: the operator runs `npm run rollups -- --subject <uuid>`
   afterwards (idempotent, one transaction per month per type).
+- Replacing the companion device (new phone, HAE replaced by Hygie Sync) does NOT move
+  the authority by itself: the cutover is bootstrapped by the first device ever seen and
+  never moves on its own, so every minute the new device sends lands in `minute_conflicts`
+  and `minute_stats` silently stops growing (incident of 2026-08-14, two days of gap). Run
+  `npm run cutover -- --device <name> [--subject <uuid>]` (dry run, then `--yes`): one
+  transaction moves `channel_cutovers.device_id` for that subject to the new device. It
+  refuses revoked devices and ambiguous names, leaves `cutover_ts` alone (the timestamp is
+  the only column the truth rules read, so nothing to rebuild) and reports the conflicting
+  minutes already recorded from the new device without promoting them.
 - p95 budget for dashboard queries: 500 ms, re-verified with EXPLAIN ANALYZE when the
   schema evolves.
 

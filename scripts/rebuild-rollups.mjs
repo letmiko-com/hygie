@@ -5,10 +5,11 @@
 //                                    [--database-url <url>]
 //
 // WHEN TO RUN IT: after an XML backfill (scripts/backfill/import-xml.mjs), after
-// moving a channel cutover by hand, or after any bulk write that did not go
+// moving a channel cutover_ts by hand, or after any bulk write that did not go
 // through the ingestion worker. Those writes add observations behind the rollups'
 // back; nothing else invalidates them. The worker keeps rollups current for HAE
-// batches on its own and needs no help.
+// batches on its own and needs no help. Moving only the authoritative device
+// (scripts/cutover.mjs) changes no truth and needs no rebuild.
 //
 // It calls the same SQL builder as the worker (rollup_rebuild_range, migration
 // 0002), one call per month per type so no transaction is ever long, and it is
