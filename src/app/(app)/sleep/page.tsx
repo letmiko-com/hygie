@@ -4,7 +4,7 @@
 // dashed placeholder everywhere, never a zero. Stage detail bars only render
 // for periods up to 100 days; longer windows keep the rolling-mean chart.
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { LineChart } from '@/components/charts/LineChart';
 import { MetricCard } from '@/components/data/MetricCard';
 import { StatTile } from '@/components/data/StatTile';
@@ -224,7 +224,6 @@ function NightBars({
                 <Link
                   key={i}
                   href={`/sleep?from=${days[i]}&to=${days[i]}`}
-                  prefetch={false}
                   className="hy-drill hy-tipwrap"
                   aria-label={m.common.drillDay(fmtDay(days[i], locale))}
                   style={{ flex: 1, display: 'flex', flexDirection: 'column-reverse', height: '100%' }}

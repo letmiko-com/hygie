@@ -5,7 +5,7 @@
 // query string (where @auth/core reads them; CSRF only applies to credentials
 // providers). On an invalid or expired token, Auth.js redirects to /login
 // with ?error=Verification.
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import type { Metadata } from 'next';
 import { IconBadge, LoginShell, PanelHeading, panelStyle, primaryButtonStyle } from '../ui';
 

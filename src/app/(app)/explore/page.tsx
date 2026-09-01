@@ -13,7 +13,7 @@
 // never asked; the chosen grain is displayed so no one mistakes an hourly
 // mean for a raw sample.
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { MultiLineChart, planScale, type OverlaySeries } from '@/components/charts/MultiLineChart';
 import { drillZone } from '@/lib/drill';
 import { DataTable, type Column } from '@/components/data/DataTable';

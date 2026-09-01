@@ -2,7 +2,7 @@
 // band with trends, per-sport tabs (links, URL is the state), sessions
 // grouped by month, all under the shared time navigation.
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { SessionRow } from '@/components/data/SessionRow';
 import { StatTile } from '@/components/data/StatTile';
 import { TrendChip } from '@/components/data/TrendChip';

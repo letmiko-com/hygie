@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { ABSENT } from '@/lib/format';
 import type { DrillZone } from '@/lib/drill';
 
@@ -87,7 +87,6 @@ export function BarChart({
             <Link
               key={i}
               href={zone.href}
-              prefetch={false}
               className="hy-drill"
               aria-label={zone.label}
               title={`${value} · ${zone.label}`}

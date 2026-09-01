@@ -21,7 +21,7 @@
 // month of heart rate, 942 ms all-time, measured), and it is secondary: the
 // numbers and the chart must not wait for it.
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { BarChart } from '@/components/charts/BarChart';
