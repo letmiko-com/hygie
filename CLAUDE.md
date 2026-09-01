@@ -41,9 +41,11 @@ config 100 % par variables d'environnement (`.env.example` = contrat).
   db/, scripts/, public/, Dockerfile, configs). Commits en anglais, un commit une intention.
 - Postgres de production : accessible uniquement depuis le réseau privé Railway ;
   administration ponctuelle via `railway ssh --service app` (script + `NODE_PATH=/app/node_modules`).
-- Base de DEV avec les données réelles complètes : conteneur Docker local `hygie-pgbench`,
-  `postgres://postgres:<mdp local, voir ~/Letmiko/work/hygie/bench/>@127.0.0.1:5433/hygie_dev`
-  (6,48 M observations réelles importées). S'en servir pour développer et mesurer.
+- Base de DEV : le conteneur Docker local `hygie-pgbench` (6,48 M observations réelles) et son
+  dossier `~/Letmiko/work/hygie/bench/` n'existent plus sur le Mac (constaté 2026-09-01 : ni
+  conteneur, ni volume). Pour développer avec des données : recréer un Postgres jetable
+  (`docker run postgres:17`, `npm run migrate && npm run seed`, backfill d'un export XML), ou
+  valider sur la prod au navigateur après déploiement.
 - Scripts : `npm run migrate` / `seed` / `backfill` / `rollups` (reconstruction de
   `rollup_hourly`, à lancer après tout backfill XML). Tests manuels : harnais dans
   `~/Letmiko/work/hygie/test-ingest/` et `test-auth/`.
