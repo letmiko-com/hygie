@@ -36,6 +36,8 @@ export const dynamic = 'force-dynamic';
 
 /** Sessions per page. All-time held ~1000 rows, i.e. 4.7 MB of HTML. */
 const PAGE_SIZE = 50;
+/** Widest window the zone accounting is run on (see the panel below). */
+const ZONES_MAX_DAYS = 92;
 
 function pct(cur: number | null, prev: number | null): number | null {
   if (cur === null || prev === null || prev === 0) return null;
@@ -78,9 +80,10 @@ export default async function SportPage({
   ]);
 
   // Time in HR zones over the period's sessions (this sport or all), against the
-  // observed maximum. Stops at a year: the join walks every HR sample of every
-  // session in the window.
-  const maxHrEstimate = rangeDays <= 366 ? await estimatedMaxHr(ctx, today) : null;
+  // observed maximum. Stops at a quarter: the join walks every HR sample of
+  // every session in the window (measured on production: 0.8 s on six months,
+  // 1.5 s on a year, against a 500 ms budget).
+  const maxHrEstimate = rangeDays <= ZONES_MAX_DAYS ? await estimatedMaxHr(ctx, today) : null;
   const zones = maxHrEstimate ? await timeInZones(ctx, range, maxHrEstimate.bpm, sport) : null;
 
   // Tabs: every sport present on the period, ordered by count.
@@ -251,7 +254,7 @@ export default async function SportPage({
             )
           ) : (
             <p style={{ margin: 0, font: 'italic 400 var(--text-sm)/1.4 var(--font-ui)', color: 'var(--text-3)' }}>
-              {rangeDays > 366 ? m.zones.tooWide : m.zones.noMax}
+              {rangeDays > ZONES_MAX_DAYS ? m.zones.tooWide : m.zones.noMax}
             </p>
           )}
         </Panel>
