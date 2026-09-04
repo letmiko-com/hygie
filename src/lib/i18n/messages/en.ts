@@ -19,8 +19,7 @@ export const en = {
     records: 'Records',
     sleep: 'Sleep',
     explore: 'Explorer',
-    allData: 'All my data',
-    devices: 'Devices',
+    allData: 'All my data',    devices: 'Devices',
     markers: 'Health markers',
     overview: 'Overview',
     analysis: 'Analysis',
@@ -370,6 +369,18 @@ export const en = {
     segmentsTile: 'Segments (all-time)',
     tooLongForBars: 'Stage detail is shown for periods up to 100 days.',
     empty: 'No sleep data on this period',
+  },
+  markers: {
+    title: 'Health markers',
+    intro:
+      'Background measures, away from effort: what the body shows at rest and during sleep. Each marker is read over the period and compared with the previous one, never scored.',
+    latest: (value: string, day: string) => `latest: ${value}, ${day}`,
+    measured: (n: number, total: number) => `${n} / ${total} days measured`,
+    rollingNote: (n: number) => `Daily values translucent, ${n}-day rolling mean in the bold line.`,
+    sparseNote: 'Sparse measures: the curve joins the measures that exist, nothing is interpolated.',
+    empty: 'No marker recorded for this account',
+    emptyHint:
+      'HRV, resting heart rate, respiratory rate, wrist temperature, VO₂ max and body composition appear here once synchronised.',
   },
   records: {
     title: 'Records',
