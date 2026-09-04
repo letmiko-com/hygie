@@ -29,7 +29,7 @@ import { dataColor } from '@/lib/metrics';
 import { sportDisplay, sportLabel } from '@/lib/sports';
 import { getSubjectContext } from '@/lib/queries/context';
 import { addDays, dayInZone, todayInZone } from '@/lib/queries/time';
-import { estimatedMaxHr, zonesFromSamples } from '@/lib/queries/zones';
+import { resolveMaxHr, zonesFromSamples } from '@/lib/queries/zones';
 import {
   getWorkout,
   observationSamples,
@@ -85,7 +85,7 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
     workoutHeartRate(ctx, workout.id),
     workoutSplits(ctx, workout.id),
     workoutSummary(ctx, { fromDay: addDays(workoutDay, -90), toDayExcl: workoutDay }, workout.activityType),
-    estimatedMaxHr(ctx, todayInZone(ctx.timezone)),
+    resolveMaxHr(ctx, todayInZone(ctx.timezone)),
   ]);
 
   const isRun = workout.activityType === 'HKWorkoutActivityTypeRunning';
@@ -254,7 +254,13 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
           <PanelLabel>{m.zones.sessionTitle}</PanelLabel>
           <ZoneBar breakdown={zones} locale={locale} m={m} ariaLabel={m.zones.sessionTitle} />
           <p style={{ margin: '10px 0 0', font: '400 var(--text-2xs)/1.4 var(--font-ui)', color: 'var(--text-3)' }}>
-            {m.zones.basis(fmtInt(maxHrEstimate.bpm, locale), fmtDay(maxHrEstimate.sinceDay, locale), maxHrEstimate.sessions)}
+            {maxHrEstimate.basis === 'declared'
+              ? m.zones.basisDeclared(fmtInt(maxHrEstimate.bpm, locale), maxHrEstimate.observed ? fmtInt(maxHrEstimate.observed.bpm, locale) : null)
+              : m.zones.basis(
+                  fmtInt(maxHrEstimate.bpm, locale),
+                  maxHrEstimate.observed ? fmtDay(maxHrEstimate.observed.sinceDay, locale) : '',
+                  maxHrEstimate.observed?.sessions ?? 0
+                )}
           </p>
         </Panel>
       )}

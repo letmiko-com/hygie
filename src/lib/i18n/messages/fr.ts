@@ -387,6 +387,12 @@ export const fr: Messages = {
     noHr: 'Aucune fréquence cardiaque enregistrée en séance sur la période.',
     tooWide: 'Zones calculées pour une période de trois mois au plus.',
     sessionTitle: 'Temps par zone',
+    basisDeclared: (bpm: string, observed: string | null) =>
+      `FC max déclarée : ${bpm} bpm${observed ? ` (observée sur 12 mois : ${observed} bpm)` : ''}. Zones à 50, 60, 70, 80 et 90 % de ce maximum.`,
+    declaredLabel: 'FC max déclarée',
+    declaredHint: 'Vide : la FC max observée sur 12 mois sert de base.',
+    save: 'Enregistrer',
+    clear: 'Effacer',
   },
   calendar: {
     title: 'Calendrier',
