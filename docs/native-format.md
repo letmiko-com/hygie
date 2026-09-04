@@ -50,7 +50,13 @@ One entry per HKSample, straight from `HKAnchoredObjectQuery`:
 - `value` + `unit` for quantity kinds; `category` (the raw HealthKit enum
   integer) for category kinds. Exactly one of the two must be present.
 - **The app converts every quantity to the canonical unit of the taxonomy**
-  before sending (kJ for energies, fractions for percentages, m, °C, …).
+  before sending (kJ for energies, m, °C, …). One exception, percentages: the
+  canonical `%` is 0-100 (Apple's XML export and HAE both carry 97 for 97 %,
+  and so do 99 % of the rows in the database), but `HKUnit.percent()` hands
+  the app a fraction (0.97) and hygie-native/1 sends it as is. The server
+  scales `%` values by 100 at ingestion (normalize-native.ts) until
+  hygie-native/2 has the app send 0-100; that change and the removal of the
+  server-side scaling must ship together.
   The `unit` field is a control: a mismatch is counted per type
   (`unit_mismatch`) and the sample refused — the server never guesses a
   conversion. The app's unit table is generated from `db/taxonomy.json` by

@@ -356,6 +356,11 @@ export async function normalizeNativePayload(
       bump(counts, name, 'unit_mismatch');
       continue;
     }
+    // HealthKit hands percentages out as fractions (0.97 for 97 %) while the
+    // canonical percent, like Apple's XML export and every HAE row, is 0-100
+    // (checked on real data, 2026-09-04). Scaled here until hygie-native/2
+    // has the app send percents (docs/native-format.md).
+    const value = type.canonical_unit === '%' ? s.value * 100 : s.value;
     staged.push({
       idx: idx++,
       uuid: s.uuid,
@@ -365,8 +370,8 @@ export async function normalizeNativePayload(
       startTs: start.utc,
       endTs: end && end.utc >= start.utc ? end.utc : null,
       tzOffsetMin: start.tzOffsetMin,
-      value: s.value,
-      valueKey: quantize(s.value, type.quantize_scale),
+      value,
+      valueKey: quantize(value, type.quantize_scale),
       categoryValue: null,
       originalUnitId: s.unit ? await getUnitId(ctx, s.unit) : null,
     });
