@@ -41,13 +41,17 @@ config 100 % par variables d'environnement (`.env.example` = contrat).
   db/, scripts/, public/, Dockerfile, configs). Commits en anglais, un commit une intention.
 - Postgres de production : accessible uniquement depuis le réseau privé Railway ;
   administration ponctuelle via `railway ssh --service app` (script + `NODE_PATH=/app/node_modules`).
-- Base de DEV : plus de base à données réelles sur le Mac (le conteneur `hygie-pgbench` et
-  `~/Letmiko/work/hygie/bench/` ont disparu, constaté 2026-09-01). Pour développer : Postgres
-  jetable (`docker run -d --name hygie-shots-pg -e POSTGRES_PASSWORD=... -p 5434:5432 postgres:17`),
-  `npm run migrate && npm run seed`, puis `npm run synthetic -- --email demo@hygie.invalid --yes`
-  (jeu synthétique déterministe, 400 jours, ajouté le 2026-09-04) et `npm run rollups`. Connexion
-  en local via `HYGIE_MAIL_CAPTURE_DIR` (le magic link atterrit en JSON). Les captures du README
-  viennent de ce jeu : jamais de vraies valeurs dans le repo public.
+- Base de DEV sur le Mac : conteneur Docker `hygie-demo-pg` (Postgres 17, port 5434, volume nommé
+  `hygie-demo-pg`, redémarre avec Docker Desktop), base `hygie_demo` remplie par le jeu synthétique
+  (`npm run synthetic`, sujet « Camille », deux ans, 443 837 observations, rollups faits le
+  2026-09-04). Le `.env` local du repo (ignoré par git) pointe dessus, avec
+  `HYGIE_MAIL_CAPTURE_DIR` : `npm run build && npm start`, puis demander un magic link pour
+  `demo@hygie.invalid` sur http://localhost:3000/login et ouvrir le lien trouvé dans le JSON du
+  dossier de capture. Pour repartir de zéro : `docker rm -f hygie-demo-pg && docker volume rm
+  hygie-demo-pg`, relancer le conteneur, `npm run migrate && npm run seed`, `npm run synthetic --
+  --email demo@hygie.invalid --days 730 --yes`, `npm run rollups -- --subject <uuid affiché>`.
+  Plus de base à données réelles ici (`hygie-pgbench` a disparu, constaté 2026-09-01) : les
+  captures du README viennent du jeu synthétique, jamais de vraies valeurs dans le repo public.
 - Scripts : `npm run migrate` / `seed` / `backfill` / `rollups` (reconstruction de
   `rollup_hourly`, à lancer après tout backfill XML). Tests manuels : harnais dans
   `~/Letmiko/work/hygie/test-ingest/` et `test-auth/`.
