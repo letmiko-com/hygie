@@ -1,3 +1,6 @@
+// A month without a session trained 0:00 over 0 km: training is observed
+// through the sessions themselves, so that zero is a fact, not a gap (a month
+// whose sessions carry no distance keeps the absence glyph).
 // Month calendar (product phase 2, 2026-09-04: fitIQ's "Calendar" read through
 // the charter). One month, Monday-first grid: each day shows its sessions
 // (sport, start time, duration) and its night (time asleep). The month's
@@ -147,12 +150,12 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           />
           <StatTile
             label={m.calendar.training}
-            value={cur.sessions === 0 ? null : fmtDuration(cur.trainingS)}
+            value={fmtDuration(cur.trainingS)}
             sub={<TrendChip deltaPct={deltaPct(cur.trainingS, prev.trainingS)} label={m.calendar.vsPrevMonth} locale={locale} />}
           />
           <StatTile
             label={m.calendar.distance}
-            value={cur.distanceM === null ? null : fmtNumber(cur.distanceM / 1000, locale, 1)}
+            value={cur.sessions === 0 ? fmtNumber(0, locale, 1) : cur.distanceM === null ? null : fmtNumber(cur.distanceM / 1000, locale, 1)}
             unit="km"
             sub={<TrendChip deltaPct={deltaPct(cur.distanceM, prev.distanceM)} label={m.calendar.vsPrevMonth} locale={locale} />}
           />

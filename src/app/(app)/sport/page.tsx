@@ -8,6 +8,7 @@ import { StatTile } from '@/components/data/StatTile';
 import { TrendChip } from '@/components/data/TrendChip';
 import { EmptyState } from '@/components/data/EmptyState';
 import { BarChart } from '@/components/charts/BarChart';
+import { ZoneBar } from '@/components/charts/ZoneBar';
 import { LinkTabs, type LinkTab } from '@/components/ui/LinkTabs';
 import { Panel, PanelLabel } from '@/components/ui/Panel';
 import { TimeNav } from '@/components/time/TimeNav';
@@ -19,6 +20,7 @@ import { sportDisplay, sportLabel } from '@/lib/sports';
 import { getSubjectContext } from '@/lib/queries/context';
 import { dataTotals } from '@/lib/queries/sync';
 import { comparisonRange, daysBetween, elapsedDays, todayInZone } from '@/lib/queries/time';
+import { estimatedMaxHr, timeInZones } from '@/lib/queries/zones';
 import { parseTimeParams, type TimeSearchParams } from '@/lib/queries/time-params';
 import {
   monthlyTrainingSilhouette,
@@ -74,6 +76,12 @@ export default async function SportPage({
     rangeDays <= 200 ? weeklyVolume(ctx, range) : Promise.resolve(null),
     monthlyTrainingSilhouette(ctx),
   ]);
+
+  // Time in HR zones over the period's sessions (this sport or all), against the
+  // observed maximum. Stops at a year: the join walks every HR sample of every
+  // session in the window.
+  const maxHrEstimate = rangeDays <= 366 ? await estimatedMaxHr(ctx, today) : null;
+  const zones = maxHrEstimate ? await timeInZones(ctx, range, maxHrEstimate.bpm, sport) : null;
 
   // Tabs: every sport present on the period, ordered by count.
   const timeQuery = new URLSearchParams();
@@ -226,6 +234,28 @@ export default async function SportPage({
           </Panel>
         )}
       </div>
+
+      {summary.count > 0 && (
+        <Panel>
+          <PanelLabel>{m.zones.title}</PanelLabel>
+          {zones && maxHrEstimate ? (
+            zones.totalS > 0 ? (
+              <>
+                <ZoneBar breakdown={zones} locale={locale} m={m} ariaLabel={m.zones.title} />
+                <p style={{ margin: '10px 0 0', font: '400 var(--text-2xs)/1.4 var(--font-ui)', color: 'var(--text-3)' }}>
+                  {m.zones.basis(fmtInt(maxHrEstimate.bpm, locale), fmtDay(maxHrEstimate.sinceDay, locale), maxHrEstimate.sessions)}
+                </p>
+              </>
+            ) : (
+              <p style={{ margin: 0, font: 'italic 400 var(--text-sm)/1.4 var(--font-ui)', color: 'var(--text-3)' }}>{m.zones.noHr}</p>
+            )
+          ) : (
+            <p style={{ margin: 0, font: 'italic 400 var(--text-sm)/1.4 var(--font-ui)', color: 'var(--text-3)' }}>
+              {rangeDays > 366 ? m.zones.tooWide : m.zones.noMax}
+            </p>
+          )}
+        </Panel>
+      )}
 
       <LinkTabs tabs={tabs} ariaLabel={m.sport.title} />
 
