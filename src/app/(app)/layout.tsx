@@ -30,7 +30,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const sections: NavSection[] = [
     {
       label: m.nav.overview,
-      items: [{ href: '/', icon: 'monitoring', label: m.nav.dashboard }],
+      items: [
+        { href: '/', icon: 'monitoring', label: m.nav.dashboard },
+        { href: '/week', icon: 'view_week', label: m.nav.week },
+      ],
     },
     {
       label: m.nav.analysis,
