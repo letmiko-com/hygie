@@ -14,7 +14,8 @@
     "seed": "node scripts/seed-taxonomy.mjs",
     "backfill": "node scripts/backfill/import-xml.mjs",
     "rollups": "node scripts/rebuild-rollups.mjs",
-    "cutover": "node scripts/cutover.mjs"
+    "cutover": "node scripts/cutover.mjs",
+    "synthetic": "node scripts/synthetic-data.mjs"
   },
   "dependencies": {
     "next": "^16.0.0",
