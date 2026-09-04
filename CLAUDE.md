@@ -41,11 +41,13 @@ config 100 % par variables d'environnement (`.env.example` = contrat).
   db/, scripts/, public/, Dockerfile, configs). Commits en anglais, un commit une intention.
 - Postgres de production : accessible uniquement depuis le réseau privé Railway ;
   administration ponctuelle via `railway ssh --service app` (script + `NODE_PATH=/app/node_modules`).
-- Base de DEV : le conteneur Docker local `hygie-pgbench` (6,48 M observations réelles) et son
-  dossier `~/Letmiko/work/hygie/bench/` n'existent plus sur le Mac (constaté 2026-09-01 : ni
-  conteneur, ni volume). Pour développer avec des données : recréer un Postgres jetable
-  (`docker run postgres:17`, `npm run migrate && npm run seed`, backfill d'un export XML), ou
-  valider sur la prod au navigateur après déploiement.
+- Base de DEV : plus de base à données réelles sur le Mac (le conteneur `hygie-pgbench` et
+  `~/Letmiko/work/hygie/bench/` ont disparu, constaté 2026-09-01). Pour développer : Postgres
+  jetable (`docker run -d --name hygie-shots-pg -e POSTGRES_PASSWORD=... -p 5434:5432 postgres:17`),
+  `npm run migrate && npm run seed`, puis `npm run synthetic -- --email demo@hygie.invalid --yes`
+  (jeu synthétique déterministe, 400 jours, ajouté le 2026-09-04) et `npm run rollups`. Connexion
+  en local via `HYGIE_MAIL_CAPTURE_DIR` (le magic link atterrit en JSON). Les captures du README
+  viennent de ce jeu : jamais de vraies valeurs dans le repo public.
 - Scripts : `npm run migrate` / `seed` / `backfill` / `rollups` (reconstruction de
   `rollup_hourly`, à lancer après tout backfill XML). Tests manuels : harnais dans
   `~/Letmiko/work/hygie/test-ingest/` et `test-auth/`.
