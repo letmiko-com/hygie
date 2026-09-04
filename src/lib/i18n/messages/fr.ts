@@ -376,6 +376,18 @@ export const fr: Messages = {
     tooLongForBars: 'Le détail des phases s’affiche jusqu’à 100 jours de période.',
     empty: 'Pas de donnée de sommeil sur la période',
   },
+  zones: {
+    title: 'Zones de fréquence cardiaque',
+    basis: (bpm: string, since: string, n: number) =>
+      `FC max observée : ${bpm} bpm (99e centile de séance le plus haut depuis le ${since}, ${n} séance${n > 1 ? 's' : ''} avec FC). Zones à 50, 60, 70, 80 et 90 % de ce maximum.`,
+    zoneLabel: (z: number) => `Z${z}`,
+    pctRange: (from: number, to: number | null) => (to === null ? `≥ ${from} %` : `${from}-${to} %`),
+    below: (time: string, pct: string) => `${time} sous Z1 (moins de 50 %, ${pct} du temps enregistré), hors barre.`,
+    noMax: 'FC max inconnue : aucune séance avec fréquence cardiaque sur les 12 derniers mois.',
+    noHr: 'Aucune fréquence cardiaque enregistrée en séance sur la période.',
+    tooWide: 'Zones calculées pour une période d’un an au plus.',
+    sessionTitle: 'Temps par zone',
+  },
   calendar: {
     title: 'Calendrier',
     prevMonth: 'Mois précédent',

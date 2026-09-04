@@ -7,6 +7,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from '@/components/ui/Link';
 import { LineChart } from '@/components/charts/LineChart';
+import { ZoneBar } from '@/components/charts/ZoneBar';
 import { DataTable } from '@/components/data/DataTable';
 import { SourceBadge } from '@/components/data/SourceBadge';
 import { StatTile } from '@/components/data/StatTile';
@@ -15,6 +16,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { Panel, PanelLabel } from '@/components/ui/Panel';
 import {
+  fmtDay,
   fmtDuration,
   fmtInt,
   fmtKcalFromKj,
@@ -26,7 +28,8 @@ import { getMessages, resolveLocale } from '@/lib/i18n';
 import { dataColor } from '@/lib/metrics';
 import { sportDisplay, sportLabel } from '@/lib/sports';
 import { getSubjectContext } from '@/lib/queries/context';
-import { addDays, dayInZone } from '@/lib/queries/time';
+import { addDays, dayInZone, todayInZone } from '@/lib/queries/time';
+import { estimatedMaxHr, zonesFromSamples } from '@/lib/queries/zones';
 import {
   getWorkout,
   observationSamples,
@@ -78,10 +81,11 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
   // printed an exact "0,0 %" instead of an absence. Its own day is excluded,
   // so the session can never enter its own average.
   const workoutDay = dayInZone(workout.startTs, ctx.timezone);
-  const [hrSeries, splits, sameSport90] = await Promise.all([
+  const [hrSeries, splits, sameSport90, maxHrEstimate] = await Promise.all([
     workoutHeartRate(ctx, workout.id),
     workoutSplits(ctx, workout.id),
     workoutSummary(ctx, { fromDay: addDays(workoutDay, -90), toDayExcl: workoutDay }, workout.activityType),
+    estimatedMaxHr(ctx, todayInZone(ctx.timezone)),
   ]);
 
   const isRun = workout.activityType === 'HKWorkoutActivityTypeRunning';
@@ -91,6 +95,9 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
 
   const primaryHr = hrSeries[0] ?? null;
   const maxHr = primaryHr ? Math.max(...primaryHr.samples.map((s) => s.bpm)) : null;
+  // Zones of this session against the subject's observed maximum (queries/zones).
+  const zones =
+    primaryHr && maxHrEstimate && primaryHr.samples.length > 1 ? zonesFromSamples(primaryHr.samples, maxHrEstimate.bpm) : null;
   const hrValues = primaryHr ? downsample(primaryHr.samples.map((s) => s.bpm), 400) : [];
   const hrDelta =
     workout.avgHrBpm !== null && sameSport90.avgHrBpm !== null && sameSport90.avgHrBpm !== 0
@@ -241,6 +248,16 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
           </p>
         )}
       </Panel>
+
+      {zones && maxHrEstimate && (
+        <Panel>
+          <PanelLabel>{m.zones.sessionTitle}</PanelLabel>
+          <ZoneBar breakdown={zones} locale={locale} m={m} ariaLabel={m.zones.sessionTitle} />
+          <p style={{ margin: '10px 0 0', font: '400 var(--text-2xs)/1.4 var(--font-ui)', color: 'var(--text-3)' }}>
+            {m.zones.basis(fmtInt(maxHrEstimate.bpm, locale), fmtDay(maxHrEstimate.sinceDay, locale), maxHrEstimate.sessions)}
+          </p>
+        </Panel>
+      )}
 
       {(power.length > 1 || splits !== null) && (
         <div
