@@ -16,7 +16,7 @@ daily summary shapes.
 | walking_heart_rate_average | HKQuantityTypeIdentifierWalkingHeartRateAverage | count/min | raw | |
 | heart_rate_variability | HKQuantityTypeIdentifierHeartRateVariabilitySDNN | ms | raw | |
 | respiratory_rate | HKQuantityTypeIdentifierRespiratoryRate | count/min | raw | |
-| blood_oxygen_saturation | HKQuantityTypeIdentifierOxygenSaturation | % | raw | XML stores fraction 0-1, JSON percent 0-100 |
+| blood_oxygen_saturation | HKQuantityTypeIdentifierOxygenSaturation | % | raw | XML and JSON both carry percent 0-100, the canonical `%` (checked on real data 2026-09-04: 7 958 XML rows, 161 HAE rows). Only HealthKit's in-app API yields fractions, scaled by the native normalizer |
 | body_temperature | HKQuantityTypeIdentifierBodyTemperature | degC | raw | |
 | apple_sleeping_wrist_temperature | HKQuantityTypeIdentifierAppleSleepingWristTemperature | degC | raw | |
 | breathing_disturbances | HKQuantityTypeIdentifierAppleSleepingBreathingDisturbances | count | raw | |
