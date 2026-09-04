@@ -33,6 +33,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       items: [
         { href: '/', icon: 'monitoring', label: m.nav.dashboard },
         { href: '/week', icon: 'view_week', label: m.nav.week },
+        { href: '/calendar', icon: 'calendar_month', label: m.nav.calendar },
       ],
     },
     {
