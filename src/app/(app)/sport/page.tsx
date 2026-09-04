@@ -20,7 +20,9 @@ import { sportDisplay, sportLabel } from '@/lib/sports';
 import { getSubjectContext } from '@/lib/queries/context';
 import { dataTotals } from '@/lib/queries/sync';
 import { comparisonRange, daysBetween, elapsedDays, todayInZone } from '@/lib/queries/time';
-import { estimatedMaxHr, timeInZones } from '@/lib/queries/zones';
+import { getSubjectSettings } from '@/lib/queries/settings';
+import { resolveMaxHr, timeInZones, type MaxHrBasis } from '@/lib/queries/zones';
+import { setMaxHrAction } from './actions';
 import { parseTimeParams, type TimeSearchParams } from '@/lib/queries/time-params';
 import {
   monthlyTrainingSilhouette,
@@ -36,6 +38,16 @@ export const dynamic = 'force-dynamic';
 
 /** Sessions per page. All-time held ~1000 rows, i.e. 4.7 MB of HTML. */
 const PAGE_SIZE = 50;
+const ZONE_BTN = {
+  height: 26,
+  padding: '0 10px',
+  borderRadius: 'var(--r-md)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+  color: 'var(--text-2)',
+  cursor: 'pointer',
+  font: '500 var(--text-xs)/1 var(--font-ui)',
+} as const;
 /** Widest window the zone accounting is run on (see the panel below). */
 const ZONES_MAX_DAYS = 92;
 
@@ -83,8 +95,15 @@ export default async function SportPage({
   // observed maximum. Stops at a quarter: the join walks every HR sample of
   // every session in the window (measured on production: 0.8 s on six months,
   // 1.5 s on a year, against a 500 ms budget).
-  const maxHrEstimate = rangeDays <= ZONES_MAX_DAYS ? await estimatedMaxHr(ctx, today) : null;
-  const zones = maxHrEstimate ? await timeInZones(ctx, range, maxHrEstimate.bpm, sport) : null;
+  const [maxHr, settings] = await Promise.all([
+    rangeDays <= ZONES_MAX_DAYS ? resolveMaxHr(ctx, today) : Promise.resolve(null),
+    getSubjectSettings(ctx),
+  ]);
+  const zones = maxHr ? await timeInZones(ctx, range, maxHr.bpm, sport) : null;
+  const basisLine = (b: MaxHrBasis) =>
+    b.basis === 'declared'
+      ? m.zones.basisDeclared(fmtInt(b.bpm, locale), b.observed ? fmtInt(b.observed.bpm, locale) : null)
+      : m.zones.basis(fmtInt(b.bpm, locale), b.observed ? fmtDay(b.observed.sinceDay, locale) : '', b.observed?.sessions ?? 0);
 
   // Tabs: every sport present on the period, ordered by count.
   const timeQuery = new URLSearchParams();
@@ -241,12 +260,12 @@ export default async function SportPage({
       {summary.count > 0 && (
         <Panel>
           <PanelLabel>{m.zones.title}</PanelLabel>
-          {zones && maxHrEstimate ? (
+          {zones && maxHr ? (
             zones.totalS > 0 ? (
               <>
                 <ZoneBar breakdown={zones} locale={locale} m={m} ariaLabel={m.zones.title} />
                 <p style={{ margin: '10px 0 0', font: '400 var(--text-2xs)/1.4 var(--font-ui)', color: 'var(--text-3)' }}>
-                  {m.zones.basis(fmtInt(maxHrEstimate.bpm, locale), fmtDay(maxHrEstimate.sinceDay, locale), maxHrEstimate.sessions)}
+                  {basisLine(maxHr)}
                 </p>
               </>
             ) : (
@@ -257,6 +276,47 @@ export default async function SportPage({
               {rangeDays > ZONES_MAX_DAYS ? m.zones.tooWide : m.zones.noMax}
             </p>
           )}
+          {/* The declared maximum is a setting of the subject, not of the window:
+              the form is there whatever the period shows. */}
+          <form
+            action={setMaxHrAction}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}
+          >
+            <label htmlFor="maxHr" className="hy-label">
+              {m.zones.declaredLabel}
+            </label>
+            <input
+              id="maxHr"
+              name="maxHr"
+              type="number"
+              inputMode="numeric"
+              min={100}
+              max={230}
+              defaultValue={settings.maxHrBpm ?? ''}
+              placeholder={maxHr?.observed ? String(maxHr.observed.bpm) : ''}
+              className="tnum"
+              style={{
+                width: 72,
+                height: 26,
+                padding: '0 8px',
+                borderRadius: 'var(--r-md)',
+                border: '1px solid var(--border-strong)',
+                background: 'var(--surface)',
+                color: 'var(--text-1)',
+                font: '400 var(--text-sm)/1 var(--font-data)',
+              }}
+            />
+            <span style={{ font: '400 var(--text-xs)/1 var(--font-ui)', color: 'var(--text-3)' }}>bpm</span>
+            <button type="submit" className="hy-btn hy-ghost" style={ZONE_BTN}>
+              {m.zones.save}
+            </button>
+            {settings.maxHrBpm !== null && (
+              <button type="submit" name="clear" value="1" className="hy-btn hy-ghost" style={ZONE_BTN}>
+                {m.zones.clear}
+              </button>
+            )}
+            <span style={{ font: '400 var(--text-2xs)/1.3 var(--font-ui)', color: 'var(--text-3)' }}>{m.zones.declaredHint}</span>
+          </form>
         </Panel>
       )}
 
