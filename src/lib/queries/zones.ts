@@ -115,7 +115,8 @@ export function zonesFromSamples(samples: Array<{ ts: Date; bpm: number }>, maxH
 /**
  * Time in zones over every session of a window (subject-local days), one
  * activity type or all. The join walks each session's HR samples: fine for a
- * month, a few hundred milliseconds for a year, so callers stop at a year.
+ * month, 0.8 s for six months and 1.5 s for a year on production, so callers
+ * stop at a quarter.
  */
 export async function timeInZones(
   ctx: SubjectContext,
