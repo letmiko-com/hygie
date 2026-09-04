@@ -58,7 +58,7 @@ export async function seriesWithTrend(
   hkIdentifier: string,
   range: DayRange,
   preset: Preset | null = null
-): Promise<{ points: DailyPoint[]; trend: Trend; unit: string | null }> {
+): Promise<{ points: DailyPoint[]; previousPoints: DailyPoint[]; trend: Trend; unit: string | null }> {
   const today = todayInZone(ctx.timezone);
   const elapsed = elapsedDays(range, today);
   const prev = comparisonRange(preset, range, elapsed);
@@ -78,6 +78,9 @@ export async function seriesWithTrend(
 
   return {
     points: curPoints,
+    // The comparison window, already read: a screen drawing it dashed next to
+    // the current one has no second query to pay.
+    previousPoints: prevPoints,
     unit: series.unit,
     trend: {
       current,
