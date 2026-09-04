@@ -378,10 +378,10 @@ export const en = {
       `Observed max HR: ${bpm} bpm (highest 99th percentile of a session since ${since}, ${n} session${n > 1 ? 's' : ''} with HR). Zones at 50, 60, 70, 80 and 90 % of that maximum.`,
     zoneLabel: (z: number) => `Z${z}`,
     pctRange: (from: number, to: number | null) => (to === null ? `≥ ${from} %` : `${from}-${to} %`),
-    below: (time: string, pct: string) => `${time} under Z1 (below 50 %, ${pct} of recorded time), not painted.`,
+    below: (time: string, pct: string) => `${time} under Z1 (below 50 %, ${pct} % of recorded time), not painted.`,
     noMax: 'Max HR unknown: no session with heart rate over the last 12 months.',
     noHr: 'No heart rate recorded in sessions on this period.',
-    tooWide: 'Zones are computed for periods up to one year.',
+    tooWide: 'Zones are computed for periods up to three months.',
     sessionTitle: 'Time in zones',
   },
   calendar: {
