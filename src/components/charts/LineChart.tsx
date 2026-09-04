@@ -7,9 +7,15 @@ export interface LineSeries {
   color: string;
   label?: string;
   /** Rolling mean window: renders the raw line faint and the mean bold. */
-  rolling?: number;
-  dashed?: boolean;
+  rolling?: number;  dashed?: boolean;
   area?: boolean;
+  /**
+   * Join the measured points across gaps. For a sparse point measure (a VO₂
+   * max every ten days, a weight twice a week) a gap-breaking line is all
+   * gaps and no line. Nothing is interpolated: the polyline only visits real
+   * samples, and each sample gets a dot when there are few enough to read.
+   */
+  connect?: boolean;
 }
 
 /**
@@ -33,11 +39,17 @@ export function rollingMean(data: Array<number | null>, window: number): Array<n
   });
 }
 
-function segments(data: Array<number | null>, x: (i: number) => number, y: (v: number) => number) {
+function segments(
+  data: Array<number | null>,
+  x: (i: number) => number,
+  y: (v: number) => number,
+  connect = false
+) {
   const out: Array<Array<[number, number]>> = [];
   let run: Array<[number, number]> = [];
   data.forEach((v, i) => {
     if (v === null) {
+      if (connect) return;
       if (run.length > 0) out.push(run);
       run = [];
     } else {
@@ -54,22 +66,22 @@ function Path({
   y,
   color,
   width,
-  opacity = 1,
-  dashed = false,
+  opacity = 1,  dashed = false,
   area = false,
+  connect = false,
 }: {
   data: Array<number | null>;
   x: (i: number) => number;
   y: (v: number) => number;
   color: string;
   width: number;
-  opacity?: number;
-  dashed?: boolean;
+  opacity?: number;  dashed?: boolean;
   area?: boolean;
+  connect?: boolean;
 }) {
   return (
     <>
-      {segments(data, x, y).map((seg, si) => {
+      {segments(data, x, y, connect).map((seg, si) => {
         if (seg.length === 1) return null;
         const pts = seg.map(([px, py]) => `${px},${py}`).join(' ');
         return (
@@ -250,8 +262,17 @@ export function LineChart({
             {rolled.map((s, i) =>
               s.rolledData ? (
                 <g key={i}>
-                  <Path data={s.data} x={x} y={y} color={s.color} width={1} opacity={0.3} />
-                  <Path data={s.rolledData} x={x} y={y} color={s.color} width={2} dashed={s.dashed} area={s.area} />
+                  <Path data={s.data} x={x} y={y} color={s.color} width={1} opacity={0.3} connect={s.connect} />
+                  <Path
+                    data={s.rolledData}
+                    x={x}
+                    y={y}
+                    color={s.color}
+                    width={2}
+                    dashed={s.dashed}
+                    area={s.area}
+                    connect={s.connect}
+                  />
                 </g>
               ) : (
                 <Path
@@ -261,9 +282,9 @@ export function LineChart({
                   y={y}
                   color={s.color}
                   width={s.dashed ? 1.5 : 2}
-                  opacity={s.dashed ? 0.7 : 1}
-                  dashed={s.dashed}
+                  opacity={s.dashed ? 0.7 : 1}                  dashed={s.dashed}
                   area={s.area}
+                  connect={s.connect}
                 />
               )
             )}
@@ -271,11 +292,14 @@ export function LineChart({
           {/* A measure with no neighbour has no line to live on (a window with
               three scattered nights, a first day of data). It is still data:
               it gets a dot. HTML rather than SVG because the viewBox above is
-              stretched with preserveAspectRatio none. */}
-          {rolled.flatMap((s, si) =>
-            segments(s.rolledData ?? s.data, x, y)
-              .filter((seg) => seg.length === 1)
-              .map(([[px, py]], di) => (
+              stretched with preserveAspectRatio none. */}          {rolled.flatMap((s, si) => {
+            const runs = segments(s.rolledData ?? s.data, x, y);
+            const measured = (s.rolledData ?? s.data).filter((v) => v !== null).length;
+            // A connected sparse series shows every sample it visits; a dense
+            // one keeps only the points that have no neighbour to join.
+            const dots =
+              s.connect && measured <= 60 ? runs.flat() : runs.filter((seg) => seg.length === 1).map((seg) => seg[0]);
+            return dots.map(([px, py], di) => (
                 <span
                   key={`${si}-${di}`}
                   aria-hidden
@@ -285,13 +309,12 @@ export function LineChart({
                     top: `${py}%`,
                     width: 4,
                     height: 4,
-                    borderRadius: '50%',
-                    background: s.color,
+                    borderRadius: '50%',                    background: s.color,
                     transform: 'translate(-50%, -50%)',
                   }}
                 />
-              ))
-          )}
+              ));
+          })}
           {drill && <DrillBands set={drill} n={n} align="point" />}
         </div>
       </div>
