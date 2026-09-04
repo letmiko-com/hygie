@@ -19,8 +19,7 @@ export const fr: Messages = {
     records: 'Records',
     sleep: 'Sommeil',
     explore: 'Explorateur',
-    allData: 'Toutes mes données',
-    devices: 'Appareils',
+    allData: 'Toutes mes données',    devices: 'Appareils',
     markers: 'Marqueurs',
     overview: 'Vue d’ensemble',
     analysis: 'Analyse',
@@ -374,6 +373,18 @@ export const fr: Messages = {
     segmentsTile: 'Segments (14 ans)',
     tooLongForBars: 'Le détail des phases s’affiche jusqu’à 100 jours de période.',
     empty: 'Pas de donnée de sommeil sur la période',
+  },
+  markers: {
+    title: 'Marqueurs de santé',
+    intro:
+      'Mesures de fond, hors effort : ce que le corps montre au repos et pendant le sommeil. Chaque marqueur est lu sur la période et comparé à la période précédente, jamais noté.',
+    latest: (value: string, day: string) => `dernier : ${value}, ${day}`,
+    measured: (n: number, total: number) => `${n} / ${total} jours mesurés`,
+    rollingNote: (n: number) => `Valeurs journalières en translucide, moyenne glissante sur ${n} jours en trait épais.`,
+    sparseNote: 'Mesures espacées : la courbe relie les seules mesures présentes, rien n’est interpolé.',
+    empty: 'Aucun marqueur enregistré pour ce compte',
+    emptyHint:
+      'VFC, FC au repos, fréquence respiratoire, température du poignet, VO₂ max et masses corporelles apparaissent ici dès qu’ils sont synchronisés.',
   },
   records: {
     title: 'Records',
