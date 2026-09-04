@@ -178,6 +178,11 @@ export function displayUnit(unit: string | null): UnitDisplay {
       return { unit: '/min', convert: (v) => v };
     case 'km/hr':
       return { unit: 'km/h', convert: (v) => v };
+    case '%':
+      // HealthKit percents are fractions (0.98 for 98 %), and so is the
+      // canonical unit (hae-mapping.md). Printing the fraction with a percent
+      // sign read "0,21 %" for a body fat of 21 %.
+      return { unit: '%', convert: (v) => v * 100 };
     case 'degC':
       return { unit: '°C', convert: (v) => v };
     case 'dBASPL':
