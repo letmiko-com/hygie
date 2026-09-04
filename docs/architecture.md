@@ -22,6 +22,11 @@ exactly one subject and authenticates with its own API key.
   unreachable), then a background job physically purges rows and raw files, verifiably.
   Restores from backup must not resurrect revoked keys: a tombstone registry (purged subjects, revoked keys) is stored outside the main backup set and re-applied after any restore. Purge runs table by table in batches; ON DELETE CASCADE is an integrity net, not the purge algorithm.
 
+Per-subject settings that are not measures live in `subject_settings` (migration
+0005): today a declared maximum heart rate, which the zone accounting
+(`queries/zones.ts`) uses instead of the observed maximum when present. Written by
+the subject's own screens only, one row per subject, absent row = nothing declared.
+
 ## 2. Data channels: the two-regime rule
 
 Measured fact: Health Auto Export (HAE) JSON carries two different kinds of series, and the

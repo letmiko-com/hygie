@@ -383,6 +383,12 @@ export const en = {
     noHr: 'No heart rate recorded in sessions on this period.',
     tooWide: 'Zones are computed for periods up to three months.',
     sessionTitle: 'Time in zones',
+    basisDeclared: (bpm: string, observed: string | null) =>
+      `Declared max HR: ${bpm} bpm${observed ? ` (observed over 12 months: ${observed} bpm)` : ''}. Zones at 50, 60, 70, 80 and 90 % of that maximum.`,
+    declaredLabel: 'Declared max HR',
+    declaredHint: 'Empty: the maximum observed over 12 months is the basis.',
+    save: 'Save',
+    clear: 'Clear',
   },
   calendar: {
     title: 'Calendar',

@@ -15,6 +15,7 @@
 import { cached } from './cache';
 import type { SubjectContext } from './context';
 import { getMetricType } from './metric-types';
+import { getSubjectSettings } from './settings';
 import { heavyRead } from './read';
 import { addDays, type DayRange } from './time';
 
@@ -99,6 +100,21 @@ export async function estimatedMaxHr(ctx: SubjectContext, today: string): Promis
     if (!row || row.bpm === null) return null;
     return { bpm: Math.round(row.bpm), sinceDay, sessions: row.sessions };
   });
+}
+
+export interface MaxHrBasis {
+  bpm: number;
+  /** Declared by the subject (subject_settings) or observed in their sessions. */
+  basis: 'declared' | 'observed';
+  /** The observed estimate, also given next to a declared maximum for comparison. */
+  observed: MaxHrEstimate | null;
+}
+
+/** The maximum the zones are cut from: declared when the subject set one, observed otherwise. */
+export async function resolveMaxHr(ctx: SubjectContext, today: string): Promise<MaxHrBasis | null> {
+  const [settings, observed] = await Promise.all([getSubjectSettings(ctx), estimatedMaxHr(ctx, today)]);
+  if (settings.maxHrBpm !== null) return { bpm: settings.maxHrBpm, basis: 'declared', observed };
+  return observed ? { bpm: observed.bpm, basis: 'observed', observed } : null;
 }
 
 /** Time in zones of one session from its HR samples (already fetched, sorted). */
