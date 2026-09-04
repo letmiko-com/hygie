@@ -82,9 +82,6 @@ const today = dayFmt.format(new Date());
 const firstDay = addDays(today, -(days - 1));
 
 // --- the person: slow trends, weekly rhythm, a few events --------------------------
-function dayIndex(day) {
-  return Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${firstDay}T00:00:00Z`)) / 86_400_000);
-}
 const season = (i) => Math.sin(((i / 365) * 2 - 0.4) * Math.PI); // -1 winter, +1 summer
 const fitness = (i) => Math.min(1, i / days); // steady progress across the window
 const weekday = (day) => new Date(`${day}T12:00:00Z`).getUTCDay(); // 0 Sunday
@@ -294,7 +291,6 @@ try {
       const active = hourLocal > 8 && hourLocal < 20 ? 1 : 0.4;
       obs(HR, ts, Math.round(Math.max(48, gauss(66 - 4 * fit + 8 * active, 6))));
     }
-    let daySteps = 0;
     for (let h = 0; h < 24; h++) {
       const hourStart = localToUtc(day, h);
       const hourEnd = new Date(hourStart.getTime() + 3600_000);
@@ -310,7 +306,6 @@ try {
         distance += overlap * (session.hrMean > 130 ? 10500 : 4800);
         kj += overlap * 2600;
       }
-      daySteps += steps;
       obs(STEPS, hourStart, Math.round(steps), hourEnd);
       obs(ENERGY, hourStart, Math.round(kj), hourEnd);
       // Distance in the type's canonical unit (kilometres in the taxonomy).
