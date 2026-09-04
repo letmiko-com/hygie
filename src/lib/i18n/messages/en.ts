@@ -372,6 +372,18 @@ export const en = {
     tooLongForBars: 'Stage detail is shown for periods up to 100 days.',
     empty: 'No sleep data on this period',
   },
+  zones: {
+    title: 'Heart rate zones',
+    basis: (bpm: string, since: string, n: number) =>
+      `Observed max HR: ${bpm} bpm (highest 99th percentile of a session since ${since}, ${n} session${n > 1 ? 's' : ''} with HR). Zones at 50, 60, 70, 80 and 90 % of that maximum.`,
+    zoneLabel: (z: number) => `Z${z}`,
+    pctRange: (from: number, to: number | null) => (to === null ? `≥ ${from} %` : `${from}-${to} %`),
+    below: (time: string, pct: string) => `${time} under Z1 (below 50 %, ${pct} of recorded time), not painted.`,
+    noMax: 'Max HR unknown: no session with heart rate over the last 12 months.',
+    noHr: 'No heart rate recorded in sessions on this period.',
+    tooWide: 'Zones are computed for periods up to one year.',
+    sessionTitle: 'Time in zones',
+  },
   calendar: {
     title: 'Calendar',
     prevMonth: 'Previous month',
