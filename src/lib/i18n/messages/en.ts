@@ -21,6 +21,10 @@ export const en = {
     explore: 'Explorer',
     allData: 'All my data',
     devices: 'Devices',
+    markers: 'Health markers',
+    overview: 'Overview',
+    analysis: 'Analysis',
+    data: 'Data',
     instance: 'Instance',
   },
   noSubject: {

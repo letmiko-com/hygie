@@ -24,16 +24,26 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   async function logout() {
     'use server';
     await signOut({ redirectTo: '/login' });
-  }
-
+  }  // Four sections, by what the reader is doing: looking at the whole (overview),
+  // reading one subject in depth (analysis), building their own view of the
+  // raw material (data), and running the instance.
   const sections: NavSection[] = [
     {
-      label: '',
+      label: m.nav.overview,
+      items: [{ href: '/', icon: 'monitoring', label: m.nav.dashboard }],
+    },
+    {
+      label: m.nav.analysis,
       items: [
-        { href: '/', icon: 'monitoring', label: m.nav.dashboard },
         { href: '/sport', icon: 'exercise', label: m.nav.sport },
-        { href: '/records', icon: 'trophy', label: m.nav.records },
         { href: '/sleep', icon: 'bedtime', label: m.nav.sleep },
+        { href: '/markers', icon: 'ecg', label: m.nav.markers },
+        { href: '/records', icon: 'trophy', label: m.nav.records },
+      ],
+    },
+    {
+      label: m.nav.data,
+      items: [
         { href: '/explore', icon: 'query_stats', label: m.nav.explore },
         { href: '/metrics', icon: 'database', label: m.nav.allData },
       ],

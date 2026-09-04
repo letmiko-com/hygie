@@ -21,6 +21,10 @@ export const fr: Messages = {
     explore: 'Explorateur',
     allData: 'Toutes mes données',
     devices: 'Appareils',
+    markers: 'Marqueurs',
+    overview: 'Vue d’ensemble',
+    analysis: 'Analyse',
+    data: 'Données',
     instance: 'Instance',
   },
   noSubject: {
