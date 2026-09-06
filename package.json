@@ -13,6 +13,7 @@
     "migrate": "node scripts/migrate.mjs",
     "seed": "node scripts/seed-taxonomy.mjs",
     "backfill": "node scripts/backfill/import-xml.mjs",
+  "backfill:series": "node scripts/backfill/import-series.mjs",
     "rollups": "node scripts/rebuild-rollups.mjs",
     "cutover": "node scripts/cutover.mjs",
     "synthetic": "node scripts/synthetic-data.mjs"
