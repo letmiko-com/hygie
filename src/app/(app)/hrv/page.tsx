@@ -62,6 +62,9 @@ export default async function HrvPage({ searchParams }: { searchParams: Promise<
   const rmssd = dayKeys.map((k) => byDay.get(k)?.rmssdMs ?? null);
   const sdnn = dayKeys.map((k) => byDay.get(k)?.sdnnMs ?? null);
 
+  // The list is capped, the window is not: the tile must count what the window
+  // holds, or "200" would be read as a measurement on a three-year view.
+  const windowSeries = days.reduce((a, d) => a + d.seriesCount, 0);
   const meanHr = mean(days.map((d) => d.meanHrBpm));
   const fmtMean = (v: number | null) => (v === null ? null : fmtInt(v, locale));
   const hasHistory = totals.series > 0;
@@ -101,7 +104,7 @@ export default async function HrvPage({ searchParams }: { searchParams: Promise<
             <StatTile label={m.hrv.rmssd} value={fmtMean(mean(rmssd))} unit="ms" />
             <StatTile label={m.hrv.sdnn} value={fmtMean(mean(sdnn))} unit="ms" />
             <StatTile label={m.hrv.meanHr} value={fmtMean(meanHr)} unit="bpm" />
-            <StatTile label={m.hrv.series} value={fmtInt(series.length, locale)} />
+            <StatTile label={m.hrv.series} value={fmtInt(windowSeries, locale)} />
           </div>
 
           <Panel>
@@ -111,7 +114,16 @@ export default async function HrvPage({ searchParams }: { searchParams: Promise<
                 { data: rmssd, color: 'var(--data-heart)', label: m.hrv.rmssd, connect: true },
                 { data: sdnn, color: 'var(--data-sleep)', label: m.hrv.sdnn, connect: true, dashed: true },
               ]}
-              xLabels={dayAxisLabels(dayKeys, locale, 4, { day: 'numeric', month: 'short' })}
+              xLabels={dayAxisLabels(
+                dayKeys,
+                locale,
+                4,
+                // Past a year, a bare "25 oct." on a three-year axis says
+                // nothing: the year is the part that carries the meaning.
+                dayKeys.length > 366
+                  ? { month: 'short', year: '2-digit' }
+                  : { day: 'numeric', month: 'short' }
+              )}
               ariaLabel={`${m.hrv.trend} — ${m.hrv.rmssd}, ${m.hrv.sdnn}`}
               emptyLabel={m.hrv.empty}
               yFormat={(v, digits) => `${v.toFixed(digits)} ms`}
@@ -119,7 +131,11 @@ export default async function HrvPage({ searchParams }: { searchParams: Promise<
           </Panel>
 
           <Panel>
-            <PanelLabel>{m.hrv.seriesCount(series.length)}</PanelLabel>
+            <PanelLabel>
+              {series.length < windowSeries
+                ? m.hrv.seriesShown(series.length, windowSeries)
+                : m.hrv.seriesCount(series.length)}
+            </PanelLabel>
             {series.length === 0 ? (
               <EmptyState icon="monitor_heart" title={m.hrv.empty} hint={m.hrv.emptyHint} />
             ) : (
