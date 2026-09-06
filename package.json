@@ -13,7 +13,7 @@
     "migrate": "node scripts/migrate.mjs",
     "seed": "node scripts/seed-taxonomy.mjs",
     "backfill": "node scripts/backfill/import-xml.mjs",
-  "backfill:series": "node scripts/backfill/import-series.mjs",
+    "backfill:series": "node scripts/backfill/import-series.mjs",
     "rollups": "node scripts/rebuild-rollups.mjs",
     "cutover": "node scripts/cutover.mjs",
     "synthetic": "node scripts/synthetic-data.mjs"
@@ -21,7 +21,7 @@
   "dependencies": {
     "next": "^16.0.0",
     "next-auth": "^5.0.0-beta.32",
-    "nodemailer": "^8.0.11",
+    "nodemailer": "^10.0.0",
     "pg": "^8.13.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
