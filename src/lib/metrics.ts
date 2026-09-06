@@ -43,6 +43,8 @@ export type MetricGroup =
   | 'sleep'
   | 'nutrition'
   | 'audio'
+  | 'symptoms'
+  | 'cycle'
   | 'other';
 
 export const METRIC_GROUPS: readonly MetricGroup[] = [
@@ -54,6 +56,8 @@ export const METRIC_GROUPS: readonly MetricGroup[] = [
   'sleep',
   'nutrition',
   'audio',
+  'symptoms',
+  'cycle',
   'other',
 ];
 
@@ -85,11 +89,18 @@ interface Rule extends MetricDisplay {
  * metric, not a gait metric) come before the ones they would be captured by.
  */
 const RULES: readonly Rule[] = [
+  // --- symptoms (logged in Health, severity or presence): before everything,
+  // several of them would otherwise be caught by heart, sleep or body rules ---
+  { re: /^HKCategoryTypeIdentifier(AbdominalCramps|Acne|AppetiteChanges|BladderIncontinence|Bloating|BreastPain|ChestTightnessOrPain|Chills|Constipation|Coughing|Diarrhea|Dizziness|DrySkin|Fainting|Fatigue|Fever|GeneralizedBodyAche|HairLoss|Headache|Heartburn|HotFlashes|LossOfSmell|LossOfTaste|LowerBackPain|MemoryLapse|MoodChanges|Nausea|NightSweats|PelvicPain|RapidPoundingOrFlutteringHeartbeat|RunnyNose|ShortnessOfBreath|SinusCongestion|SkippedHeartbeat|SleepChanges|SoreThroat|VaginalDryness|Vomiting|Wheezing)$/, group: 'symptoms', family: 'neutral', icon: 'sick', quality: 'lower-better' },
+
+  // --- cycle and reproductive health -----------------------------------------
+  { re: /Menstrual|IntermenstrualBleeding|Ovulation|Cervical|Contraceptive|Pregnancy|Lactation|ProgesteroneTest/, group: 'cycle', family: 'neutral', icon: 'calendar_month', quality: 'neutral' },
+
   // --- heart: specific cases first, the plain HeartRate catch-all last ------
   { re: /HeartRateVariability/, group: 'heart', family: 'heart', icon: 'ecg', quality: 'higher-better' },
   { re: /HeartRateRecovery/, group: 'heart', family: 'heart', icon: 'ecg_heart', quality: 'higher-better' },
   { re: /RestingHeartRate|WalkingHeartRateAverage/, group: 'heart', family: 'heart', icon: 'favorite', quality: 'lower-better' },
-  { re: /(High|Low|IrregularHeartRhythm)(HeartRate)?Event/, group: 'heart', family: 'heart', icon: 'ecg_heart', quality: 'lower-better' },
+  { re: /(High|Low|IrregularHeartRhythm)(HeartRate)?Event|HypertensionEvent/, group: 'heart', family: 'heart', icon: 'ecg_heart', quality: 'lower-better' },
   { re: /AtrialFibrillation/, group: 'heart', family: 'heart', icon: 'ecg_heart', quality: 'lower-better' },
   { re: /BloodPressure/, group: 'heart', family: 'heart', icon: 'monitor_heart', quality: 'neutral' },
   { re: /HeartRate|Cardio/, group: 'heart', family: 'heart', icon: 'favorite', quality: 'neutral' },
@@ -97,7 +108,9 @@ const RULES: readonly Rule[] = [
 
   // --- respiratory ----------------------------------------------------------
   { re: /OxygenSaturation/, group: 'respiratory', family: 'water', icon: 'spo2', quality: 'higher-better' },
-  { re: /RespiratoryRate|ForcedVital|PeakExpiratory/, group: 'respiratory', family: 'water', icon: 'pulmonology', quality: 'neutral' },
+  { re: /RespiratoryRate|ForcedVital|ForcedExpiratory|PeakExpiratory/, group: 'respiratory', family: 'water', icon: 'pulmonology', quality: 'neutral' },
+  { re: /PeripheralPerfusionIndex/, group: 'respiratory', family: 'water', icon: 'spo2', quality: 'neutral' },
+  { re: /InhalerUsage/, group: 'respiratory', family: 'water', icon: 'medication', quality: 'lower-better' },
 
   // --- sleep (before the mobility and body rules: AppleSleepingWrist... ) ---
   { re: /Sleep/, group: 'sleep', family: 'sleep', icon: 'bedtime', quality: 'neutral' },
@@ -119,7 +132,9 @@ const RULES: readonly Rule[] = [
   { re: /Audio|Sound/, group: 'audio', family: 'neutral', icon: 'volume_up', quality: 'lower-better' },
 
   // --- mobility (gait quality; before the activity catch-alls) --------------
+  { re: /WalkingSteadinessEvent|NumberOfTimesFallen/, group: 'mobility', family: 'activity', icon: 'personal_injury', quality: 'lower-better' },
   { re: /WalkingSteadiness/, group: 'mobility', family: 'activity', icon: 'accessible', quality: 'higher-better' },
+  { re: /Wheelchair|PushCount/, group: 'mobility', family: 'activity', icon: 'accessible_forward', quality: 'higher-better' },
   { re: /WalkingAsymmetry|DoubleSupport/, group: 'mobility', family: 'activity', icon: 'accessible', quality: 'lower-better' },
   { re: /WalkingSpeed|WalkingStepLength/, group: 'mobility', family: 'activity', icon: 'directions_walk', quality: 'higher-better' },
   { re: /Stair(Ascent|Descent)Speed/, group: 'mobility', family: 'activity', icon: 'stairs', quality: 'higher-better' },
@@ -132,6 +147,9 @@ const RULES: readonly Rule[] = [
   { re: /BodyMass|WaistCircumference/, group: 'body', family: 'water', icon: 'monitor_weight', quality: 'lower-better' },
   { re: /Height/, group: 'body', family: 'water', icon: 'straighten', quality: 'neutral' },
   { re: /BodyTemperature|BasalBodyTemperature/, group: 'body', family: 'water', icon: 'thermostat', quality: 'neutral' },
+  { re: /BloodGlucose/, group: 'body', family: 'water', icon: 'glucose', quality: 'neutral' },
+  { re: /InsulinDelivery/, group: 'body', family: 'water', icon: 'medication', quality: 'neutral' },
+  { re: /ElectrodermalActivity/, group: 'body', family: 'water', icon: 'bolt', quality: 'neutral' },
 
   // --- activity -------------------------------------------------------------
   { re: /StepCount/, group: 'activity', family: 'activity', icon: 'steps', quality: 'higher-better' },
@@ -144,16 +162,21 @@ const RULES: readonly Rule[] = [
   { re: /DistanceCycling|CyclingCadence|CyclingPower|CyclingSpeed|CyclingFunctionalThreshold/, group: 'activity', family: 'distance', icon: 'directions_bike', quality: 'neutral' },
   { re: /Rowing/, group: 'activity', family: 'distance', icon: 'rowing', quality: 'neutral' },
   { re: /Swimming|UnderwaterDepth|WaterTemperature/, group: 'activity', family: 'water', icon: 'pool', quality: 'neutral' },
+  { re: /DownhillSnowSports/, group: 'activity', family: 'distance', icon: 'downhill_skiing', quality: 'neutral' },
+  { re: /CrossCountrySkiing/, group: 'activity', family: 'distance', icon: 'nordic_walking', quality: 'neutral' },
+  { re: /PaddleSports/, group: 'activity', family: 'distance', icon: 'kayaking', quality: 'neutral' },
+  { re: /SkatingSports/, group: 'activity', family: 'distance', icon: 'ice_skating', quality: 'neutral' },
   { re: /RunningPower/, group: 'activity', family: 'power', icon: 'bolt', quality: 'neutral' },
   { re: /Running|Nike/, group: 'activity', family: 'activity', icon: 'directions_run', quality: 'neutral' },
   { re: /Distance/, group: 'activity', family: 'activity', icon: 'directions_walk', quality: 'higher-better' },
 
   // --- residual -------------------------------------------------------------
   { re: /TimeInDaylight/, group: 'other', family: 'neutral', icon: 'sunny', quality: 'higher-better' },
+  { re: /UVExposure/, group: 'other', family: 'neutral', icon: 'wb_sunny', quality: 'neutral' },
+  { re: /Toothbrushing/, group: 'other', family: 'neutral', icon: 'dentistry', quality: 'higher-better' },
+  { re: /Handwashing/, group: 'other', family: 'neutral', icon: 'wash', quality: 'higher-better' },
   { re: /Mindful/, group: 'other', family: 'sleep', icon: 'self_improvement', quality: 'higher-better' },
   { re: /SexualActivity/, group: 'other', family: 'neutral', icon: 'favorite', quality: 'neutral' },
-  { re: /Menstrual|Ovulation|Cervical|Contraceptive|Pregnancy|Lactation/, group: 'other', family: 'neutral', icon: 'calendar_month', quality: 'neutral' },
-  { re: /Insulin|BloodGlucose/, group: 'other', family: 'neutral', icon: 'glucose', quality: 'neutral' },
 ];
 
 const FALLBACK: MetricDisplay = {
@@ -319,6 +342,100 @@ const LABELS: Readonly<Record<string, readonly [string, string]>> = {
   HKQuantityTypeIdentifierTimeInDaylight: ['Time in daylight', 'Temps à la lumière du jour'],
   HKCategoryTypeIdentifierMindfulSession: ['Mindful sessions', 'Séances de pleine conscience'],
   HKCategoryTypeIdentifierSexualActivity: ['Sexual activity', 'Activité sexuelle'],
+  // --- added 2026-09-06 with the SDK catalogue (94 types) ---------------------
+  HKQuantityTypeIdentifierAppleMoveTime: ['Move time', 'Temps en mouvement'],
+  HKQuantityTypeIdentifierBasalBodyTemperature: ['Basal body temperature', 'Température basale'],
+  HKQuantityTypeIdentifierBloodAlcoholContent: ['Blood alcohol content', 'Alcoolémie'],
+  HKQuantityTypeIdentifierBloodGlucose: ['Blood glucose', 'Glycémie'],
+  HKQuantityTypeIdentifierCrossCountrySkiingSpeed: ['Cross-country skiing speed', 'Vitesse en ski de fond'],
+  HKQuantityTypeIdentifierCyclingFunctionalThresholdPower: ['Cycling FTP', 'FTP cyclisme'],
+  HKQuantityTypeIdentifierCyclingPower: ['Cycling power', 'Puissance cyclisme'],
+  HKQuantityTypeIdentifierCyclingSpeed: ['Cycling speed', 'Vitesse cyclisme'],
+  HKQuantityTypeIdentifierDietaryCaffeine: ['Caffeine', 'Caféine'],
+  HKQuantityTypeIdentifierDietaryChloride: ['Chloride', 'Chlorure'],
+  HKQuantityTypeIdentifierDietaryChromium: ['Chromium', 'Chrome'],
+  HKQuantityTypeIdentifierDietaryMolybdenum: ['Molybdenum', 'Molybdène'],
+  HKQuantityTypeIdentifierDistanceCrossCountrySkiing: ['Cross-country skiing distance', 'Distance en ski de fond'],
+  HKQuantityTypeIdentifierDistanceDownhillSnowSports: ['Downhill snow sports distance', 'Distance en sports de neige'],
+  HKQuantityTypeIdentifierDistancePaddleSports: ['Paddle sports distance', 'Distance en sports de pagaie'],
+  HKQuantityTypeIdentifierDistanceSkatingSports: ['Skating distance', 'Distance en patinage'],
+  HKQuantityTypeIdentifierDistanceSwimming: ['Swimming distance', 'Distance de natation'],
+  HKQuantityTypeIdentifierDistanceWheelchair: ['Wheelchair distance', 'Distance en fauteuil'],
+  HKQuantityTypeIdentifierElectrodermalActivity: ['Electrodermal activity', 'Activité électrodermale'],
+  HKQuantityTypeIdentifierForcedExpiratoryVolume1: ['FEV1', 'VEMS'],
+  HKQuantityTypeIdentifierForcedVitalCapacity: ['Forced vital capacity', 'Capacité vitale forcée'],
+  HKQuantityTypeIdentifierInhalerUsage: ['Inhaler usage', 'Prises d’inhalateur'],
+  HKQuantityTypeIdentifierInsulinDelivery: ['Insulin delivery', 'Insuline administrée'],
+  HKQuantityTypeIdentifierNikeFuel: ['NikeFuel', 'NikeFuel'],
+  HKQuantityTypeIdentifierNumberOfTimesFallen: ['Falls', 'Chutes'],
+  HKQuantityTypeIdentifierPaddleSportsSpeed: ['Paddle sports speed', 'Vitesse en sports de pagaie'],
+  HKQuantityTypeIdentifierPeakExpiratoryFlowRate: ['Peak expiratory flow', 'Débit expiratoire de pointe'],
+  HKQuantityTypeIdentifierPeripheralPerfusionIndex: ['Peripheral perfusion index', 'Index de perfusion périphérique'],
+  HKQuantityTypeIdentifierPushCount: ['Wheelchair pushes', 'Poussées de fauteuil'],
+  HKQuantityTypeIdentifierSwimmingStrokeCount: ['Swimming strokes', 'Mouvements de natation'],
+  HKQuantityTypeIdentifierUVExposure: ['UV exposure', 'Exposition aux UV'],
+  HKQuantityTypeIdentifierWaistCircumference: ['Waist circumference', 'Tour de taille'],
+  HKCategoryTypeIdentifierAbdominalCramps: ['Abdominal cramps', 'Crampes abdominales'],
+  HKCategoryTypeIdentifierAcne: ['Acne', 'Acné'],
+  HKCategoryTypeIdentifierAppetiteChanges: ['Appetite changes', 'Changements d’appétit'],
+  HKCategoryTypeIdentifierAppleWalkingSteadinessEvent: ['Walking steadiness alert', 'Alerte de stabilité de la marche'],
+  HKCategoryTypeIdentifierBladderIncontinence: ['Bladder incontinence', 'Incontinence urinaire'],
+  HKCategoryTypeIdentifierBleedingAfterPregnancy: ['Bleeding after pregnancy', 'Saignements après la grossesse'],
+  HKCategoryTypeIdentifierBleedingDuringPregnancy: ['Bleeding during pregnancy', 'Saignements pendant la grossesse'],
+  HKCategoryTypeIdentifierBloating: ['Bloating', 'Ballonnements'],
+  HKCategoryTypeIdentifierBreastPain: ['Breast pain', 'Douleur mammaire'],
+  HKCategoryTypeIdentifierCervicalMucusQuality: ['Cervical mucus quality', 'Glaire cervicale'],
+  HKCategoryTypeIdentifierChestTightnessOrPain: ['Chest tightness or pain', 'Oppression ou douleur thoracique'],
+  HKCategoryTypeIdentifierChills: ['Chills', 'Frissons'],
+  HKCategoryTypeIdentifierConstipation: ['Constipation', 'Constipation'],
+  HKCategoryTypeIdentifierContraceptive: ['Contraceptive', 'Contraception'],
+  HKCategoryTypeIdentifierCoughing: ['Coughing', 'Toux'],
+  HKCategoryTypeIdentifierDiarrhea: ['Diarrhea', 'Diarrhée'],
+  HKCategoryTypeIdentifierDizziness: ['Dizziness', 'Vertiges'],
+  HKCategoryTypeIdentifierDrySkin: ['Dry skin', 'Peau sèche'],
+  HKCategoryTypeIdentifierEnvironmentalAudioExposureEvent: ['Environmental sound alert', 'Alerte de bruit ambiant'],
+  HKCategoryTypeIdentifierFainting: ['Fainting', 'Évanouissement'],
+  HKCategoryTypeIdentifierFatigue: ['Fatigue', 'Fatigue'],
+  HKCategoryTypeIdentifierFever: ['Fever', 'Fièvre'],
+  HKCategoryTypeIdentifierGeneralizedBodyAche: ['Body ache', 'Courbatures'],
+  HKCategoryTypeIdentifierHairLoss: ['Hair loss', 'Perte de cheveux'],
+  HKCategoryTypeIdentifierHandwashingEvent: ['Handwashing', 'Lavage des mains'],
+  HKCategoryTypeIdentifierHeadache: ['Headache', 'Maux de tête'],
+  HKCategoryTypeIdentifierHeartburn: ['Heartburn', 'Brûlures d’estomac'],
+  HKCategoryTypeIdentifierHotFlashes: ['Hot flashes', 'Bouffées de chaleur'],
+  HKCategoryTypeIdentifierHypertensionEvent: ['Hypertension alert', 'Alerte d’hypertension'],
+  HKCategoryTypeIdentifierInfrequentMenstrualCycles: ['Infrequent cycles', 'Cycles peu fréquents'],
+  HKCategoryTypeIdentifierIntermenstrualBleeding: ['Spotting', 'Saignements intermenstruels'],
+  HKCategoryTypeIdentifierIrregularMenstrualCycles: ['Irregular cycles', 'Cycles irréguliers'],
+  HKCategoryTypeIdentifierLactation: ['Lactation', 'Allaitement'],
+  HKCategoryTypeIdentifierLossOfSmell: ['Loss of smell', 'Perte d’odorat'],
+  HKCategoryTypeIdentifierLossOfTaste: ['Loss of taste', 'Perte de goût'],
+  HKCategoryTypeIdentifierLowCardioFitnessEvent: ['Low cardio fitness alert', 'Alerte de capacité cardio basse'],
+  HKCategoryTypeIdentifierLowerBackPain: ['Lower back pain', 'Lombalgie'],
+  HKCategoryTypeIdentifierMemoryLapse: ['Memory lapse', 'Trous de mémoire'],
+  HKCategoryTypeIdentifierMenstrualFlow: ['Menstrual flow', 'Flux menstruel'],
+  HKCategoryTypeIdentifierMoodChanges: ['Mood changes', 'Changements d’humeur'],
+  HKCategoryTypeIdentifierNausea: ['Nausea', 'Nausées'],
+  HKCategoryTypeIdentifierNightSweats: ['Night sweats', 'Sueurs nocturnes'],
+  HKCategoryTypeIdentifierOvulationTestResult: ['Ovulation test', 'Test d’ovulation'],
+  HKCategoryTypeIdentifierPelvicPain: ['Pelvic pain', 'Douleur pelvienne'],
+  HKCategoryTypeIdentifierPersistentIntermenstrualBleeding: ['Persistent spotting', 'Saignements intermenstruels persistants'],
+  HKCategoryTypeIdentifierPregnancy: ['Pregnancy', 'Grossesse'],
+  HKCategoryTypeIdentifierPregnancyTestResult: ['Pregnancy test', 'Test de grossesse'],
+  HKCategoryTypeIdentifierProgesteroneTestResult: ['Progesterone test', 'Test de progestérone'],
+  HKCategoryTypeIdentifierProlongedMenstrualPeriods: ['Prolonged periods', 'Règles prolongées'],
+  HKCategoryTypeIdentifierRapidPoundingOrFlutteringHeartbeat: ['Palpitations', 'Palpitations'],
+  HKCategoryTypeIdentifierRunnyNose: ['Runny nose', 'Nez qui coule'],
+  HKCategoryTypeIdentifierShortnessOfBreath: ['Shortness of breath', 'Essoufflement'],
+  HKCategoryTypeIdentifierSinusCongestion: ['Sinus congestion', 'Congestion des sinus'],
+  HKCategoryTypeIdentifierSkippedHeartbeat: ['Skipped heartbeat', 'Battements manqués'],
+  HKCategoryTypeIdentifierSleepApneaEvent: ['Sleep apnea notification', 'Notification d’apnée du sommeil'],
+  HKCategoryTypeIdentifierSleepChanges: ['Sleep changes', 'Changements de sommeil'],
+  HKCategoryTypeIdentifierSoreThroat: ['Sore throat', 'Mal de gorge'],
+  HKCategoryTypeIdentifierToothbrushingEvent: ['Toothbrushing', 'Brossage des dents'],
+  HKCategoryTypeIdentifierVaginalDryness: ['Vaginal dryness', 'Sécheresse vaginale'],
+  HKCategoryTypeIdentifierVomiting: ['Vomiting', 'Vomissements'],
+  HKCategoryTypeIdentifierWheezing: ['Wheezing', 'Respiration sifflante'],
 };
 
 const displayCache = new Map<string, MetricDisplay>();
