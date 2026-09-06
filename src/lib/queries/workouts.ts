@@ -208,6 +208,37 @@ export async function getWorkout(ctx: SubjectContext, workoutId: string): Promis
   return { ...mapItem(r), elevationUpM: r.elevation_up_m, stats: r.stats, hasRoute: r.has_route };
 }
 
+export interface RoutePoint {
+  ts: Date;
+  lat: number;
+  lon: number;
+  altitudeM: number | null;
+  speedMs: number | null;
+}
+
+/**
+ * GPS fixes of a session, in time order. Joins workouts to re-filter on
+ * subject_id: the points table carries no subject of its own.
+ */
+export async function workoutRoute(ctx: SubjectContext, workoutId: string): Promise<RoutePoint[]> {
+  interface Row {
+    ts: Date;
+    lat: number;
+    lon: number;
+    altitude_m: number | null;
+    speed_ms: number | null;
+  }
+  const { rows } = await getDb().query<Row>(
+    `select rp.ts, rp.lat, rp.lon, rp.altitude_m, rp.speed_ms
+     from workout_route_points rp
+     join workouts w on w.id = rp.workout_id
+     where w.subject_id = $1 and w.id = $2
+     order by rp.ts`,
+    [ctx.subjectId, workoutId]
+  );
+  return rows.map((r) => ({ ts: r.ts, lat: r.lat, lon: r.lon, altitudeM: r.altitude_m, speedMs: r.speed_ms }));
+}
+
 export interface RawSample {
   ts: Date;
   value: number;
