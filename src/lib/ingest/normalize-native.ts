@@ -966,8 +966,11 @@ async function insertEcg(ctx: Ctx, e: NativeEcg): Promise<void> {
      where not exists (
        select 1 from ecg_recordings where subject_id = $1 and hk_uuid = $2
      ) and not exists (
+       -- Same subject, same second: the same recording, whatever name the
+       -- channel gave the watch (CSV import says "Watch7,1", HealthKit says
+       -- the user's watch name). One person cannot start two ECGs in one second.
        select 1 from ecg_recordings
-       where subject_id = $1 and source_id = $3
+       where subject_id = $1
          and date_trunc('second', start_ts at time zone 'UTC')
              = date_trunc('second', $4::timestamptz at time zone 'UTC')
      )`,
@@ -1039,7 +1042,7 @@ async function insertAudiogram(ctx: Ctx, a: NativeAudiogram): Promise<void> {
        select 1 from audiograms where subject_id = $1 and hk_uuid = $2
      ) and not exists (
        select 1 from audiograms
-       where subject_id = $1 and source_id = $3
+       where subject_id = $1
          and date_trunc('second', start_ts at time zone 'UTC')
              = date_trunc('second', $4::timestamptz at time zone 'UTC')
      )

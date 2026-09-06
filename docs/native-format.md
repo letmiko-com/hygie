@@ -189,8 +189,9 @@ real changes (`inserted` / `updated` / `unchanged`).
 is so a future value is never lost); `symptoms` is `not_set`, `none` or
 `present`. Voltages are integer microvolts at `sampling_hz`, at most 60 000
 per recording; the server clamps to int16. Identity: uuid per subject, then
-(source, start second) against uuid-less rows imported from the CSV files of
-an export. Table `ecg_recordings`.
+the start second per subject against uuid-less rows imported from the CSV
+files of an export (the source name differs between channels: the CSV names
+the hardware model, HealthKit the user's watch). Table `ecg_recordings`.
 
 ### audiograms — hearing tests (`HKAudiogramSample`)
 
