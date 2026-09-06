@@ -4,3 +4,12 @@
 @import '../../design/tokens/typography.css';
 @import '../../design/tokens/spacing.css';
 @import '../../design/tokens/base.css';
+
+/* Map tiles under a GPS trace (RouteTrace): muted so the line stays the
+   subject; dimmed further in the dark theme, where the light tiles would glare. */
+.hy-map-tiles { filter: saturate(0.55) contrast(0.95); }
+[data-theme="dark"] .hy-map-tiles { filter: saturate(0.4) brightness(0.72) contrast(0.95); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .hy-map-tiles { filter: saturate(0.4) brightness(0.72) contrast(0.95); }
+}
+
