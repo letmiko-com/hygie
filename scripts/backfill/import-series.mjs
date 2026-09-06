@@ -319,12 +319,19 @@ try {
     for (const path of csvs) {
       counts.ecg.files++;
       const text = await files.read(path);
-      const all = text.split(/\r?\n/);
-      const blank = all.findIndex((l) => l.trim() === '');
-      const header = blank < 0 ? all.slice(0, 12) : all.slice(0, blank);
-      const values = (blank < 0 ? all.slice(12) : all.slice(blank + 1)).filter((l) => l.trim() !== '');
+      // Apple's file: "key,value" header lines, blank lines scattered among
+      // them (two sit before the lead and the unit), then one sample per
+      // line as a decimal-comma number. Each line is classified by its
+      // shape, never by its position.
       const meta = {};
-      for (const line of header) {
+      const values = [];
+      for (const raw of text.split(/\r?\n/)) {
+        const line = raw.trim();
+        if (line === '') continue;
+        if (/^-?\d+(?:[.,]\d+)?$/.test(line)) {
+          values.push(line);
+          continue;
+        }
         const c = line.indexOf(',');
         if (c < 0) continue;
         const key = strip(line.slice(0, c));
@@ -340,14 +347,16 @@ try {
       }
       const startMs = parseTs(meta.date);
       const tz = tzOffsetMin(meta.date);
-      const hz = num((meta.sampling ?? '').match(/[\d.]+/)?.[0]);
+      // "512,000 hertz" in a French export: decimal comma before the unit.
+      const hz = num((meta.sampling ?? '').replace(',', '.').match(/[\d.]+/)?.[0]);
       const toUv = strip(meta.unit ?? 'µv').includes('mv') ? 1000 : 1;
       const voltages = values.map((l) => Math.round(Number(l.trim().replace(',', '.')) * toUv));
       if (!Number.isFinite(startMs) || tz === null || hz === null || hz <= 0 || voltages.length === 0 || voltages.some((v) => !Number.isFinite(v))) {
         counts.ecg.skipped_invalid++;
         continue;
       }
-      const sourceId = await sourceIdOf((meta.device ?? '').split(',')[0]);
+      // The device is Apple's hardware model ("Watch5,4"), kept whole.
+      const sourceId = await sourceIdOf(meta.device ?? '');
       const durationMs = (voltages.length / hz) * 1000;
       const algo = num((meta.software ?? '').match(/\d+/)?.[0]);
       const res = await client.query(
