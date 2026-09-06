@@ -342,7 +342,7 @@ const LABELS: Readonly<Record<string, readonly [string, string]>> = {
   HKQuantityTypeIdentifierTimeInDaylight: ['Time in daylight', 'Temps à la lumière du jour'],
   HKCategoryTypeIdentifierMindfulSession: ['Mindful sessions', 'Séances de pleine conscience'],
   HKCategoryTypeIdentifierSexualActivity: ['Sexual activity', 'Activité sexuelle'],
-  // --- added 2026-09-06 with the SDK catalogue (94 types) ---------------------
+  // --- added 2026-09-06 with the SDK catalogue (93 types) ---------------------
   HKQuantityTypeIdentifierAppleMoveTime: ['Move time', 'Temps en mouvement'],
   HKQuantityTypeIdentifierBasalBodyTemperature: ['Basal body temperature', 'Température basale'],
   HKQuantityTypeIdentifierBloodAlcoholContent: ['Blood alcohol content', 'Alcoolémie'],
@@ -393,7 +393,6 @@ const LABELS: Readonly<Record<string, readonly [string, string]>> = {
   HKCategoryTypeIdentifierDiarrhea: ['Diarrhea', 'Diarrhée'],
   HKCategoryTypeIdentifierDizziness: ['Dizziness', 'Vertiges'],
   HKCategoryTypeIdentifierDrySkin: ['Dry skin', 'Peau sèche'],
-  HKCategoryTypeIdentifierEnvironmentalAudioExposureEvent: ['Environmental sound alert', 'Alerte de bruit ambiant'],
   HKCategoryTypeIdentifierFainting: ['Fainting', 'Évanouissement'],
   HKCategoryTypeIdentifierFatigue: ['Fatigue', 'Fatigue'],
   HKCategoryTypeIdentifierFever: ['Fever', 'Fièvre'],

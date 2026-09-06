@@ -7,14 +7,16 @@ reduces to one number.
 
 ## Coverage
 
-**191 types, all `supported = true`.** Two provenances:
+**190 types, all `supported = true`.** Two provenances:
 
 - **97 types inventoried from a real `export.xml`** (2026-08-04): type name, `unit`
   attribute, and for category kinds the exact `value` strings. For these, nothing in the
   file was absent from the export and nothing in the export absent from the file.
-- **94 types added from the iOS 26.5 SDK** (2026-09-06): every remaining
-  `HKQuantityTypeIdentifier` (32) and `HKCategoryTypeIdentifier` (62) the native channel
-  can read, so that Hygie Sync pushes whatever a member's Health store holds, not only what
+- **93 types added from the iOS 26.5 SDK** (2026-09-06): every remaining
+  `HKQuantityTypeIdentifier` (32) and `HKCategoryTypeIdentifier` (61) the native channel
+  can read (`EnvironmentalAudioExposureEvent` is left out: at run time its identifier is
+  an alias of the `AudioExposureEvent` already listed, HealthKit resolves the new name to
+  nothing), so that Hygie Sync pushes whatever a member's Health store holds, not only what
   one export happened to contain. Their category contracts are HealthKit's own value enums
   (`HKCategoryValues.h`: severity for the symptoms, presence, appetite changes, menstrual
   flow, test results, contraceptive, walking steadiness and audio events, `notApplicable`
