@@ -84,7 +84,10 @@ The short version, until the guide exists: PostgreSQL 16+, `cp .env.example .env
 History comes from an Apple Health export: `npm run backfill -- export.zip --subject <uuid>` for the
 samples, sleep and workouts, then `npm run backfill:series -- export.zip --subject <uuid>` for the
 activity rings, audiograms, GPS routes (GPX) and ECGs (CSV) of the same archive, then
-`npm run rollups -- --subject <uuid>`.
+`npm run rollups -- --subject <uuid>`. A later export must not be imported whole again (the
+samples of the first one would be duplicated): run `backfill` with `--from <iso> --to <iso>`
+on the window the channels missed (`--skip-minute-types` when minute_stats already carries
+it), and `backfill:series` without a window, it is idempotent.
 Backfill your history with `npm run backfill -- export.zip --subject <uuid>`, then
 `npm run rollups -- --subject <uuid>`. When you replace the phone that feeds Hygie, run
 `npm run cutover -- --device <new device name>` so the new device becomes the authority for
