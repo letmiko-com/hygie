@@ -52,7 +52,8 @@ config 100 % par variables d'environnement (`.env.example` = contrat).
   --email demo@hygie.invalid --days 730 --yes`, `npm run rollups -- --subject <uuid affiché>`.
   Plus de base à données réelles ici (`hygie-pgbench` a disparu, constaté 2026-09-01) : les
   captures du README viennent du jeu synthétique, jamais de vraies valeurs dans le repo public.
-- Scripts : `npm run migrate` / `seed` / `backfill` / `rollups` (reconstruction de
+- Scripts : `npm run migrate` / `seed` / `backfill` / `backfill:series` (anneaux, audiogrammes,
+  GPX et CSV d'ECG du même export, à lancer APRÈS `backfill`) / `rollups` (reconstruction de
   `rollup_hourly`, à lancer après tout backfill XML). Tests manuels : harnais dans
   `~/Letmiko/work/hygie/test-ingest/` et `test-auth/`.
 - `~/Letmiko/work/hygie/` contient des données de santé réelles : exclu de git, ne jamais

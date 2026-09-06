@@ -79,6 +79,10 @@ never run automatically at boot. Read `docs/architecture.md` first: it is the co
 
 The short version, until the guide exists: PostgreSQL 16+, `cp .env.example .env` and fill it,
 `npm run migrate && npm run seed`, build and run the Dockerfile (or `npm run build && npm start`).
+History comes from an Apple Health export: `npm run backfill -- export.zip --subject <uuid>` for the
+samples, sleep and workouts, then `npm run backfill:series -- export.zip --subject <uuid>` for the
+activity rings, audiograms, GPS routes (GPX) and ECGs (CSV) of the same archive, then
+`npm run rollups -- --subject <uuid>`.
 Backfill your history with `npm run backfill -- export.zip --subject <uuid>`, then
 `npm run rollups -- --subject <uuid>`. When you replace the phone that feeds Hygie, run
 `npm run cutover -- --device <new device name>` so the new device becomes the authority for
