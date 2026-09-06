@@ -7,6 +7,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from '@/components/ui/Link';
 import { LineChart } from '@/components/charts/LineChart';
+import { RouteTrace } from '@/components/charts/RouteTrace';
 import { ZoneBar } from '@/components/charts/ZoneBar';
 import { DataTable } from '@/components/data/DataTable';
 import { SourceBadge } from '@/components/data/SourceBadge';
@@ -34,6 +35,7 @@ import {
   getWorkout,
   observationSamples,
   workoutHeartRate,
+  workoutRoute,
   workoutSplits,
   workoutSummary,
 } from '@/lib/queries/workouts';
@@ -74,6 +76,9 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
 
   const sport = sportDisplay(workout.activityType);
   const color = dataColor(sport.family);
+  // The GPS fixes, only when the session has some (hasRoute is the cheap
+  // existence test; the points table can hold tens of thousands of rows).
+  const route = workout.hasRoute ? await workoutRoute(ctx, workout.id) : [];
 
   // The reference window is the 90 days BEFORE this session, in the subject's
   // zone: anchoring it on today compared an April session against July ones,
@@ -319,11 +324,33 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
         </div>
       )}
 
-      {workout.hasRoute && (
-        <Panel style={{ minHeight: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span className="tnum" style={{ font: '400 var(--text-xs)/1 var(--font-data)', color: 'var(--text-3)' }}>
-            {m.session.gpsPlaceholder}
-          </span>
+      {route.length > 1 && (
+        <Panel>
+          <PanelLabel
+            trailing={
+              <span className="tnum" style={{ font: '400 var(--text-2xs)/1 var(--font-data)', color: 'var(--text-3)' }}>
+                {m.session.routePoints(route.length)}
+              </span>
+            }
+          >
+            {m.session.routeTitle}
+          </PanelLabel>
+          <RouteTrace
+            points={route}
+            color={color}
+            ariaLabel={m.session.routeTitle}
+            labels={{
+              start: m.session.routeStart,
+              end: m.session.routeEnd,
+              elevation: m.session.routeElevation,
+              distance: m.session.routeDistance,
+              scale: (meters) => (meters >= 1000 ? `${fmtNumber(meters / 1000, locale, 0)} km` : `${fmtInt(meters, locale)} m`),
+            }}
+            format={{
+              km: (meters) => fmtKm(meters, locale, 1),
+              m: (v) => `${fmtInt(v, locale)} m`,
+            }}
+          />
         </Panel>
       )}
     </div>

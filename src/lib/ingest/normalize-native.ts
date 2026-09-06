@@ -18,6 +18,7 @@ import {
   bump,
   getSourceId,
   getUnitId,
+  insertRoutePoints,
   normalizeMinuteRegime,
   quantize,
   resolveRawPath,
@@ -26,6 +27,7 @@ import {
   type MetricTypeRow,
   type MinutePoint,
   type NormalizeCounts,
+  type RoutePointRow,
 } from '@/lib/ingest/normalize-hae';
 import { enqueueDirtyRanges, markDirtyHour } from '@/lib/rollups';
 
@@ -33,6 +35,24 @@ export const NATIVE_FORMAT_VERSION = 'hygie-native-v1';
 
 const HK_SLEEP = 'HKCategoryTypeIdentifierSleepAnalysis';
 const MAX_DECOMPRESSED_BYTES = 256 * 1024 * 1024;
+
+// Bounds of the series sections (native-format.md). A 24 h outdoor workout
+// at 1 Hz is 86 400 points; a 30 s ECG at 512 Hz is 15 360 samples.
+const MAX_ROUTE_POINTS = 250_000;
+const MAX_ECG_SAMPLES = 60_000;
+const MAX_AUDIOGRAM_POINTS = 64;
+const INT16_MAX = 32_767;
+// Advisory lock keys of the series sections; metric type ids are positive
+// and workouts use 0, so the sections take the negative range.
+const LOCK_KEY_WORKOUTS = 0;
+const LOCK_KEY_ACTIVITY_SUMMARIES = -1;
+const LOCK_KEY_ECGS = -2;
+const LOCK_KEY_AUDIOGRAMS = -3;
+const ECG_SYMPTOMS = new Set(['not_set', 'none', 'present']);
+const AUDIOGRAM_SIDES = new Set(['left', 'right']);
+const AUDIOGRAM_CLAMPS = new Set(['low', 'high']);
+const TOKEN_RE = /^[a-z0-9_]{1,64}$/;
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // ---------------------------------------------------------------------------
 // Payload shape
@@ -68,6 +88,81 @@ export interface NativeWorkout {
   source?: string;
 }
 
+// --- series sections (additive since Hygie Sync 1.1) -------------------------
+
+export interface NativeRoutePoint {
+  t: string;
+  lat: number;
+  lon: number;
+  alt?: number;
+  speed?: number;
+  course?: number;
+  hacc?: number;
+}
+
+export interface NativeRoute {
+  workout_uuid: string;
+  uuid?: string;
+  source?: string;
+  points: NativeRoutePoint[];
+}
+
+export interface NativeActivitySummary {
+  day: string;
+  move_mode?: 'energy' | 'time';
+  move_kj?: number;
+  move_goal_kj?: number;
+  move_time_min?: number;
+  move_time_goal_min?: number;
+  exercise_min?: number;
+  exercise_goal_min?: number;
+  stand_h?: number;
+  stand_goal_h?: number;
+  paused?: boolean;
+  source?: string;
+}
+
+export interface NativeEcg {
+  uuid: string;
+  start: string;
+  end?: string;
+  source?: string;
+  classification: string;
+  symptoms?: string;
+  avg_hr_bpm?: number;
+  sampling_hz: number;
+  algorithm_version?: number;
+  lead?: string;
+  voltages_uv: number[];
+}
+
+export interface NativeAudiogramPoint {
+  hz: number;
+  side: 'left' | 'right';
+  db_hl: number;
+  masked?: boolean;
+  conduction?: string;
+  clamped?: 'low' | 'high' | null;
+}
+
+export interface NativeAudiogram {
+  uuid: string;
+  start: string;
+  end?: string;
+  source?: string;
+  points: NativeAudiogramPoint[];
+}
+
+const SECTION_KEYS = [
+  'samples',
+  'minutes',
+  'workouts',
+  'routes',
+  'activity_summaries',
+  'ecgs',
+  'audiograms',
+] as const;
+
 export interface NativePayload {
   format: 'hygie-native/1';
   app_version?: string;
@@ -76,6 +171,10 @@ export interface NativePayload {
   samples?: NativeSample[];
   minutes?: NativeMinute[];
   workouts?: NativeWorkout[];
+  routes?: NativeRoute[];
+  activity_summaries?: NativeActivitySummary[];
+  ecgs?: NativeEcg[];
+  audiograms?: NativeAudiogram[];
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -112,7 +211,7 @@ export function isNativePayload(v: unknown): v is NativePayload {
   if (typeof v !== 'object' || v === null) return false;
   const p = v as Record<string, unknown>;
   if (p.format !== 'hygie-native/1') return false;
-  for (const key of ['samples', 'minutes', 'workouts'] as const) {
+  for (const key of SECTION_KEYS) {
     if (p[key] !== undefined && !Array.isArray(p[key])) return false;
   }
   return true;
@@ -170,6 +269,13 @@ export async function readAndValidateNativeBatchFile(
     consider(w?.start);
     consider(w?.end);
   }
+  for (const r of parsed.routes ?? []) {
+    const pts = Array.isArray(r?.points) ? r.points : [];
+    consider(pts[0]?.t);
+    consider(pts[pts.length - 1]?.t);
+  }
+  for (const e of parsed.ecgs ?? []) consider(e?.start);
+  for (const a of parsed.audiograms ?? []) consider(a?.start);
   return {
     payload: parsed,
     declaredRange: min !== null && max !== null ? { min, max } : null,
@@ -217,12 +323,20 @@ export async function normalizeNativePayload(
   const samples = payload.samples ?? [];
   const minutes = payload.minutes ?? [];
   const workouts = payload.workouts ?? [];
+  const routes = payload.routes ?? [];
+  const summaries = payload.activity_summaries ?? [];
+  const ecgs = payload.ecgs ?? [];
+  const audiograms = payload.audiograms ?? [];
 
   // Advisory locks per (subject, type), plus key 0 for workouts — the same
   // discipline and ordering as the HAE normalizer, so the two channels can
-  // never deadlock against each other.
+  // never deadlock against each other. Routes write under workouts; the
+  // other series sections have their own negative keys.
   const lockKeys = new Set<number>();
-  if (workouts.length > 0) lockKeys.add(0);
+  if (workouts.length > 0 || routes.length > 0) lockKeys.add(LOCK_KEY_WORKOUTS);
+  if (summaries.length > 0) lockKeys.add(LOCK_KEY_ACTIVITY_SUMMARIES);
+  if (ecgs.length > 0) lockKeys.add(LOCK_KEY_ECGS);
+  if (audiograms.length > 0) lockKeys.add(LOCK_KEY_AUDIOGRAMS);
   for (const s of samples) {
     const t = typeof s?.type === 'string' ? types.get(s.type) : undefined;
     if (t) lockKeys.add(t.id);
@@ -415,6 +529,20 @@ export async function normalizeNativePayload(
 
   for (const w of workouts) {
     await normalizeNativeWorkout(ctx, w);
+  }
+  // Routes after workouts: a route names its workout by HealthKit uuid and
+  // the same payload usually carries both.
+  for (const r of routes) {
+    await normalizeNativeRoute(ctx, r);
+  }
+  for (const a of summaries) {
+    await upsertActivitySummary(ctx, a, payload.device?.name);
+  }
+  for (const e of ecgs) {
+    await insertEcg(ctx, e);
+  }
+  for (const a of audiograms) {
+    await insertAudiogram(ctx, a);
   }
 
   const queued = await enqueueDirtyRanges(
@@ -661,4 +789,288 @@ async function normalizeNativeWorkout(ctx: Ctx, w: NativeWorkout): Promise<void>
      on conflict do nothing`,
     [workoutId, w.uuid]
   );
+}
+
+// ---------------------------------------------------------------------------
+// Routes: GPS points of a workout already known under namespace 'healthkit'
+
+async function normalizeNativeRoute(ctx: Ctx, r: NativeRoute): Promise<void> {
+  const rc = (ctx.counts.routes ??= {});
+  rc.received = (rc.received ?? 0) + 1;
+
+  if (typeof r?.workout_uuid !== 'string' || !UUID_RE.test(r.workout_uuid) || !Array.isArray(r.points)) {
+    rc.skipped_invalid = (rc.skipped_invalid ?? 0) + 1;
+    return;
+  }
+  if (r.points.length > MAX_ROUTE_POINTS) {
+    rc.skipped_too_large = (rc.skipped_too_large ?? 0) + 1;
+    return;
+  }
+  // Scoped to the device's subject: a uuid known under another subject is a
+  // foreign route, counted and never adopted.
+  const known = await ctx.client.query<{ workout_id: string }>(
+    `select e.workout_id from workout_external_ids e
+     join workouts wk on wk.id = e.workout_id
+     where e.namespace = 'healthkit' and e.external_id = $1 and wk.subject_id = $2`,
+    [r.workout_uuid, ctx.batch.subject_id]
+  );
+  if (known.rows.length === 0) {
+    rc.workout_unknown = (rc.workout_unknown ?? 0) + 1;
+    return;
+  }
+  const workoutId = known.rows[0].workout_id;
+
+  const rows: RoutePointRow[] = [];
+  for (const p of r.points) {
+    const ts = typeof p?.t === 'string' ? parseIsoDate(p.t) : null;
+    if (
+      !ts ||
+      !isFiniteNumber(p.lat) || Math.abs(p.lat) > 90 ||
+      !isFiniteNumber(p.lon) || Math.abs(p.lon) > 180
+    ) {
+      rc.points_skipped = (rc.points_skipped ?? 0) + 1;
+      continue;
+    }
+    rows.push([
+      ts.utc,
+      p.lat,
+      p.lon,
+      isFiniteNumber(p.alt) ? p.alt : null,
+      isFiniteNumber(p.speed) && p.speed >= 0 ? p.speed : null,
+      isFiniteNumber(p.course) && p.course >= 0 ? p.course : null,
+      isFiniteNumber(p.hacc) && p.hacc >= 0 ? p.hacc : null,
+    ]);
+  }
+  const res = await insertRoutePoints(ctx.client, workoutId, rows);
+  rc.points_inserted = (rc.points_inserted ?? 0) + res.inserted;
+  rc.points_duplicate = (rc.points_duplicate ?? 0) + res.duplicate;
+  rc[res.inserted > 0 ? 'inserted' : 'deduped'] = (rc[res.inserted > 0 ? 'inserted' : 'deduped'] ?? 0) + 1;
+}
+
+// ---------------------------------------------------------------------------
+// Activity rings: one row per day, upsert that only registers real changes
+
+function nonNegative(v: unknown): number | null {
+  return isFiniteNumber(v) && v >= 0 ? v : null;
+}
+
+async function upsertActivitySummary(
+  ctx: Ctx,
+  a: NativeActivitySummary,
+  deviceName: string | undefined
+): Promise<void> {
+  const ac = (ctx.counts.activity_summaries ??= {});
+  ac.received = (ac.received ?? 0) + 1;
+
+  if (typeof a?.day !== 'string' || !DAY_RE.test(a.day) || Number.isNaN(Date.parse(`${a.day}T00:00:00Z`))) {
+    ac.skipped_invalid = (ac.skipped_invalid ?? 0) + 1;
+    return;
+  }
+  const moveMode = a.move_mode === 'time' ? 'time' : 'energy';
+  const sourceId = await getSourceId(ctx, a.source ?? deviceName ?? 'HealthKit');
+  const values = [
+    ctx.batch.subject_id,
+    a.day,
+    moveMode,
+    nonNegative(a.move_kj),
+    nonNegative(a.move_goal_kj),
+    nonNegative(a.move_time_min),
+    nonNegative(a.move_time_goal_min),
+    nonNegative(a.exercise_min),
+    nonNegative(a.exercise_goal_min),
+    nonNegative(a.stand_h),
+    nonNegative(a.stand_goal_h),
+    a.paused === true,
+    sourceId,
+    ctx.batch.id,
+  ];
+  // `xmax = 0` marks a fresh insert; a conflict whose WHERE is false returns
+  // nothing, which is the "unchanged" outcome.
+  const res = await ctx.client.query<{ inserted: boolean }>(
+    `insert into activity_summaries
+       (subject_id, day, move_mode, move_kj, move_goal_kj, move_time_min, move_time_goal_min,
+        exercise_min, exercise_goal_min, stand_h, stand_goal_h, paused, source_id, ingest_batch_id)
+     values ($1, $2::date, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+     on conflict (subject_id, day) do update set
+       move_mode = excluded.move_mode,
+       move_kj = excluded.move_kj,
+       move_goal_kj = excluded.move_goal_kj,
+       move_time_min = excluded.move_time_min,
+       move_time_goal_min = excluded.move_time_goal_min,
+       exercise_min = excluded.exercise_min,
+       exercise_goal_min = excluded.exercise_goal_min,
+       stand_h = excluded.stand_h,
+       stand_goal_h = excluded.stand_goal_h,
+       paused = excluded.paused,
+       source_id = excluded.source_id,
+       ingest_batch_id = excluded.ingest_batch_id,
+       updated_at = now()
+     where (activity_summaries.move_mode, activity_summaries.move_kj, activity_summaries.move_goal_kj,
+            activity_summaries.move_time_min, activity_summaries.move_time_goal_min,
+            activity_summaries.exercise_min, activity_summaries.exercise_goal_min,
+            activity_summaries.stand_h, activity_summaries.stand_goal_h, activity_summaries.paused)
+           is distinct from
+           (excluded.move_mode, excluded.move_kj, excluded.move_goal_kj,
+            excluded.move_time_min, excluded.move_time_goal_min,
+            excluded.exercise_min, excluded.exercise_goal_min,
+            excluded.stand_h, excluded.stand_goal_h, excluded.paused)
+     returning (xmax = 0) as inserted`,
+    values
+  );
+  const row = res.rows[0];
+  const key = row === undefined ? 'unchanged' : row.inserted ? 'inserted' : 'updated';
+  ac[key] = (ac[key] ?? 0) + 1;
+}
+
+// ---------------------------------------------------------------------------
+// ECG recordings: uuid identity, then the per-second residual
+
+async function insertEcg(ctx: Ctx, e: NativeEcg): Promise<void> {
+  const ec = (ctx.counts.ecgs ??= {});
+  ec.received = (ec.received ?? 0) + 1;
+
+  const start = typeof e?.start === 'string' ? parseIsoDate(e.start) : null;
+  const end = typeof e?.end === 'string' ? parseIsoDate(e.end) : null;
+  if (
+    !start ||
+    typeof e.uuid !== 'string' || !UUID_RE.test(e.uuid) ||
+    typeof e.classification !== 'string' || !TOKEN_RE.test(e.classification) ||
+    !isFiniteNumber(e.sampling_hz) || e.sampling_hz <= 0 ||
+    !Array.isArray(e.voltages_uv) || e.voltages_uv.length === 0
+  ) {
+    ec.skipped_invalid = (ec.skipped_invalid ?? 0) + 1;
+    return;
+  }
+  if (e.voltages_uv.length > MAX_ECG_SAMPLES) {
+    ec.skipped_too_large = (ec.skipped_too_large ?? 0) + 1;
+    return;
+  }
+  const voltages: number[] = new Array(e.voltages_uv.length);
+  for (let i = 0; i < e.voltages_uv.length; i++) {
+    const v = e.voltages_uv[i];
+    if (!isFiniteNumber(v)) {
+      ec.skipped_invalid = (ec.skipped_invalid ?? 0) + 1;
+      return;
+    }
+    voltages[i] = Math.max(-INT16_MAX, Math.min(INT16_MAX, Math.round(v)));
+  }
+  const symptoms = typeof e.symptoms === 'string' && ECG_SYMPTOMS.has(e.symptoms) ? e.symptoms : 'not_set';
+  const lead = typeof e.lead === 'string' && TOKEN_RE.test(e.lead) ? e.lead : 'apple_watch_similar_to_lead_i';
+  const sourceId = await getSourceId(ctx, e.source);
+  const res = await ctx.client.query(
+    `insert into ecg_recordings
+       (subject_id, hk_uuid, source_id, start_ts, end_ts, tz_offset_min, classification,
+        symptoms_status, avg_hr_bpm, sampling_hz, algorithm_version, lead, n_samples,
+        voltages_uv, ingest_batch_id)
+     select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::smallint[], $15
+     where not exists (
+       select 1 from ecg_recordings where subject_id = $1 and hk_uuid = $2
+     ) and not exists (
+       select 1 from ecg_recordings
+       where subject_id = $1 and source_id = $3
+         and date_trunc('second', start_ts at time zone 'UTC')
+             = date_trunc('second', $4::timestamptz at time zone 'UTC')
+     )`,
+    [
+      ctx.batch.subject_id,
+      e.uuid,
+      sourceId,
+      start.utc,
+      end && end.utc >= start.utc ? end.utc : null,
+      start.tzOffsetMin,
+      e.classification,
+      symptoms,
+      isFiniteNumber(e.avg_hr_bpm) && e.avg_hr_bpm > 0 ? e.avg_hr_bpm : null,
+      e.sampling_hz,
+      isFiniteNumber(e.algorithm_version) && Number.isInteger(e.algorithm_version) ? e.algorithm_version : null,
+      lead,
+      voltages.length,
+      voltages,
+      ctx.batch.id,
+    ]
+  );
+  ec[res.rowCount ? 'inserted' : 'deduped'] = (ec[res.rowCount ? 'inserted' : 'deduped'] ?? 0) + 1;
+}
+
+// ---------------------------------------------------------------------------
+// Audiograms: same identity discipline, points in a child table
+
+async function insertAudiogram(ctx: Ctx, a: NativeAudiogram): Promise<void> {
+  const ac = (ctx.counts.audiograms ??= {});
+  ac.received = (ac.received ?? 0) + 1;
+
+  const start = typeof a?.start === 'string' ? parseIsoDate(a.start) : null;
+  const end = typeof a?.end === 'string' ? parseIsoDate(a.end) : null;
+  if (
+    !start ||
+    typeof a.uuid !== 'string' || !UUID_RE.test(a.uuid) ||
+    !Array.isArray(a.points) || a.points.length === 0 || a.points.length > MAX_AUDIOGRAM_POINTS
+  ) {
+    ac.skipped_invalid = (ac.skipped_invalid ?? 0) + 1;
+    return;
+  }
+  type Point = [string, number, number, boolean, string, string | null];
+  const points = new Map<string, Point>();
+  for (const p of a.points) {
+    if (
+      typeof p?.side !== 'string' || !AUDIOGRAM_SIDES.has(p.side) ||
+      !isFiniteNumber(p.hz) || p.hz <= 0 ||
+      !isFiniteNumber(p.db_hl)
+    ) {
+      ac.points_skipped = (ac.points_skipped ?? 0) + 1;
+      continue;
+    }
+    const masked = p.masked === true;
+    const conduction = typeof p.conduction === 'string' && TOKEN_RE.test(p.conduction) ? p.conduction : 'air';
+    const clamped = typeof p.clamped === 'string' && AUDIOGRAM_CLAMPS.has(p.clamped) ? p.clamped : null;
+    // Same primary key as the table: the last occurrence wins.
+    points.set(`${p.side}|${p.hz}|${masked}`, [p.side, p.hz, p.db_hl, masked, conduction, clamped]);
+  }
+  if (points.size === 0) {
+    ac.skipped_invalid = (ac.skipped_invalid ?? 0) + 1;
+    return;
+  }
+  const sourceId = await getSourceId(ctx, a.source);
+  const created = await ctx.client.query<{ id: string }>(
+    `insert into audiograms
+       (subject_id, hk_uuid, source_id, start_ts, end_ts, tz_offset_min, ingest_batch_id)
+     select $1, $2, $3, $4, $5, $6, $7
+     where not exists (
+       select 1 from audiograms where subject_id = $1 and hk_uuid = $2
+     ) and not exists (
+       select 1 from audiograms
+       where subject_id = $1 and source_id = $3
+         and date_trunc('second', start_ts at time zone 'UTC')
+             = date_trunc('second', $4::timestamptz at time zone 'UTC')
+     )
+     returning id`,
+    [
+      ctx.batch.subject_id,
+      a.uuid,
+      sourceId,
+      start.utc,
+      end && end.utc >= start.utc ? end.utc : null,
+      start.tzOffsetMin,
+      ctx.batch.id,
+    ]
+  );
+  const row = created.rows[0];
+  if (!row) {
+    ac.deduped = (ac.deduped ?? 0) + 1;
+    return;
+  }
+  const params: unknown[] = [row.id];
+  const tuples = [...points.values()].map((p, j) => {
+    params.push(...p);
+    const b = 1 + j * 6;
+    return `($1, $${b + 1}, $${b + 2}::float8, $${b + 3}::float8, $${b + 4}::boolean, $${b + 5}, $${b + 6})`;
+  });
+  await ctx.client.query(
+    `insert into audiogram_points
+       (audiogram_id, side, frequency_hz, sensitivity_db_hl, masked, conduction, clamped)
+     values ${tuples.join(',')}`,
+    params
+  );
+  ac.inserted = (ac.inserted ?? 0) + 1;
+  ac.points_inserted = (ac.points_inserted ?? 0) + points.size;
 }

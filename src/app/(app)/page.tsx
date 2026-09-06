@@ -9,6 +9,7 @@ import Link from '@/components/ui/Link';
 import { Suspense } from 'react';
 import { TimelinePanel, TimelineSkeleton, TIMELINE_LOOKBACK_DAYS } from './timeline-panel';
 import { CalendarHeatmap } from '@/components/charts/CalendarHeatmap';
+import { ActivityRings } from '@/components/charts/ActivityRings';
 import { Gauge } from '@/components/charts/Gauge';
 import { BarChart } from '@/components/charts/BarChart';
 import { LineChart } from '@/components/charts/LineChart';
@@ -20,13 +21,14 @@ import { Panel, PanelLabel } from '@/components/ui/Panel';
 import { TimeNav } from '@/components/time/TimeNav';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
 import { bucketSpans, drillSet, drillZone, spanQuery } from '@/lib/drill';
-import { fmtDay, fmtHoursMinutes, fmtInt, fmtNumber, kjToKcal } from '@/lib/format';
+import { ABSENT, fmtDay, fmtHoursMinutes, fmtInt, fmtNumber, kjToKcal } from '@/lib/format';
 import { getMessages, resolveLocale, type Locale } from '@/lib/i18n';
 import { dataColor, metricHref, type DataFamily } from '@/lib/metrics';
 import { getSubjectContext, type SubjectContext } from '@/lib/queries/context';
 import { allTimeDailySeries, dailySeries, type DailyPoint } from '@/lib/queries/series';
 import { seriesWithTrend, type Trend } from '@/lib/queries/trends';
 import { sleepNights, sleepTrend } from '@/lib/queries/sleep';
+import { activityRings, type RingsDay } from '@/lib/queries/rings';
 import { dataTotals } from '@/lib/queries/sync';
 import {
   addDays,
@@ -175,6 +177,7 @@ export default async function DashboardPage({
     heatSummary,
     heatSummaryPrev,
     silhouette,
+    ringsWeek,
   ] = await Promise.all([
     Promise.all(cardSpecs.map((spec) => metricCardData(ctx, spec, range, preset, isAll, totals.firstDay))),
     sleepNights(ctx, range),
@@ -193,7 +196,25 @@ export default async function DashboardPage({
     workoutSummary(ctx, heatRange),
     workoutSummary(ctx, prev52),
     monthlyTrainingSilhouette(ctx),
+    activityRings(ctx, addDays(today, -6), today),
   ]);
+
+  // --- activity rings -----------------------------------------------------------
+  const ringsToday = ringsWeek.find((r) => r.day === today) ?? null;
+  const ringSpec = (r: RingsDay | null) =>
+    [
+      {
+        value: r === null ? null : r.moveMode === 'time' ? r.moveTimeMin : r.moveKj,
+        goal: r === null ? null : r.moveMode === 'time' ? r.moveTimeGoalMin : r.moveGoalKj,
+        color: 'var(--data-heart)',
+        label: m.dash.ringMove,
+      },
+      { value: r?.exerciseMin ?? null, goal: r?.exerciseGoalMin ?? null, color: 'var(--data-activity)', label: m.dash.ringExercise },
+      { value: r?.standH ?? null, goal: r?.standGoalH ?? null, color: 'var(--data-water)', label: m.dash.ringStand },
+    ] as const;
+  const ringsByDay = new Map(ringsWeek.map((r) => [r.day, r]));
+  const ringDays: string[] = [];
+  for (let d = addDays(today, -6); d <= today; d = addDays(d, 1)) ringDays.push(d);
 
   // --- sleep card -------------------------------------------------------------
   const nightsByDate = new Map(nights.map((n) => [n.nightDate, n.asleepS]));
@@ -424,6 +445,57 @@ export default async function DashboardPage({
               <p style={{ font: '400 var(--text-2xs)/1.4 var(--font-ui)', color: 'var(--text-3)', margin: '8px 0 0' }}>
                 {m.dash.vsAvg90d(`${fmtInt(mean90Kcal, locale)} kcal`)}
               </p>
+            )}
+          </Panel>
+
+          <Panel>
+            <PanelLabel
+              trailing={
+                ringsToday?.paused ? (
+                  <span style={{ font: '400 var(--text-2xs)/1 var(--font-ui)', color: 'var(--text-3)' }}>{m.dash.ringsPaused}</span>
+                ) : undefined
+              }
+            >
+              {m.dash.ringsTitle}
+            </PanelLabel>
+            {ringsWeek.length === 0 ? (
+              <p style={{ font: '400 var(--text-sm)/1.4 var(--font-ui)', color: 'var(--text-3)', margin: 0 }}>{m.dash.ringsNoData}</p>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                <ActivityRings rings={[...ringSpec(ringsToday)]} size={104} ariaLabel={m.dash.ringsTitle} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 140 }}>
+                  {ringSpec(ringsToday).map((ring, i) => {
+                    const unit = i === 0 ? (ringsToday?.moveMode === 'time' ? 'min' : 'kcal') : i === 1 ? 'min' : 'h';
+                    const shown = ring.value === null ? null : i === 0 && ringsToday?.moveMode !== 'time' ? kjToKcal(ring.value) : ring.value;
+                    const goal = ring.goal === null ? null : i === 0 && ringsToday?.moveMode !== 'time' ? kjToKcal(ring.goal) : ring.goal;
+                    return (
+                      <div key={ring.label} style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                        <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: ring.color, flex: 'none', alignSelf: 'center' }} />
+                        <span className="hy-label" style={{ width: 64 }}>{ring.label}</span>
+                        <span className="tnum" style={{ font: '600 var(--text-base)/1 var(--font-ui)', color: shown === null ? 'var(--text-3)' : 'var(--text-1)' }}>
+                          {shown === null ? ABSENT : fmtInt(shown, locale)}
+                          {goal !== null && shown !== null && (
+                            <span style={{ font: '400 var(--text-2xs)/1 var(--font-ui)', color: 'var(--text-3)' }}>
+                              {' '}/ {fmtInt(goal, locale)} {unit}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', width: '100%', marginTop: 4 }}>
+                  {ringDays.map((d) => (
+                    <div key={d} title={fmtDay(d, locale, { weekday: 'short', day: 'numeric', month: 'short' })} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                      <ActivityRings rings={[...ringSpec(ringsByDay.get(d) ?? null)]} size={30} stroke={3} ariaLabel={fmtDay(d, locale)} />
+                      <span className="tnum" style={{ font: '400 10px var(--font-data)', color: d === today ? 'var(--text-1)' : 'var(--text-3)' }}>
+                        {fmtDay(d, locale, { weekday: 'narrow' })}
+                      </span>
+                    </div>
+                  ))}
+                  <span style={{ font: '400 var(--text-2xs)/1 var(--font-ui)', color: 'var(--text-3)', marginLeft: 'auto', alignSelf: 'center' }}>{m.dash.ringsLast7}</span>
+                </div>
+              </div>
             )}
           </Panel>
 
