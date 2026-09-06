@@ -33,6 +33,8 @@ export function tileConfig(): TileConfig | null {
 
 export const TILE_SIZE = 256;
 export const MAX_FIT_ZOOM = 17;
+/** Finest tiles the trace ever asks for (OSM serves up to 19). */
+export const MAX_TILE_ZOOM = 18;
 
 /** World pixel coordinates of a lat/lon at zoom z (Web Mercator, 256 px tiles). */
 export function mercator(lat: number, lon: number, z: number): { x: number; y: number } {

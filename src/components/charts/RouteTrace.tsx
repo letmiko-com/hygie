@@ -6,7 +6,7 @@
 // line sits exactly on the roads. Below, the altitude profile against
 // cumulative distance when the fixes carry an altitude.
 import { ABSENT } from '@/lib/format';
-import { fitZoom, mercator, TILE_SIZE } from '@/lib/tiles';
+import { fitZoom, MAX_TILE_ZOOM, mercator, TILE_SIZE } from '@/lib/tiles';
 
 export interface TracePoint {
   lat: number;
@@ -71,32 +71,41 @@ export function RouteTrace({
     minLon: Math.min(...pts.map((p) => p.lon)),
     maxLon: Math.max(...pts.map((p) => p.lon)),
   };
-  const z = fitZoom(bounds, width - 2 * pad, height - 2 * pad);
-  // World pixels at zoom z; the frame is centred on the track's bounding box.
+  // Fractional fit: tiles one level finer than the integer zoom that fits,
+  // scaled down by k in (0.5, 1] so the track fills the frame whatever its
+  // aspect ratio. Downscaled tiles stay crisp; a whole level too wide would
+  // leave a short ride as a small figure in a large map.
+  const frameW = width - 2 * pad;
+  const frameH = height - 2 * pad;
+  const zFit = fitZoom(bounds, frameW, frameH);
+  const z = Math.min(zFit + 1, MAX_TILE_ZOOM);
   const nw = mercator(bounds.maxLat, bounds.minLon, z);
   const se = mercator(bounds.minLat, bounds.maxLon, z);
-  const originX = (nw.x + se.x) / 2 - width / 2;
-  const originY = (nw.y + se.y) / 2 - height / 2;
+  const k = Math.min(1, frameW / Math.max(1, se.x - nw.x), frameH / Math.max(1, se.y - nw.y));
+  // Scaled world pixels at zoom z; the frame is centred on the bounding box.
+  const originX = ((nw.x + se.x) / 2) * k - width / 2;
+  const originY = ((nw.y + se.y) / 2) * k - height / 2;
   const project = (p: TracePoint) => {
     const m = mercator(p.lat, p.lon, z);
-    return { x: m.x - originX, y: m.y - originY };
+    return { x: m.x * k - originX, y: m.y * k - originY };
   };
   const projected = pts.map(project);
   const path = projected.map((q, i) => `${i === 0 ? 'M' : 'L'}${q.x.toFixed(1)} ${q.y.toFixed(1)}`).join('');
 
-  // Tiles covering the frame, positioned in the same pixel space.
+  // Tiles covering the frame, positioned and sized in the same scaled space.
+  const tilePx = TILE_SIZE * k;
   const tileImages: Array<{ x: number; y: number; tx: number; ty: number }> = [];
   if (tiles) {
     const worldTiles = 2 ** z;
-    const tx0 = Math.floor(originX / TILE_SIZE);
-    const tx1 = Math.floor((originX + width) / TILE_SIZE);
-    const ty0 = Math.max(0, Math.floor(originY / TILE_SIZE));
-    const ty1 = Math.min(worldTiles - 1, Math.floor((originY + height) / TILE_SIZE));
+    const tx0 = Math.floor(originX / tilePx);
+    const tx1 = Math.floor((originX + width) / tilePx);
+    const ty0 = Math.max(0, Math.floor(originY / tilePx));
+    const ty1 = Math.min(worldTiles - 1, Math.floor((originY + height) / tilePx));
     for (let tx = tx0; tx <= tx1; tx++) {
       for (let ty = ty0; ty <= ty1; ty++) {
         tileImages.push({
-          x: tx * TILE_SIZE - originX,
-          y: ty * TILE_SIZE - originY,
+          x: tx * tilePx - originX,
+          y: ty * tilePx - originY,
           tx: ((tx % worldTiles) + worldTiles) % worldTiles, // wrap around the antimeridian
           ty,
         });
@@ -104,9 +113,9 @@ export function RouteTrace({
     }
   }
 
-  // Metres per pixel at this latitude and zoom, for the scale bar.
+  // Metres per frame pixel at this latitude, zoom and scale, for the scale bar.
   const midLat = (bounds.minLat + bounds.maxLat) / 2;
-  const metresPerPx = (156_543.03392 * Math.cos((midLat * Math.PI) / 180)) / 2 ** z;
+  const metresPerPx = (156_543.03392 * Math.cos((midLat * Math.PI) / 180)) / (2 ** z * k);
   const barM = niceScale(((width - 2 * pad) / 3) * metresPerPx);
   const barPx = barM / metresPerPx;
 
@@ -165,8 +174,8 @@ export function RouteTrace({
                 href={`/api/tiles/${z}/${t.tx}/${t.ty}`}
                 x={t.x}
                 y={t.y}
-                width={TILE_SIZE}
-                height={TILE_SIZE}
+                width={tilePx + 0.5}
+                height={tilePx + 0.5}
                 preserveAspectRatio="none"
               />
             ))}
