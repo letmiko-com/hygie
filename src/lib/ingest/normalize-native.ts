@@ -29,6 +29,7 @@ import {
   type NormalizeCounts,
   type RoutePointRow,
 } from '@/lib/ingest/normalize-hae';
+import { hrvMetrics } from '@/lib/hrv';
 import { enqueueDirtyRanges, markDirtyHour } from '@/lib/rollups';
 
 export const NATIVE_FORMAT_VERSION = 'hygie-native-v1';
@@ -41,6 +42,9 @@ const MAX_DECOMPRESSED_BYTES = 256 * 1024 * 1024;
 const MAX_ROUTE_POINTS = 250_000;
 const MAX_ECG_SAMPLES = 60_000;
 const MAX_AUDIOGRAM_POINTS = 64;
+// A day of beats at 60 bpm is 86 400; a watch series is a minute of them.
+const MAX_BEAT_INTERVALS = 100_000;
+const MAX_MOOD_TOKENS = 64;
 const INT16_MAX = 32_767;
 // Advisory lock keys of the series sections; metric type ids are positive
 // and workouts use 0, so the sections take the negative range.
@@ -48,9 +52,12 @@ const LOCK_KEY_WORKOUTS = 0;
 const LOCK_KEY_ACTIVITY_SUMMARIES = -1;
 const LOCK_KEY_ECGS = -2;
 const LOCK_KEY_AUDIOGRAMS = -3;
+const LOCK_KEY_HEARTBEAT_SERIES = -4;
+const LOCK_KEY_STATE_OF_MIND = -5;
 const ECG_SYMPTOMS = new Set(['not_set', 'none', 'present']);
 const AUDIOGRAM_SIDES = new Set(['left', 'right']);
 const AUDIOGRAM_CLAMPS = new Set(['low', 'high']);
+const MOOD_KINDS = new Set(['momentary_emotion', 'daily_mood']);
 const TOKEN_RE = /^[a-z0-9_]{1,64}$/;
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -153,6 +160,27 @@ export interface NativeAudiogram {
   points: NativeAudiogramPoint[];
 }
 
+export interface NativeHeartbeatSeries {
+  uuid: string;
+  start: string;
+  end?: string;
+  source?: string;
+  /** Delay to the next beat, in ms; null where a gap preceded the beat. */
+  intervals_ms: Array<number | null>;
+}
+
+export interface NativeStateOfMind {
+  uuid: string;
+  start: string;
+  end?: string;
+  source?: string;
+  kind: string;
+  valence: number;
+  valence_classification?: number;
+  labels?: string[];
+  associations?: string[];
+}
+
 const SECTION_KEYS = [
   'samples',
   'minutes',
@@ -161,6 +189,8 @@ const SECTION_KEYS = [
   'activity_summaries',
   'ecgs',
   'audiograms',
+  'heartbeat_series',
+  'state_of_mind',
 ] as const;
 
 export interface NativePayload {
@@ -175,6 +205,8 @@ export interface NativePayload {
   activity_summaries?: NativeActivitySummary[];
   ecgs?: NativeEcg[];
   audiograms?: NativeAudiogram[];
+  heartbeat_series?: NativeHeartbeatSeries[];
+  state_of_mind?: NativeStateOfMind[];
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -276,6 +308,11 @@ export async function readAndValidateNativeBatchFile(
   }
   for (const e of parsed.ecgs ?? []) consider(e?.start);
   for (const a of parsed.audiograms ?? []) consider(a?.start);
+  for (const h of parsed.heartbeat_series ?? []) {
+    consider(h?.start);
+    consider(h?.end);
+  }
+  for (const s of parsed.state_of_mind ?? []) consider(s?.start);
   return {
     payload: parsed,
     declaredRange: min !== null && max !== null ? { min, max } : null,
@@ -327,6 +364,8 @@ export async function normalizeNativePayload(
   const summaries = payload.activity_summaries ?? [];
   const ecgs = payload.ecgs ?? [];
   const audiograms = payload.audiograms ?? [];
+  const heartbeats = payload.heartbeat_series ?? [];
+  const moods = payload.state_of_mind ?? [];
 
   // Advisory locks per (subject, type), plus key 0 for workouts — the same
   // discipline and ordering as the HAE normalizer, so the two channels can
@@ -337,6 +376,8 @@ export async function normalizeNativePayload(
   if (summaries.length > 0) lockKeys.add(LOCK_KEY_ACTIVITY_SUMMARIES);
   if (ecgs.length > 0) lockKeys.add(LOCK_KEY_ECGS);
   if (audiograms.length > 0) lockKeys.add(LOCK_KEY_AUDIOGRAMS);
+  if (heartbeats.length > 0) lockKeys.add(LOCK_KEY_HEARTBEAT_SERIES);
+  if (moods.length > 0) lockKeys.add(LOCK_KEY_STATE_OF_MIND);
   for (const s of samples) {
     const t = typeof s?.type === 'string' ? types.get(s.type) : undefined;
     if (t) lockKeys.add(t.id);
@@ -543,6 +584,12 @@ export async function normalizeNativePayload(
   }
   for (const a of audiograms) {
     await insertAudiogram(ctx, a);
+  }
+  for (const h of heartbeats) {
+    await insertHeartbeatSeries(ctx, h);
+  }
+  for (const s of moods) {
+    await insertStateOfMind(ctx, s);
   }
 
   const queued = await enqueueDirtyRanges(
@@ -1076,4 +1123,150 @@ async function insertAudiogram(ctx: Ctx, a: NativeAudiogram): Promise<void> {
   );
   ac.inserted = (ac.inserted ?? 0) + 1;
   ac.points_inserted = (ac.points_inserted ?? 0) + points.size;
+}
+
+// ---------------------------------------------------------------------------
+// Heartbeat series: uuid identity, then the per-second residual. The derived
+// HRV metrics are computed here, once, so that aggregating a period never
+// re-reads the interval arrays (src/lib/hrv.ts holds the rules).
+
+async function insertHeartbeatSeries(ctx: Ctx, h: NativeHeartbeatSeries): Promise<void> {
+  const hc = (ctx.counts.heartbeat_series ??= {});
+  hc.received = (hc.received ?? 0) + 1;
+
+  const start = typeof h?.start === 'string' ? parseIsoDate(h.start) : null;
+  const end = typeof h?.end === 'string' ? parseIsoDate(h.end) : null;
+  if (
+    !start ||
+    typeof h.uuid !== 'string' || !UUID_RE.test(h.uuid) ||
+    !Array.isArray(h.intervals_ms)
+  ) {
+    hc.skipped_invalid = (hc.skipped_invalid ?? 0) + 1;
+    return;
+  }
+  if (h.intervals_ms.length > MAX_BEAT_INTERVALS) {
+    hc.skipped_too_large = (hc.skipped_too_large ?? 0) + 1;
+    return;
+  }
+  // A delay above the smallint ceiling is a gap by any physiological
+  // reading; it is stored as one rather than clamped to a fake interval.
+  const intervals: Array<number | null> = new Array(h.intervals_ms.length);
+  for (let i = 0; i < h.intervals_ms.length; i++) {
+    const v = h.intervals_ms[i];
+    intervals[i] =
+      isFiniteNumber(v) && v > 0 && v <= INT16_MAX ? Math.round(v) : null;
+  }
+  const metrics = hrvMetrics(intervals);
+  // Beats, not intervals: a series of n beats carries n-1 delays.
+  const beatCount = intervals.length === 0 ? 0 : intervals.length + 1;
+  const durationS =
+    end && end.utc >= start.utc ? (end.utc.getTime() - start.utc.getTime()) / 1000 : null;
+  const sourceId = await getSourceId(ctx, h.source);
+  const res = await ctx.client.query(
+    `insert into heartbeat_series
+       (subject_id, hk_uuid, source_id, start_ts, end_ts, tz_offset_min, beat_count,
+        gap_count, duration_s, intervals_ms, mean_rr_ms, mean_hr_bpm, sdnn_ms,
+        rmssd_ms, pnn50_pct, ingest_batch_id)
+     select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::smallint[], $11, $12, $13, $14, $15, $16
+     where not exists (
+       select 1 from heartbeat_series where subject_id = $1 and hk_uuid = $2
+     ) and not exists (
+       -- Same subject, same second: the same series whatever name the
+       -- channel gave the watch. Two series cannot start in the same second.
+       select 1 from heartbeat_series
+       where subject_id = $1
+         and date_trunc('second', start_ts at time zone 'UTC')
+             = date_trunc('second', $4::timestamptz at time zone 'UTC')
+     )`,
+    [
+      ctx.batch.subject_id,
+      h.uuid,
+      sourceId,
+      start.utc,
+      end && end.utc >= start.utc ? end.utc : null,
+      start.tzOffsetMin,
+      beatCount,
+      metrics.gapCount,
+      durationS,
+      intervals,
+      metrics.meanRrMs,
+      metrics.meanHrBpm,
+      metrics.sdnnMs,
+      metrics.rmssdMs,
+      metrics.pnn50Pct,
+      ctx.batch.id,
+    ]
+  );
+  const key = res.rowCount ? 'inserted' : 'deduped';
+  hc[key] = (hc[key] ?? 0) + 1;
+  if (res.rowCount) hc.beats = (hc.beats ?? 0) + beatCount;
+}
+
+// ---------------------------------------------------------------------------
+// State of mind: uuid identity, then (kind, second) — the two kinds can
+// legitimately share a timestamp, so the residual carries the kind.
+
+function moodTokens(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const v of raw) {
+    if (typeof v === 'string' && TOKEN_RE.test(v) && !out.includes(v)) out.push(v);
+    if (out.length >= MAX_MOOD_TOKENS) break;
+  }
+  return out;
+}
+
+async function insertStateOfMind(ctx: Ctx, s: NativeStateOfMind): Promise<void> {
+  const sc = (ctx.counts.state_of_mind ??= {});
+  sc.received = (sc.received ?? 0) + 1;
+
+  const start = typeof s?.start === 'string' ? parseIsoDate(s.start) : null;
+  const end = typeof s?.end === 'string' ? parseIsoDate(s.end) : null;
+  if (
+    !start ||
+    typeof s.uuid !== 'string' || !UUID_RE.test(s.uuid) ||
+    typeof s.kind !== 'string' || !MOOD_KINDS.has(s.kind) ||
+    !isFiniteNumber(s.valence) || s.valence < -1 || s.valence > 1
+  ) {
+    sc.skipped_invalid = (sc.skipped_invalid ?? 0) + 1;
+    return;
+  }
+  const classification =
+    isFiniteNumber(s.valence_classification) &&
+    Number.isInteger(s.valence_classification) &&
+    s.valence_classification >= 1 &&
+    s.valence_classification <= 7
+      ? s.valence_classification
+      : null;
+  const sourceId = await getSourceId(ctx, s.source);
+  const res = await ctx.client.query(
+    `insert into state_of_mind
+       (subject_id, hk_uuid, source_id, start_ts, end_ts, tz_offset_min, kind,
+        valence, valence_classification, labels, associations, ingest_batch_id)
+     select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::text[], $11::text[], $12
+     where not exists (
+       select 1 from state_of_mind where subject_id = $1 and hk_uuid = $2
+     ) and not exists (
+       select 1 from state_of_mind
+       where subject_id = $1 and kind = $7
+         and date_trunc('second', start_ts at time zone 'UTC')
+             = date_trunc('second', $4::timestamptz at time zone 'UTC')
+     )`,
+    [
+      ctx.batch.subject_id,
+      s.uuid,
+      sourceId,
+      start.utc,
+      end && end.utc >= start.utc ? end.utc : null,
+      start.tzOffsetMin,
+      s.kind,
+      s.valence,
+      classification,
+      moodTokens(s.labels),
+      moodTokens(s.associations),
+      ctx.batch.id,
+    ]
+  );
+  const key = res.rowCount ? 'inserted' : 'deduped';
+  sc[key] = (sc[key] ?? 0) + 1;
 }
