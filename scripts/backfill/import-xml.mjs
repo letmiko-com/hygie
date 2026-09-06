@@ -20,6 +20,14 @@
 // full import of a newer file would duplicate every row of the first one (COPY has no
 // row-level dedup against health_xml rows).
 //
+// A window AFTER a type's channel cutover is read from minute_stats only (architecture
+// §2), so XML samples alone would leave it blank: --minute-types-to-stats derives the
+// minute_stats rows from the samples of this run with the read layer's own rule (one
+// winning source per UTC hour: source_priorities rank, else the watch, else the higher
+// total), each sample spread over the minutes it covers in proportion to time, never
+// overwriting a minute another channel already wrote. The rows are attributed to the
+// type's authoritative device (channel_cutovers) and to this import run.
+//
 // Growing the taxonomy: --only-missing-types replays the same file for the types that
 // have no XML rows yet for this subject, and only those. The set is computed from the
 // database, not typed by hand, which is what makes the replay idempotent: a type that
@@ -52,7 +60,7 @@ function usage(msg) {
   console.error(
     'usage: node scripts/backfill/import-xml.mjs <export.zip|export.xml> --subject <uuid> ' +
       '[--database-url <url>] [--only-types <hk1,hk2,...> | --only-missing-types] ' +
-      '[--from <iso> --to <iso>] [--skip-minute-types]'
+      '[--from <iso> --to <iso>] [--skip-minute-types | --minute-types-to-stats]'
   );
   process.exit(2);
 }
@@ -66,11 +74,13 @@ let onlyMissing = false; // fill onlyTypes from the database instead of the CLI
 let fromMs = null; // --from: inclusive lower bound on start instant
 let toMs = null; // --to: exclusive upper bound on start instant
 let skipMinuteTypes = false;
+let minuteTypesToStats = false;
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--subject') subjectId = args[++i];
   else if (args[i] === '--from') fromMs = Date.parse(args[++i] ?? '');
   else if (args[i] === '--to') toMs = Date.parse(args[++i] ?? '');
   else if (args[i] === '--skip-minute-types') skipMinuteTypes = true;
+  else if (args[i] === '--minute-types-to-stats') minuteTypesToStats = true;
   else if (args[i] === '--database-url') databaseUrl = args[++i];
   else if (args[i] === '--only-types') onlyTypes = new Set((args[++i] ?? '').split(',').filter(Boolean));
   else if (args[i] === '--only-missing-types') onlyMissing = true;
@@ -85,6 +95,8 @@ if ((fromMs !== null && !Number.isFinite(fromMs)) || (toMs !== null && !Number.i
 if ((fromMs === null) !== (toMs === null)) usage('--from and --to go together');
 if (fromMs !== null && toMs <= fromMs) usage('--to must be after --from');
 const windowed = fromMs !== null;
+if (skipMinuteTypes && minuteTypesToStats) usage('--skip-minute-types and --minute-types-to-stats are exclusive');
+if (minuteTypesToStats && !windowed) usage('--minute-types-to-stats needs a --from/--to window');
 const inWindow = (ms) => !windowed || (Number.isFinite(ms) && ms >= fromMs && ms < toMs);
 if (!input || !subjectId) usage();
 if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subjectId)) {
@@ -269,6 +281,69 @@ async function dedupFreshXmlAgainstHae(client, subjectId, runId, counts, nameOfT
   return dropped;
 }
 
+// --- minute regime from XML samples -----------------------------------------------------
+// Only the types with a channel cutover and only from that cutover on: before it the read
+// layer uses the XML rows themselves. Same winner rule as rollup_rebuild_range (0002).
+async function deriveMinuteStats(client, subjectId, runId, fromMs, toMs, counts, types) {
+  const minuteTypes = [...types.entries()].filter(([, t]) => t.minute);
+  for (const [hk, t] of minuteTypes) {
+    const res = await client.query(
+      `with bounds as (
+         select c.cutover_ts, c.device_id
+         from channel_cutovers c
+         where c.subject_id = $1 and c.type_id = $2
+       ),
+       raw as (
+         select o.source_id, o.start_ts, coalesce(o.end_ts, o.start_ts) as end_ts, o.value
+         from observations o, bounds b
+         where o.subject_id = $1 and o.type_id = $2 and o.import_run_id = $3
+           and o.value is not null
+           and o.start_ts >= greatest($4::timestamptz, b.cutover_ts) and o.start_ts < $5::timestamptz
+       ),
+       hourly as (
+         select date_trunc('hour', r.start_ts) as hour_utc, r.source_id, sum(r.value) as v
+         from raw r group by 1, 2
+       ),
+       winner as (
+         select distinct on (h.hour_utc) h.hour_utc, h.source_id
+         from hourly h
+         join sources s on s.id = h.source_id
+         left join source_priorities sp
+           on sp.subject_id = $1 and sp.type_id = $2 and sp.source_id = h.source_id
+         order by h.hour_utc, sp.rank asc nulls last, (s.name ~* 'watch') desc, h.v desc
+       ),
+       kept as (
+         select r.* from raw r
+         join winner w on w.hour_utc = date_trunc('hour', r.start_ts) and w.source_id = r.source_id
+       ),
+       spread as (
+         select k.source_id, m.minute_ts,
+                k.value * extract(epoch from (least(k.end_ts, m.minute_ts + interval '1 minute') - greatest(k.start_ts, m.minute_ts)))
+                        / extract(epoch from (k.end_ts - k.start_ts)) as v
+         from kept k
+         cross join lateral generate_series(
+           date_trunc('minute', k.start_ts),
+           date_trunc('minute', k.end_ts - interval '1 microsecond'),
+           interval '1 minute') as m(minute_ts)
+         where k.end_ts > k.start_ts
+         union all
+         select k.source_id, date_trunc('minute', k.start_ts), k.value
+         from kept k where k.end_ts <= k.start_ts
+       )
+       insert into minute_stats (subject_id, type_id, minute_ts, value, source_id, device_id, ingest_batch_id)
+       select $1, $2, sp.minute_ts, sum(sp.v), sp.source_id, b.device_id, $3
+       from spread sp, bounds b
+       group by sp.minute_ts, sp.source_id, b.device_id
+       having sum(sp.v) > 0
+       on conflict (subject_id, type_id, minute_ts) do nothing`,
+      [subjectId, t.id, runId, new Date(fromMs).toISOString(), new Date(toMs).toISOString()]
+    );
+    counts.minute_types_to_stats[hk] = res.rowCount ?? 0;
+  }
+  const total = Object.values(counts.minute_types_to_stats).reduce((a, b) => a + b, 0);
+  console.log(`minute_stats derived from the XML samples of this run: ${total} minutes over ${minuteTypes.length} types`);
+}
+
 // --- main ------------------------------------------------------------------------------
 
 const meta = new pg.Client({ connectionString: databaseUrl }); // run bookkeeping + lookups
@@ -325,8 +400,10 @@ try {
     // COPY has no row-level dedup: a full re-run of an imported file would
     // duplicate every row. Re-import is only allowed in --only-types mode,
     // the "taxonomy grew, pick up newly supported types" case, where the
-    // selected types are expected to have no existing rows.
-    if (onlyTypes === null) {
+    // selected types are expected to have no existing rows, and in windowed
+    // mode, where the operator owns the windows (each run records its own in
+    // import_runs.counts.window; two runs over the same window WOULD duplicate).
+    if (onlyTypes === null && !windowed) {
       console.error(
         `refusing to re-import: this file (sha256 ${checksum.toString('hex').slice(0, 12)}…) ` +
         `was already imported for this subject by run ${prior.rows[0].id} ` +
@@ -334,7 +411,10 @@ try {
       );
       process.exit(1);
     }
-    console.warn(`file already imported by run ${prior.rows[0].id}; --only-types re-import`);
+    console.warn(
+      `file already imported by run ${prior.rows[0].id}; ` +
+        (windowed ? 'windowed re-import, check that the window is new' : '--only-types re-import')
+    );
   }
   const stale = await meta.query(
     `select count(*)::int as n from import_runs
@@ -406,6 +486,7 @@ try {
     only_types: onlyTypes === null ? null : [...onlyTypes],
     window: windowed ? { from: new Date(fromMs).toISOString(), to: new Date(toMs).toISOString() } : null,
     skip_minute_types: skipMinuteTypes,
+    minute_types_to_stats: minuteTypesToStats ? {} : null,
     records_seen: 0,
     observations_inserted: 0,
     sleep_segments_inserted: 0,
@@ -630,6 +711,7 @@ try {
   // observation are dropped before commit, counted, never silent.
   const nameOfTypeId = new Map([...types.entries()].map(([name, t]) => [t.id, name]));
   const dedupDropped = await dedupFreshXmlAgainstHae(copy, subjectId, runId, counts, nameOfTypeId);
+  if (minuteTypesToStats) await deriveMinuteStats(copy, subjectId, runId, fromMs, toMs, counts, types);
   const sleepCopy = startCopy(
     copy,
     'copy sleep_segments (subject_id, source_id, stage, start_ts, end_ts, tz_offset_min) from stdin'
