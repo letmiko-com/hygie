@@ -23,9 +23,11 @@ project once it reaches the App Store. Presentation site: [hygie.letmiko.com](ht
 - **Health markers**: HRV, resting and walking heart rate, respiratory rate, SpO₂, wrist
   temperature, breathing disturbances, VO₂ max, weight and body composition, each read over the
   window and against the previous one. No composite score: the numbers, their trend, their curve.
-- **Series beyond samples**: GPS trace of every outdoor session drawn as a plain SVG (no tile
-  server sees your positions), activity rings on the dashboard, electrocardiograms on standard
-  paper with Apple's classification, audiograms on a clinical chart. Pushed by Hygie Sync 1.1.
+- **Series beyond samples**: GPS trace of every outdoor session over OpenStreetMap tiles that
+  this server fetches and caches itself (the browser never talks to the tile provider, and
+  `HYGIE_TILE_URL=off` gives a plain trace), activity rings on the dashboard, electrocardiograms
+  on standard paper with Apple's classification, audiograms on a clinical chart. Pushed by
+  Hygie Sync 1.1.
 - **Records replayed against the full history**: a displayed record is a proven one, with the
   mark it replaced.
 - **Explorer and full metrics catalog**: up to six metrics on one chart; every metric type present
