@@ -179,6 +179,8 @@ export const en = {
     sleep: 'Sleep',
     nutrition: 'Nutrition and hydration',
     audio: 'Sound exposure',
+    symptoms: 'Symptoms',
+    cycle: 'Cycle and reproductive health',
     other: 'Other',
   } as Record<string, string>,
   aggregations: {
