@@ -276,6 +276,8 @@ export interface NormalizeCounts {
   activity_summaries?: MetricCounters;
   ecgs?: MetricCounters;
   audiograms?: MetricCounters;
+  heartbeat_series?: MetricCounters;
+  state_of_mind?: MetricCounters;
   /** Invalidation ranges queued for the rollup builder (see src/lib/rollups.ts). */
   dirty_ranges?: number;
 }
