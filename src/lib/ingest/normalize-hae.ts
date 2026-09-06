@@ -271,6 +271,11 @@ type MetricCounters = Record<string, number>;
 export interface NormalizeCounts {
   metrics: Record<string, MetricCounters>;
   workouts?: MetricCounters;
+  /** Native-channel series sections (docs/native-format.md). */
+  routes?: MetricCounters;
+  activity_summaries?: MetricCounters;
+  ecgs?: MetricCounters;
+  audiograms?: MetricCounters;
   /** Invalidation ranges queued for the rollup builder (see src/lib/rollups.ts). */
   dirty_ranges?: number;
 }
@@ -1007,7 +1012,7 @@ async function normalizeWorkout(ctx: Ctx, w: HaeWorkout): Promise<void> {
 
   // Inline GPS route -> workout_route_points (speed observed in m/s).
   const route = Array.isArray(w.route) ? w.route : [];
-  const rows: Array<[Date, number, number, number | null, number | null, number | null, number | null]> = [];
+  const rows: RoutePointRow[] = [];
   for (const p of route) {
     const ts = typeof p.timestamp === 'string' ? parseHaeDate(p.timestamp) : null;
     if (!ts || !isFiniteNumber(p.latitude) || !isFiniteNumber(p.longitude)) {
@@ -1024,6 +1029,26 @@ async function normalizeWorkout(ctx: Ctx, w: HaeWorkout): Promise<void> {
       isFiniteNumber(p.horizontalAccuracy) ? p.horizontalAccuracy : null,
     ]);
   }
+  const res = await insertRoutePoints(ctx.client, workoutId, rows);
+  wc.route_points_inserted = (wc.route_points_inserted ?? 0) + res.inserted;
+  wc.route_points_duplicate = (wc.route_points_duplicate ?? 0) + res.duplicate;
+}
+
+/** One GPS point ready for workout_route_points: ts, lat, lon, altitude_m, speed_ms, course_deg, h_acc_m. */
+export type RoutePointRow = [Date, number, number, number | null, number | null, number | null, number | null];
+
+/**
+ * Appends route points to a workout, whatever the channel (HAE inline route,
+ * native HKWorkoutRoute, GPX of an export). Identity is (workout, timestamp):
+ * a replayed route never duplicates a point.
+ */
+export async function insertRoutePoints(
+  client: pg.PoolClient,
+  workoutId: string,
+  rows: RoutePointRow[]
+): Promise<{ inserted: number; duplicate: number }> {
+  let inserted = 0;
+  let duplicate = 0;
   const CHUNK = 400;
   for (let i = 0; i < rows.length; i += CHUNK) {
     const slice = rows.slice(i, i + CHUNK);
@@ -1033,17 +1058,17 @@ async function normalizeWorkout(ctx: Ctx, w: HaeWorkout): Promise<void> {
       const b = 1 + j * 7;
       return `($1, $${b + 1}::timestamptz, $${b + 2}::float8, $${b + 3}::float8, $${b + 4}::float8, $${b + 5}::float8, $${b + 6}::float8, $${b + 7}::float8)`;
     });
-    const res = await ctx.client.query(
+    const res = await client.query(
       `insert into workout_route_points
          (workout_id, ts, lat, lon, altitude_m, speed_ms, course_deg, h_acc_m)
        values ${tuples.join(',')}
        on conflict (workout_id, ts) do nothing`,
       params
     );
-    wc.route_points_inserted = (wc.route_points_inserted ?? 0) + (res.rowCount ?? 0);
-    wc.route_points_duplicate =
-      (wc.route_points_duplicate ?? 0) + slice.length - (res.rowCount ?? 0);
+    inserted += res.rowCount ?? 0;
+    duplicate += slice.length - (res.rowCount ?? 0);
   }
+  return { inserted, duplicate };
 }
 
 // ---------------------------------------------------------------------------

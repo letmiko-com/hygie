@@ -126,8 +126,87 @@ arrives through `samples` like any other reading, and the workout detail
 screen falls back to `observations` when a workout has no
 `workout_points` rows.
 
-## Explicitly out of scope in v1 (v2 candidates)
+## Series sections (additive, since Hygie Sync 1.1)
 
-ECGs (`HKElectrocardiogram`, needs its own table and screen), workout GPS
-routes (`HKWorkoutRoute`), activity summaries (rings), audiograms,
-clinical records.
+Four optional top-level arrays extend the format without a version bump: a
+1.0 app never sends them, a server that predates them ignores unknown keys
+(the shape check only requires that a present key be an array). Timestamps
+follow the same ISO 8601 + offset rule as everything else. Each section has
+its own counters block in `ingest_batches.counts` (`routes`,
+`activity_summaries`, `ecgs`, `audiograms`).
+
+### routes — GPS track of a workout (`HKWorkoutRoute`)
+
+```json
+{ "workout_uuid": "5D2E…", "uuid": "9A1C…", "source": "Apple Watch Ultra",
+  "points": [ { "t": "2026-09-06T08:12:03.000+02:00", "lat": 43.712, "lon": 3.914,
+                "alt": 52.1, "speed": 3.2, "course": 181.0, "hacc": 4.5 } ] }
+```
+
+`workout_uuid` is the HealthKit uuid of the workout, which must already be
+known under namespace `healthkit` for the device's subject (send the
+`workouts` entry in the same or an earlier batch; an unknown workout is
+counted `workout_unknown` and the route dropped, the app re-sends it later).
+`alt` in metres, `speed` in m/s, `course` in degrees, `hacc` horizontal
+accuracy in metres; all optional. Points land in `workout_route_points`, the
+same table the HAE inline route used; identity is (workout, timestamp), so a
+re-sent route never duplicates a point. Bound: 250 000 points per route.
+
+The app sends a route once its workout has been acknowledged, and keeps a
+workout in a pending list until a route was found or seven days passed: the
+watch often hands the route over minutes to hours after the workout itself.
+
+### activity_summaries — the rings (`HKActivitySummary`)
+
+```json
+{ "day": "2026-09-06", "move_mode": "energy",
+  "move_kj": 1854.3, "move_goal_kj": 2510.4,
+  "move_time_min": null, "move_time_goal_min": null,
+  "exercise_min": 34, "exercise_goal_min": 30,
+  "stand_h": 9, "stand_goal_h": 12, "paused": false }
+```
+
+One entry per calendar day of the device; `move_mode` is `energy` (kJ, like
+workouts) or `time` (minutes) depending on the watch setting. The app
+re-emits the last 7 days on every sync (goals change, the current day
+evolves); the server upserts into `activity_summaries` and only registers
+real changes (`inserted` / `updated` / `unchanged`).
+
+### ecgs — electrocardiograms (`HKElectrocardiogram`)
+
+```json
+{ "uuid": "7B3F…", "start": "…", "end": "…", "source": "Apple Watch Ultra",
+  "classification": "sinus_rhythm", "symptoms": "none", "avg_hr_bpm": 62,
+  "sampling_hz": 512.0, "algorithm_version": 2,
+  "lead": "apple_watch_similar_to_lead_i",
+  "voltages_uv": [ 12, 15, 19, … ] }
+```
+
+`classification` is the HealthKit enum as a snake_case token (`not_set`,
+`sinus_rhythm`, `atrial_fibrillation`, `inconclusive_low_heart_rate`,
+`inconclusive_high_heart_rate`, `inconclusive_poor_reading`,
+`inconclusive_other`, `unrecognized`; any other lowercase token is stored as
+is so a future value is never lost); `symptoms` is `not_set`, `none` or
+`present`. Voltages are integer microvolts at `sampling_hz`, at most 60 000
+per recording; the server clamps to int16. Identity: uuid per subject, then
+(source, start second) against uuid-less rows imported from the CSV files of
+an export. Table `ecg_recordings`.
+
+### audiograms — hearing tests (`HKAudiogramSample`)
+
+```json
+{ "uuid": "C0DE…", "start": "…", "end": "…", "source": "Health",
+  "points": [ { "hz": 1000, "side": "left", "db_hl": 20, "masked": false,
+                "conduction": "air", "clamped": null } ] }
+```
+
+One point per (side, frequency, masked); `db_hl` in dB HL, `clamped` is
+`low` or `high` when the value sits on a bound of the device's measurable
+range. Same identity discipline as ECGs. Tables `audiograms` and
+`audiogram_points`. At most 64 points per audiogram.
+
+## Explicitly out of scope (still)
+
+Heartbeat series (`HKHeartbeatSeriesSample`), state of mind, scored
+assessments (GAD-7, PHQ-9), vision prescriptions, medications, clinical
+records (entitlement gated).
