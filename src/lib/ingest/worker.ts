@@ -143,23 +143,35 @@ async function releaseLease(batchId: string, workerId: string): Promise<void> {
   );
 }
 
+/** Postgres undefined_table: the release runs ahead of its migration. */
+const UNDEFINED_TABLE = '42P01';
+const SCHEMA_PENDING_RETRY_S = 600;
+
 async function markFailure(
   batch: ClaimedBatch,
   workerId: string,
   err: unknown
 ): Promise<void> {
-  const code = err instanceof BatchValidationError ? err.code : 'step_failed';
+  // Migrations never run at boot (docs/architecture.md), so a batch can
+  // reach a table its migration has not created yet. That is the operator's
+  // pending step, not a bad batch: park it, retry every ten minutes without
+  // spending an attempt, and let the operator see it waiting on the sync
+  // screen. The raw body stays on disk meanwhile.
+  const schemaPending =
+    typeof err === 'object' && err !== null && (err as { code?: unknown }).code === UNDEFINED_TABLE;
+  const code = err instanceof BatchValidationError ? err.code : schemaPending ? 'schema_pending' : 'step_failed';
   // Redacted error: code, message, step. Never payload content, never values.
   const message = err instanceof Error ? err.message.slice(0, 500) : 'unknown error';
   const permanent =
-    batch.attempt_count >= maxAttempts() || err instanceof BatchValidationError;
-  const backoff = backoffSeconds(batch.attempt_count);
+    !schemaPending && (batch.attempt_count >= maxAttempts() || err instanceof BatchValidationError);
+  const backoff = schemaPending ? SCHEMA_PENDING_RETRY_S : backoffSeconds(batch.attempt_count);
   await getDb().query(
     `update ingest_batches
      set error = $2,
          status = case when $3 then 'failed' else status end,
          finished_at = case when $3 then now() else finished_at end,
          status_updated_at = now(),
+         attempt_count = case when $6 then greatest(attempt_count - 1, 0) else attempt_count end,
          locked_by = null,
          locked_until = case when $3 then null else now() + make_interval(secs => $4) end
      where id = $1 and locked_by = $5`,
@@ -169,6 +181,7 @@ async function markFailure(
       permanent,
       backoff,
       workerId,
+      schemaPending,
     ]
   );
   console.error(
