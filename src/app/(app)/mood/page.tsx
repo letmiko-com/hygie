@@ -146,6 +146,7 @@ export default async function MoodPage({ searchParams }: { searchParams: Promise
   const daily = dayKeys.map((k) => byDay.get(k)?.dailyMood ?? null);
   const momentary = dayKeys.map((k) => byDay.get(k)?.momentary ?? null);
 
+  const windowEntries = days.reduce((a, d) => a + d.entries, 0);
   const hasHistory = totals.entries > 0;
   const labelTotal = labels.reduce((a, t) => a + t.count, 0);
   const associationTotal = associations.reduce((a, t) => a + t.count, 0);
@@ -190,7 +191,7 @@ export default async function MoodPage({ searchParams }: { searchParams: Promise
               value={fmtValence(mean(momentary))}
               color={mean(momentary) === null ? undefined : valenceColor(mean(momentary) as number)}
             />
-            <StatTile label={m.mood.entries} value={fmtInt(entries.length, locale)} />
+            <StatTile label={m.mood.entries} value={fmtInt(windowEntries, locale)} />
           </div>
 
           <Panel>
@@ -200,7 +201,14 @@ export default async function MoodPage({ searchParams }: { searchParams: Promise
                 { data: daily, color: 'var(--data-power)', label: m.mood.dailyMood, connect: true },
                 { data: momentary, color: 'var(--data-distance)', label: m.mood.momentary, connect: true, dashed: true },
               ]}
-              xLabels={dayAxisLabels(dayKeys, locale, 4, { day: 'numeric', month: 'short' })}
+              xLabels={dayAxisLabels(
+                dayKeys,
+                locale,
+                4,
+                dayKeys.length > 366
+                  ? { month: 'short', year: '2-digit' }
+                  : { day: 'numeric', month: 'short' }
+              )}
               ariaLabel={`${m.mood.trend} — ${m.mood.dailyMood}, ${m.mood.momentary}`}
               emptyLabel={m.mood.empty}
               bounds={{ min: -1, max: 1 }}
@@ -233,7 +241,11 @@ export default async function MoodPage({ searchParams }: { searchParams: Promise
           )}
 
           <Panel>
-            <PanelLabel>{m.mood.entriesCount(entries.length)}</PanelLabel>
+            <PanelLabel>
+              {entries.length < windowEntries
+                ? m.mood.entriesShown(entries.length, windowEntries)
+                : m.mood.entriesCount(entries.length)}
+            </PanelLabel>
             {entries.length === 0 ? (
               <EmptyState icon="mood" title={m.mood.empty} hint={m.mood.emptyHint} />
             ) : (
