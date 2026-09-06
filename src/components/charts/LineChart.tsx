@@ -136,6 +136,7 @@ export function LineChart({
   ariaLabel,
   emptyLabel,
   drill,
+  bounds,
 }: {
   series: LineSeries[];
   xLabels?: string[];
@@ -144,6 +145,12 @@ export function LineChart({
   yFormat?: (v: number, digits: number) => string;
   gridLines?: number;
   ariaLabel: string;
+  /**
+   * Hard limits of the quantity itself, when it has any (a valence lives in
+   * [-1, 1], a percentage in [0, 100]). Padding never crosses them, so the
+   * axis cannot graduate a value the measure cannot take.
+   */
+  bounds?: { min?: number; max?: number };
   /** Rendered instead of an empty frame when nothing can be plotted. */
   emptyLabel?: string;
   /**
@@ -191,6 +198,8 @@ export function LineChart({
   // graduated "-620", which is not a number of steps.
   min = min >= 0 ? Math.max(0, min - pad) : min - pad;
   max += pad;
+  if (bounds?.min !== undefined) min = Math.max(bounds.min, min);
+  if (bounds?.max !== undefined) max = Math.min(bounds.max, max);
 
   const n = Math.max(...rolled.map((s) => s.data.length));
   const x = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * 100);

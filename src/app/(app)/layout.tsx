@@ -41,6 +41,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       items: [
         { href: '/sport', icon: 'exercise', label: m.nav.sport },
         { href: '/sleep', icon: 'bedtime', label: m.nav.sleep },
+        { href: '/mood', icon: 'mood', label: m.nav.mood },
         { href: '/markers', icon: 'ecg', label: m.nav.markers },
         { href: '/hrv', icon: 'monitor_heart', label: m.nav.hrv },
         { href: '/ecg', icon: 'cardiology', label: m.nav.ecg },
