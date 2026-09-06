@@ -103,7 +103,14 @@ function run(cmd, args) {
  */
 export async function exportFiles(input) {
   if (input.endsWith('.zip')) {
-    const listing = (await run('unzip', ['-Z1', input])).toString('utf8').split('\n').filter(Boolean);
+    // `unzip -l` rather than `-Z1`: the container's unzip is BusyBox's, which
+    // has no zipinfo mode. Both flavours print "Length Date Time Name" rows;
+    // header, separator and totals lines have no fourth column.
+    const listing = (await run('unzip', ['-l', input]))
+      .toString('utf8')
+      .split('\n')
+      .map((l) => /^\s*\d+\s+\S+\s+\S+\s+(.+?)\s*$/.exec(l)?.[1])
+      .filter((name) => name !== undefined);
     return {
       list: (folder) => listing.filter((p) => p.includes(`/${folder}/`) && !p.endsWith('/')),
       read: async (path) => (await run('unzip', ['-p', input, path])).toString('utf8'),

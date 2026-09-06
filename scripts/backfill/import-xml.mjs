@@ -12,6 +12,14 @@
 // per type in import_runs.counts. Records nested inside Correlation or Workout elements
 // are duplicates of top-level records (per the export DTD) and are skipped.
 //
+// Filling a gap: --from / --to (ISO 8601 with offset, --to exclusive) import only the
+// records, sleep stages and workouts whose start falls in the window, from a NEWER export
+// than the one already imported. The operator picks the window from the database (last
+// imported instant on each channel), --skip-minute-types leaves the minute-regime types
+// out when their window is already carried by minute_stats. Without a window a second
+// full import of a newer file would duplicate every row of the first one (COPY has no
+// row-level dedup against health_xml rows).
+//
 // Growing the taxonomy: --only-missing-types replays the same file for the types that
 // have no XML rows yet for this subject, and only those. The set is computed from the
 // database, not typed by hand, which is what makes the replay idempotent: a type that
@@ -43,7 +51,8 @@ function usage(msg) {
   if (msg) console.error(msg);
   console.error(
     'usage: node scripts/backfill/import-xml.mjs <export.zip|export.xml> --subject <uuid> ' +
-      '[--database-url <url>] [--only-types <hk1,hk2,...> | --only-missing-types]'
+      '[--database-url <url>] [--only-types <hk1,hk2,...> | --only-missing-types] ' +
+      '[--from <iso> --to <iso>] [--skip-minute-types]'
   );
   process.exit(2);
 }
@@ -54,8 +63,14 @@ let subjectId = null;
 let databaseUrl = process.env.DATABASE_URL;
 let onlyTypes = null; // Set<hk_identifier> | null
 let onlyMissing = false; // fill onlyTypes from the database instead of the CLI
+let fromMs = null; // --from: inclusive lower bound on start instant
+let toMs = null; // --to: exclusive upper bound on start instant
+let skipMinuteTypes = false;
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--subject') subjectId = args[++i];
+  else if (args[i] === '--from') fromMs = Date.parse(args[++i] ?? '');
+  else if (args[i] === '--to') toMs = Date.parse(args[++i] ?? '');
+  else if (args[i] === '--skip-minute-types') skipMinuteTypes = true;
   else if (args[i] === '--database-url') databaseUrl = args[++i];
   else if (args[i] === '--only-types') onlyTypes = new Set((args[++i] ?? '').split(',').filter(Boolean));
   else if (args[i] === '--only-missing-types') onlyMissing = true;
@@ -64,6 +79,13 @@ for (let i = 0; i < args.length; i++) {
 }
 if (onlyTypes !== null && onlyTypes.size === 0) usage('--only-types needs a comma-separated list');
 if (onlyTypes !== null && onlyMissing) usage('--only-types and --only-missing-types are exclusive');
+if ((fromMs !== null && !Number.isFinite(fromMs)) || (toMs !== null && !Number.isFinite(toMs))) {
+  usage('--from and --to must be ISO 8601 instants with an offset, e.g. 2026-08-11T16:48:06+02:00');
+}
+if ((fromMs === null) !== (toMs === null)) usage('--from and --to go together');
+if (fromMs !== null && toMs <= fromMs) usage('--to must be after --from');
+const windowed = fromMs !== null;
+const inWindow = (ms) => !windowed || (Number.isFinite(ms) && ms >= fromMs && ms < toMs);
 if (!input || !subjectId) usage();
 if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subjectId)) {
   usage('--subject must be a uuid');
@@ -331,9 +353,12 @@ try {
   const taxonomy = JSON.parse(await readFile(join(scriptDir, '..', '..', 'db', 'taxonomy.json'), 'utf8'));
   const xmlUnitOf = new Map(taxonomy.metric_types.filter((t) => t.xml).map((t) => [t.hk_identifier, t.xml]));
 
-  const types = new Map(); // hk_identifier -> {id, kind, supported, scale}
-  for (const r of (await meta.query('select id, hk_identifier, kind, supported, quantize_scale from metric_types')).rows) {
-    types.set(r.hk_identifier, { id: r.id, kind: r.kind, supported: r.supported, scale: r.quantize_scale });
+  const types = new Map(); // hk_identifier -> {id, kind, supported, scale, minute}
+  for (const r of (await meta.query('select id, hk_identifier, kind, supported, quantize_scale, hae_regime from metric_types')).rows) {
+    types.set(r.hk_identifier, {
+      id: r.id, kind: r.kind, supported: r.supported, scale: r.quantize_scale,
+      minute: r.hae_regime === 'minute_cumulative',
+    });
   }
   if (types.size === 0) throw new Error('metric_types is empty; run the taxonomy seed first');
 
@@ -374,12 +399,16 @@ try {
     // What this run was allowed to write, so an operator reading import_runs later can
     // tell a full backfill from a taxonomy catch-up without guessing from the numbers.
     only_types: onlyTypes === null ? null : [...onlyTypes],
+    window: windowed ? { from: new Date(fromMs).toISOString(), to: new Date(toMs).toISOString() } : null,
+    skip_minute_types: skipMinuteTypes,
     records_seen: 0,
     observations_inserted: 0,
     sleep_segments_inserted: 0,
     workouts_inserted: 0,
     skipped: {
       not_selected: {},            // --only-types mode: supported but not in the list
+      outside_window: {},          // --from/--to mode: start instant outside the window
+      minute_type: {},             // --skip-minute-types: minute-regime type left out
       unsupported_type: {},        // allowlist: supported = false
       unknown_type: {},            // absent from metric_types
       nested_duplicate: {},        // Record inside Correlation/Workout (dup per DTD)
@@ -432,9 +461,11 @@ try {
     if (type === undefined) return bump(counts.skipped.unknown_type, hk);
     if (!type.supported) return bump(counts.skipped.unsupported_type, hk);
     if (onlyTypes !== null && !onlyTypes.has(hk)) return bump(counts.skipped.not_selected, hk);
+    if (skipMinuteTypes && type.minute) return bump(counts.skipped.minute_type, hk);
 
     const startDate = attr(line, 'startDate');
     const endDate = attr(line, 'endDate');
+    if (windowed && !inWindow(parseTs(startDate))) return bump(counts.skipped.outside_window, hk);
     const tz = tzOffsetMin(startDate);
     if (tz === null || tz < -900 || tz > 900) return bump(counts.skipped.invalid, hk);
     const source = await sourceIdOf(normSource(attr(line, 'sourceName') ?? '?'));
@@ -483,6 +514,7 @@ try {
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || tz === null) {
       return bump(counts.skipped.invalid, 'Workout');
     }
+    if (windowed && !inWindow(start)) return bump(counts.skipped.outside_window, 'Workout');
     let durationS = null;
     if (w.duration !== null) {
       const d = Number(w.duration);
