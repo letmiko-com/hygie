@@ -312,9 +312,13 @@ try {
   console.log('computing sha256 of input file');
   const checksum = await sha256File(input);
 
+  // Only this importer's runs count: import-series.mjs records its own runs on
+  // the same archive (importer_version 'series-…') and reads none of the rows
+  // COPY would duplicate.
   const prior = await meta.query(
     `select id, finished_at from import_runs
-     where subject_id = $1 and source_sha256 = $2 and status = 'done'`,
+     where subject_id = $1 and source_sha256 = $2 and status = 'done'
+       and importer_version not like 'series-%'`,
     [subjectId, checksum]
   );
   if (prior.rowCount > 0) {
@@ -334,7 +338,8 @@ try {
   }
   const stale = await meta.query(
     `select count(*)::int as n from import_runs
-     where subject_id = $1 and source_sha256 = $2 and status = 'running'`,
+     where subject_id = $1 and source_sha256 = $2 and status = 'running'
+       and importer_version not like 'series-%'`,
     [subjectId, checksum]
   );
   if (stale.rows[0].n > 0) {
