@@ -142,6 +142,23 @@ secondary indexes → first full backup → then enable PITR.
   recorded in the taxonomy but not ingested automatically.
 - AGPL: the UI carries a "Source" link.
 
+### Magic link hardening (pentest 2026-08-30)
+
+- **No existence oracle on the native endpoint**: the `signIn` callback lets every
+  request through at the `verificationRequest` step, so `/api/auth/signin/nodemailer`
+  redirects to `/login/sent` for known and unknown addresses alike; the gate moved into
+  `sendVerificationRequest`, which sends nothing for an unknown or disabled address (the
+  token row expires unused, purged by the worker's maintenance). At consumption the
+  callback still denies unknown addresses: no implicit signup.
+- **One email per address per minute**: `sendVerificationRequest` counts the other live
+  tokens of the address younger than `MAGIC_LINK_COOLDOWN_S` and sends nothing when one
+  exists (@auth/core inserts the current token in parallel with the send, so it is
+  excluded by its hashed form). The Cloudflare per-IP rule (Free plan: one rule, 100
+  requests per 10 s, static assets excluded) covers the volume side.
+- **Anchored proxy exclusions**: `/login`, `/api/auth`, `/api/v1/ingest`, `/_next`,
+  `/fonts` and the three static files are exempt only as exact prefixes followed by a
+  slash or the end of the path.
+
 ## 6. Backups
 
 Railway volume snapshots + Postgres PITR (first line of defense) AND a scheduled encrypted

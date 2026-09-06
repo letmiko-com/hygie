@@ -36,5 +36,10 @@ export const config = {
   // gating them strips the login page of its typography and icons) and the
   // favicon (app/icon.svg carries no data, and gating it left the sign-in tab
   // with the browser's blank icon).
-  matcher: ['/((?!login|api/auth|api/v1/ingest|_next|fonts|icon\\.svg|favicon\\.ico|robots\\.txt).*)'],
+  // Every exclusion is anchored (pentest 2026-08-30, F3): `login` matched
+  // `/loginfoo` too, `icon\.svg` matched `/icon.svg.bak`. A path is only
+  // exempt when it IS the prefix or continues with a slash.
+  matcher: [
+    '/((?!login(?:/|$)|api/auth(?:/|$)|api/v1/ingest(?:/|$)|_next(?:/|$)|fonts(?:/|$)|icon\\.svg$|favicon\\.ico$|robots\\.txt$).*)',
+  ],
 };
