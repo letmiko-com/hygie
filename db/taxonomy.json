@@ -1,5 +1,5 @@
 {
-  "comment": "Seed for units/metric_types/metric_category_values. 97 types were inventoried from a real export.xml (2026-08-04: type names, units and category values from the file itself); 94 more were added on 2026-09-06 from the iOS 26.5 SDK (every HKQuantityType and HKCategoryType identifier the native channel can read), with HealthKit's own value enums as their category contracts and the unit the export is expected to carry as xml.unit (unverified against a file: a mismatch is counted by the importer, never converted). xml.unit is the unit expected in export.xml, xml.factor the multiplier to the canonical unit (percent types are 0-1 fractions in the XML; energies are kcal). hae_regime describes the Health Auto Export channel and stays \"unsupported\" for the types HAE has not been measured to send (docs/hae-mapping.md is the contract, 31 verified entries): those are XML-only, which does not stop them from being ingested. Aggregation choices and their rationale: db/taxonomy.md.",
+  "comment": "Seed for units/metric_types/metric_category_values. 97 types were inventoried from a real export.xml (2026-08-04: type names, units and category values from the file itself); 93 more were added on 2026-09-06 from the iOS 26.5 SDK (every HKQuantityType and HKCategoryType identifier the native channel can read), with HealthKit's own value enums as their category contracts and the unit the export is expected to carry as xml.unit (unverified against a file: a mismatch is counted by the importer, never converted). xml.unit is the unit expected in export.xml, xml.factor the multiplier to the canonical unit (percent types are 0-1 fractions in the XML; energies are kcal). hae_regime describes the Health Auto Export channel and stays \"unsupported\" for the types HAE has not been measured to send (docs/hae-mapping.md is the contract, 31 verified entries): those are XML-only, which does not stop them from being ingested. Aggregation choices and their rationale: db/taxonomy.md.",
   "metric_types": [
     {
       "hk_identifier": "HKQuantityTypeIdentifierHeartRate",
@@ -2186,16 +2186,6 @@
       "supported": true
     },
     {
-      "hk_identifier": "HKCategoryTypeIdentifierEnvironmentalAudioExposureEvent",
-      "kind": "category",
-      "hae_name": null,
-      "hae_regime": "unsupported",
-      "aggregation": "none",
-      "canonical_unit": null,
-      "quantize_scale": null,
-      "supported": true
-    },
-    {
       "hk_identifier": "HKCategoryTypeIdentifierIrregularHeartRhythmEvent",
       "kind": "category",
       "hae_name": null,
@@ -3528,13 +3518,6 @@
         "raw_value": 1,
         "slug": "low_fitness",
         "hk_value": "HKCategoryValueLowCardioFitnessEventLowFitness"
-      }
-    ],
-    "HKCategoryTypeIdentifierEnvironmentalAudioExposureEvent": [
-      {
-        "raw_value": 1,
-        "slug": "momentary_limit",
-        "hk_value": "HKCategoryValueEnvironmentalAudioExposureEventMomentaryLimit"
       }
     ],
     "HKCategoryTypeIdentifierIrregularHeartRhythmEvent": [
