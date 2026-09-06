@@ -208,7 +208,7 @@ try {
          select $1, null, $2, $3::timestamptz, $4::timestamptz, $5
          where not exists (
            select 1 from audiograms
-           where subject_id = $1 and source_id = $2
+           where subject_id = $1
              and date_trunc('second', start_ts at time zone 'UTC') = date_trunc('second', $3::timestamptz at time zone 'UTC')
          )
          returning id`,
@@ -365,8 +365,10 @@ try {
             avg_hr_bpm, sampling_hz, algorithm_version, lead, n_samples, voltages_uv)
          select $1, null, $2, $3::timestamptz, $4::timestamptz, $5, $6, $7, null, $8, $9, $10, $11, $12::smallint[]
          where not exists (
+           -- Same subject, same second: the same recording whatever the source
+           -- name (the CSV names the hardware model, HealthKit the user's watch).
            select 1 from ecg_recordings
-           where subject_id = $1 and source_id = $2
+           where subject_id = $1
              and date_trunc('second', start_ts at time zone 'UTC') = date_trunc('second', $3::timestamptz at time zone 'UTC')
          )`,
         [
