@@ -3,6 +3,7 @@
 // like every other query; a missing day is a missing day, never zeros.
 import { getDb } from '@/lib/db';
 import type { SubjectContext } from './context';
+import { untilMigrated } from './optional';
 
 export interface RingsDay {
   day: string;
@@ -38,7 +39,7 @@ export async function activityRings(
   fromDay: string,
   toDayIncl: string
 ): Promise<RingsDay[]> {
-  const { rows } = await getDb().query<Row>(
+  const { rows } = await untilMigrated(() => getDb().query<Row>(
     `select to_char(day, 'YYYY-MM-DD') as day, move_mode, move_kj, move_goal_kj,
             move_time_min, move_time_goal_min, exercise_min, exercise_goal_min,
             stand_h, stand_goal_h, paused
@@ -46,7 +47,7 @@ export async function activityRings(
      where subject_id = $1 and day between $2::date and $3::date
      order by day`,
     [ctx.subjectId, fromDay, toDayIncl]
-  );
+  ), { rows: [] as Row[] });
   return rows.map((r) => ({
     day: r.day,
     moveMode: r.move_mode,
