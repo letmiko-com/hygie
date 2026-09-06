@@ -7,6 +7,7 @@
 //   consumed by the POST that page submits to /api/auth/callback/nodemailer
 //   (@auth/core reads token/email from the query string; CSRF is only enforced
 //   for credentials providers, verified against @auth/core 0.41 source).
+import { createHash } from 'node:crypto';
 import NextAuth from 'next-auth';
 import Nodemailer from 'next-auth/providers/nodemailer';
 import { hygieAdapter } from '@/lib/auth/adapter';
@@ -15,6 +16,12 @@ import { getDb } from '@/lib/db';
 import { sessionCookieName, sessionCookieSecure } from '@/lib/auth/session';
 
 export const MAGIC_LINK_MAX_AGE_S = 15 * 60; // « valable 15 minutes » (maquette Login)
+/**
+ * One email per address per minute (pentest 2026-08-30, F1): Auth.js inserts
+ * the token before asking us to send, so a second token younger than this for
+ * the same address is a flood, and nothing is sent for it.
+ */
+export const MAGIC_LINK_COOLDOWN_S = 60;
 
 // Deterministic origin: HYGIE_BASE_URL is the instance's canonical URL
 // (.env.example), let Auth.js use it instead of sniffing Host headers.
@@ -49,7 +56,34 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // provider factory only insists that `server` exists at module load.
       server: { jsonTransport: true },
       maxAge: MAGIC_LINK_MAX_AGE_S,
-      async sendVerificationRequest({ identifier, url }) {
+      async sendVerificationRequest({ identifier, url, token }) {
+        // Two gates before any email leaves, both silent (pentest 2026-08-30):
+        // - F2: an unknown or disabled address gets no email. The signIn
+        //   callback lets the request through so the native endpoint answers
+        //   /login/sent for everyone; the token row expires unused and the
+        //   worker's maintenance purges it.
+        // - F1: another token younger than MAGIC_LINK_COOLDOWN_S for the same
+        //   address means a flood. @auth/core inserts this request's token IN
+        //   PARALLEL with this call (Promise.all in send-token.js), so it may
+        //   or may not be there yet: it is excluded by its stored form,
+        //   sha256(token + secret) hex, exactly as @auth/core hashes it.
+        const current = createHash('sha256')
+          .update(`${token}${process.env.AUTH_SECRET ?? ''}`)
+          .digest('hex');
+        const { rows } = await getDb().query<{ known: boolean; recent: number }>(
+          `select exists (select 1 from users where email = $1 and disabled_at is null) as known,
+                  (select count(*)::int from auth_verification_tokens
+                    where identifier = $1 and token <> $3
+                      and expires_at > now() + ($2::int * interval '1 second')) as recent`,
+          [identifier, MAGIC_LINK_MAX_AGE_S - MAGIC_LINK_COOLDOWN_S, current]
+        );
+        const gate = rows[0];
+        if (!gate?.known) return;
+        if (gate.recent > 0) {
+          // Count only: no address in the logs.
+          console.warn('[auth] magic link throttled: a link was sent to this address less than a minute ago');
+          return;
+        }
         // `url` is the direct consuming callback; the email must NOT contain
         // it. Point to the confirmation page instead, same query string
         // (token, email, callbackUrl): mailbox link scanners GET that page
@@ -74,9 +108,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     // Defense in depth against implicit signup: runs both when sending the
-    // link and when consuming it. Unknown or disabled email => denied, so
-    // @auth/core never reaches its createUser branch.
-    async signIn({ user }) {
+    // link and when consuming it. At the REQUEST step the answer must not
+    // depend on the account (pentest F2: a denial here redirected unknown
+    // addresses to /login?error=AccessDenied, a working existence oracle on
+    // the native endpoint); the gate is in sendVerificationRequest, which
+    // sends nothing for an unknown address. At CONSUMPTION the check stands:
+    // unknown or disabled email => denied, so @auth/core never reaches its
+    // createUser branch.
+    async signIn({ user, email }) {
+      if (email?.verificationRequest) return true;
       if (!user?.email) return false;
       const { rows } = await getDb().query(
         'select 1 from users where email = $1 and disabled_at is null',
