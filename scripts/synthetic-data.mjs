@@ -59,6 +59,56 @@ const gauss = (mean, sd) => {
 };
 const pick = (xs) => xs[Math.floor(rand() * xs.length)];
 
+// --- heartbeat series ----------------------------------------------------------
+// A minute of beats with a respiratory sine on top of the mean interval, the
+// shape a watch records at rest. MIRROR of src/lib/hrv.ts: the derived metrics
+// are recomputed here because this generator is plain .mjs and the library is
+// TypeScript. Keep the two in step — the rules are stated once, in hrv.ts.
+function beatIntervals(meanRr, amplitude, beats, gapChance) {
+  const intervals = [];
+  let t = 0;
+  // Two components, because the two metrics read different things: a fast
+  // respiratory wave (~4 s) is what RMSSD and pNN50 measure, and a slow drift
+  // (~40 s) is what pushes SDNN above them. With the fast wave alone, RMSSD
+  // came out larger than SDNN on every series — a shape no real recording has.
+  for (let k = 0; k < beats - 1; k++) {
+    if (rand() < gapChance) {
+      intervals.push(null); // HealthKit lost the beat: not an RR interval
+      continue;
+    }
+    t += meanRr / 1000;
+    const resp = amplitude * 0.45 * Math.sin((t / 4) * 2 * Math.PI);
+    const drift = amplitude * 1.1 * Math.sin((t / 40) * 2 * Math.PI + 0.7);
+    intervals.push(Math.max(300, Math.round(meanRr + resp + drift + gauss(0, 6))));
+  }
+  return intervals;
+}
+
+function beatMetrics(intervals) {
+  const valid = [];
+  const diffs = [];
+  let gaps = 0;
+  let previous = null;
+  for (const v of intervals) {
+    if (v === null) { gaps++; previous = null; continue; }
+    valid.push(v);
+    if (previous !== null) diffs.push(v - previous);
+    previous = v;
+  }
+  if (valid.length < 2) return { gaps, mean: null, hr: null, sdnn: null, rmssd: null, pnn50: null };
+  const mean = valid.reduce((a, b) => a + b, 0) / valid.length;
+  const variance = valid.reduce((a, b) => a + (b - mean) ** 2, 0) / (valid.length - 1);
+  const enough = diffs.length >= 2;
+  return {
+    gaps,
+    mean,
+    hr: 60000 / mean,
+    sdnn: Math.sqrt(variance),
+    rmssd: enough ? Math.sqrt(diffs.reduce((a, d) => a + d * d, 0) / diffs.length) : null,
+    pnn50: enough ? (diffs.filter((d) => Math.abs(d) > 50).length / diffs.length) * 100 : null,
+  };
+}
+
 // --- time helpers (subject-local days in TZ, timestamps in UTC) -----------------
 const dayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
 const offsetFmt = new Intl.DateTimeFormat('en-US', { timeZone: TZ, timeZoneName: 'shortOffset' });
@@ -174,6 +224,7 @@ try {
   let vo2 = 44.0;
   let workouts = 0;
   let nights = 0;
+  let beatSeries = 0;
   let sleepEndPrev = null;
   for (let i = 0; i < days; i++) {
     const day = addDays(firstDay, i);
@@ -312,11 +363,42 @@ try {
       obs(DIST, hourStart, +(DIST.unit === 'km' ? distance / 1000 : distance).toFixed(3), hourEnd);
     }
     obs(WALK_HR, localToUtc(day, 17, 40), Math.round(Math.max(80, gauss(104 - 6 * fit, 5))));
+
+    // Heartbeat series (migration 0007): a few background measurements a day,
+    // more variable at night and when fit, flatter after a hard session.
+    const seriesToday = 2 + Math.floor(rand() * 4);
+    for (let k = 0; k < seriesToday; k++) {
+      const hour = [3, 7, 13, 18, 22][k % 5];
+      const startTs = localToUtc(day, hour, Math.floor(rand() * 55), Math.floor(rand() * 55));
+      const night = hour <= 5;
+      const restingBpm = Math.max(42, gauss(58 - 5 * fit - (night ? 4 : 0), 3));
+      const meanRr = 60000 / restingBpm;
+      // Respiratory amplitude: the variability itself. Higher at night and
+      // with fitness, cut down on the days a session was recorded.
+      const amplitude = Math.max(8, gauss(28 + 14 * fit + (night ? 12 : 0) - (session ? 6 : 0), 6));
+      const beats = 45 + Math.floor(rand() * 25);
+      const intervals = beatIntervals(meanRr, amplitude, beats, 0.01);
+      const mx = beatMetrics(intervals);
+      const totalMs = intervals.reduce((a, v) => a + (v ?? 0), 0);
+      await client.query(
+        `insert into heartbeat_series
+           (subject_id, source_id, start_ts, end_ts, tz_offset_min, beat_count, gap_count,
+            duration_s, intervals_ms, mean_rr_ms, mean_hr_bpm, sdnn_ms, rmssd_ms, pnn50_pct)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9::smallint[], $10, $11, $12, $13, $14)
+         on conflict do nothing`,
+        [
+          subject.id, source.id, startTs, new Date(startTs.getTime() + totalMs),
+          tzOffsetMin(startTs), beats, mx.gaps, totalMs / 1000, intervals,
+          mx.mean, mx.hr, mx.sdnn, mx.rmssd, mx.pnn50,
+        ]
+      );
+      beatSeries++;
+    }
     await flush();
   }
   await flush(true);
   await client.query('commit');
-  console.log(`written       : ${written} observations, ${workouts} sessions, ${nights} nights`);
+  console.log(`written       : ${written} observations, ${workouts} sessions, ${nights} nights, ${beatSeries} heartbeat series`);
   console.log(`subject uuid  : ${subject.id}`);
   console.log(`next          : npm run rollups -- --subject ${subject.id}`);
   console.log(`login         : request a magic link for ${email}`);
