@@ -2,6 +2,7 @@
 // detail loads one trace. Both re-filter on subject_id.
 import { getDb } from '@/lib/db';
 import type { SubjectContext } from './context';
+import { untilMigrated } from './optional';
 
 export interface EcgListItem {
   id: string;
@@ -56,20 +57,26 @@ const LIST_SQL = `select e.id, e.start_ts, e.end_ts, e.tz_offset_min, e.classifi
  join sources s on s.id = e.source_id`;
 
 export async function listEcgs(ctx: SubjectContext, limit = 500): Promise<EcgListItem[]> {
-  const { rows } = await getDb().query<ListRow>(
-    `${LIST_SQL} where e.subject_id = $1 order by e.start_ts desc limit $2`,
-    [ctx.subjectId, limit]
+  const { rows } = await untilMigrated(
+    () => getDb().query<ListRow>(
+      `${LIST_SQL} where e.subject_id = $1 order by e.start_ts desc limit $2`,
+      [ctx.subjectId, limit]
+    ),
+    { rows: [] as ListRow[] }
   );
   return rows.map(mapItem);
 }
 
 /** Per classification, all time: the list header reads the mix at a glance. */
 export async function ecgClassificationCounts(ctx: SubjectContext): Promise<Array<{ classification: string; count: number }>> {
-  const { rows } = await getDb().query<{ classification: string; count: number }>(
-    `select classification, count(*)::int as count
-     from ecg_recordings where subject_id = $1
-     group by 1 order by count desc, classification`,
-    [ctx.subjectId]
+  const { rows } = await untilMigrated(
+    () => getDb().query<{ classification: string; count: number }>(
+      `select classification, count(*)::int as count
+       from ecg_recordings where subject_id = $1
+       group by 1 order by count desc, classification`,
+      [ctx.subjectId]
+    ),
+    { rows: [] as Array<{ classification: string; count: number }> }
   );
   return rows;
 }
@@ -80,14 +87,17 @@ export async function getEcg(ctx: SubjectContext, id: string): Promise<EcgDetail
     lead: string;
     voltages_uv: number[];
   }
-  const { rows } = await getDb().query<Row>(
-    `select e.id, e.start_ts, e.end_ts, e.tz_offset_min, e.classification,
-            e.symptoms_status, e.avg_hr_bpm, e.sampling_hz, e.n_samples, s.name as source_name,
-            e.algorithm_version, e.lead, e.voltages_uv
-     from ecg_recordings e
-     join sources s on s.id = e.source_id
-     where e.subject_id = $1 and e.id = $2`,
-    [ctx.subjectId, id]
+  const { rows } = await untilMigrated(
+    () => getDb().query<Row>(
+      `select e.id, e.start_ts, e.end_ts, e.tz_offset_min, e.classification,
+              e.symptoms_status, e.avg_hr_bpm, e.sampling_hz, e.n_samples, s.name as source_name,
+              e.algorithm_version, e.lead, e.voltages_uv
+       from ecg_recordings e
+       join sources s on s.id = e.source_id
+       where e.subject_id = $1 and e.id = $2`,
+      [ctx.subjectId, id]
+    ),
+    { rows: [] as Row[] }
   );
   const r = rows[0];
   if (!r) return null;

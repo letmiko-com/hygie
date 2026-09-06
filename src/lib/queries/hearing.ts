@@ -2,6 +2,7 @@
 // always read whole. Scoped by subject like every other query.
 import { getDb } from '@/lib/db';
 import type { SubjectContext } from './context';
+import { untilMigrated } from './optional';
 
 export interface AudiogramPoint {
   side: 'left' | 'right';
@@ -34,7 +35,7 @@ interface Row {
 }
 
 export async function listAudiograms(ctx: SubjectContext, limit = 100): Promise<Audiogram[]> {
-  const { rows } = await getDb().query<Row>(
+  const { rows } = await untilMigrated(() => getDb().query<Row>(
     `select a.id, a.start_ts, a.tz_offset_min, s.name as source_name,
             coalesce((select jsonb_agg(jsonb_build_object(
                         'side', p.side, 'frequency_hz', p.frequency_hz,
@@ -47,7 +48,7 @@ export async function listAudiograms(ctx: SubjectContext, limit = 100): Promise<
      order by a.start_ts desc
      limit $2`,
     [ctx.subjectId, limit]
-  );
+  ), { rows: [] as Row[] });
   return rows.map((r) => ({
     id: r.id,
     startTs: r.start_ts,
