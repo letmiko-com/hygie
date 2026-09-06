@@ -1,18 +1,18 @@
-// GPS trace of a session as a plain SVG: no tiles, no third party. A trace
-// is a fact about the session (where it went, how it climbed); a map
-// background is not, and would ship every location to a tile server. The
-// projection is equirectangular around the track's mean latitude, which is
-// exact enough for a workout-sized area. Below the trace, the altitude
-// profile against cumulative distance when the fixes carry an altitude.
+// GPS trace of a session as an SVG, over map tiles when the instance has
+// them (src/lib/tiles.ts), on a blank panel otherwise. Tiles come from this
+// server's own proxy (/api/tiles), never from a third party the browser
+// would talk to. Projection is Web Mercator at the zoom where the track's
+// bounding box fits the frame, the same projection the tiles use, so the
+// line sits exactly on the roads. Below, the altitude profile against
+// cumulative distance when the fixes carry an altitude.
 import { ABSENT } from '@/lib/format';
+import { fitZoom, mercator, TILE_SIZE } from '@/lib/tiles';
 
 export interface TracePoint {
   lat: number;
   lon: number;
   altitudeM: number | null;
 }
-
-const EARTH_M_PER_DEG = 111_320;
 
 function haversineM(a: TracePoint, b: TracePoint): number {
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -46,40 +46,69 @@ export function RouteTrace({
   ariaLabel,
   labels,
   format,
-  height = 280,
+  tiles = null,
+  height = 400,
 }: {
   points: TracePoint[];
   color: string;
   ariaLabel: string;
   labels: { start: string; end: string; elevation: string; distance: string; scale: (m: number) => string };
   format: { km: (m: number) => string; m: (v: number) => string };
+  /** Attribution line of the tile provider; null draws the trace alone. */
+  tiles?: { attribution: string } | null;
   height?: number;
 }) {
   if (points.length < 2) return <div style={{ height, color: 'var(--text-3)' }}>{ABSENT}</div>;
 
-  const width = 720;
-  const pad = 16;
+  // Wide frame: the panel is wider than tall, and a wider frame lets fitZoom
+  // pick one more level of detail for the usual ride or run.
+  const width = 960;
+  const pad = 24;
   const pts = thin(points, 2500);
-  const meanLat = pts.reduce((s, p) => s + p.lat, 0) / pts.length;
-  const kx = Math.cos((meanLat * Math.PI) / 180);
-  // Metres east / north of the south-west corner.
-  const xs = pts.map((p) => p.lon * kx * EARTH_M_PER_DEG);
-  const ys = pts.map((p) => p.lat * EARTH_M_PER_DEG);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const spanX = Math.max(1, maxX - minX);
-  const spanY = Math.max(1, maxY - minY);
-  const scale = Math.min((width - 2 * pad) / spanX, (height - 2 * pad) / spanY);
-  const offX = (width - spanX * scale) / 2;
-  const offY = (height - spanY * scale) / 2;
-  const px = (i: number) => offX + (xs[i] - minX) * scale;
-  const py = (i: number) => height - offY - (ys[i] - minY) * scale;
-  const path = pts.map((_, i) => `${i === 0 ? 'M' : 'L'}${px(i).toFixed(1)} ${py(i).toFixed(1)}`).join('');
+  const bounds = {
+    minLat: Math.min(...pts.map((p) => p.lat)),
+    maxLat: Math.max(...pts.map((p) => p.lat)),
+    minLon: Math.min(...pts.map((p) => p.lon)),
+    maxLon: Math.max(...pts.map((p) => p.lon)),
+  };
+  const z = fitZoom(bounds, width - 2 * pad, height - 2 * pad);
+  // World pixels at zoom z; the frame is centred on the track's bounding box.
+  const nw = mercator(bounds.maxLat, bounds.minLon, z);
+  const se = mercator(bounds.minLat, bounds.maxLon, z);
+  const originX = (nw.x + se.x) / 2 - width / 2;
+  const originY = (nw.y + se.y) / 2 - height / 2;
+  const project = (p: TracePoint) => {
+    const m = mercator(p.lat, p.lon, z);
+    return { x: m.x - originX, y: m.y - originY };
+  };
+  const projected = pts.map(project);
+  const path = projected.map((q, i) => `${i === 0 ? 'M' : 'L'}${q.x.toFixed(1)} ${q.y.toFixed(1)}`).join('');
 
-  const barM = niceScale((width - 2 * pad) / scale / 3);
-  const barPx = barM * scale;
+  // Tiles covering the frame, positioned in the same pixel space.
+  const tileImages: Array<{ x: number; y: number; tx: number; ty: number }> = [];
+  if (tiles) {
+    const worldTiles = 2 ** z;
+    const tx0 = Math.floor(originX / TILE_SIZE);
+    const tx1 = Math.floor((originX + width) / TILE_SIZE);
+    const ty0 = Math.max(0, Math.floor(originY / TILE_SIZE));
+    const ty1 = Math.min(worldTiles - 1, Math.floor((originY + height) / TILE_SIZE));
+    for (let tx = tx0; tx <= tx1; tx++) {
+      for (let ty = ty0; ty <= ty1; ty++) {
+        tileImages.push({
+          x: tx * TILE_SIZE - originX,
+          y: ty * TILE_SIZE - originY,
+          tx: ((tx % worldTiles) + worldTiles) % worldTiles, // wrap around the antimeridian
+          ty,
+        });
+      }
+    }
+  }
+
+  // Metres per pixel at this latitude and zoom, for the scale bar.
+  const midLat = (bounds.minLat + bounds.maxLat) / 2;
+  const metresPerPx = (156_543.03392 * Math.cos((midLat * Math.PI) / 180)) / 2 ** z;
+  const barM = niceScale(((width - 2 * pad) / 3) * metresPerPx);
+  const barPx = barM / metresPerPx;
 
   // Altitude profile against cumulative distance, on the thinned track.
   const altitudes = pts.map((p) => p.altitudeM);
@@ -108,11 +137,16 @@ export function RouteTrace({
     profile = cmds.join('');
   }
 
-  const last = pts.length - 1;
-  // A loop ends where it started: one marker, one combined label, instead of
-  // two labels printed over each other.
-  const loop = Math.hypot(px(last) - px(0), py(last) - py(0)) < 14;
+  const first = projected[0];
+  const last = projected[projected.length - 1];
+  // A loop ends where it started: one marker, one combined label.
+  const loop = Math.hypot(last.x - first.x, last.y - first.y) < 14;
   const labelFont = '500 9px var(--font-ui)';
+  const onMap = tiles !== null;
+  // Over a map the labels need a halo to stay legible on any tile.
+  const halo = onMap ? { paintOrder: 'stroke' as const, stroke: 'var(--surface)', strokeWidth: 3, strokeLinejoin: 'round' as const } : {};
+  const ink = onMap ? 'var(--text-1)' : 'var(--text-2)';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <svg
@@ -121,27 +155,50 @@ export function RouteTrace({
         height="auto"
         role="img"
         aria-label={ariaLabel}
-        style={{ display: 'block', maxHeight: height }}
+        style={{ display: 'block', borderRadius: 'var(--r-md)' }}
       >
-        <path d={path} fill="none" stroke={color} strokeWidth={2.4} strokeLinejoin="round" strokeLinecap="round" opacity={0.92} />
-        {!loop && <circle cx={px(last)} cy={py(last)} r={5} fill="var(--surface)" stroke="var(--text-1)" strokeWidth={2.5} />}
-        <circle cx={px(0)} cy={py(0)} r={5} fill="var(--surface)" stroke="var(--ok)" strokeWidth={2.5} />
-        <text x={px(0) + 9} y={py(0) + 3.5} style={{ font: labelFont, fill: 'var(--text-2)' }}>
+        {onMap && (
+          <g className="hy-map-tiles">
+            {tileImages.map((t) => (
+              <image
+                key={`${t.tx}-${t.ty}`}
+                href={`/api/tiles/${z}/${t.tx}/${t.ty}`}
+                x={t.x}
+                y={t.y}
+                width={TILE_SIZE}
+                height={TILE_SIZE}
+                preserveAspectRatio="none"
+              />
+            ))}
+          </g>
+        )}
+        {onMap && (
+          <path d={path} fill="none" stroke="var(--surface)" strokeWidth={5} strokeLinejoin="round" strokeLinecap="round" opacity={0.85} />
+        )}
+        <path d={path} fill="none" stroke={color} strokeWidth={onMap ? 3 : 2.4} strokeLinejoin="round" strokeLinecap="round" opacity={0.95} />
+        {!loop && <circle cx={last.x} cy={last.y} r={5} fill="var(--surface)" stroke="var(--text-1)" strokeWidth={2.5} />}
+        <circle cx={first.x} cy={first.y} r={5} fill="var(--surface)" stroke="var(--ok)" strokeWidth={2.5} />
+        <text x={first.x + 9} y={first.y + 3.5} style={{ font: labelFont, fill: ink, ...halo }}>
           {loop ? `${labels.start} · ${labels.end}` : labels.start}
         </text>
         {!loop && (
-          <text x={px(last) + 9} y={py(last) + 3.5} style={{ font: labelFont, fill: 'var(--text-2)' }}>
+          <text x={last.x + 9} y={last.y + 3.5} style={{ font: labelFont, fill: ink, ...halo }}>
             {labels.end}
           </text>
         )}
         <g transform={`translate(${width - pad - barPx}, ${height - pad})`}>
-          <line x1={0} y1={0} x2={barPx} y2={0} stroke="var(--text-2)" strokeWidth={2} />
-          <line x1={0} y1={-4} x2={0} y2={4} stroke="var(--text-2)" strokeWidth={2} />
-          <line x1={barPx} y1={-4} x2={barPx} y2={4} stroke="var(--text-2)" strokeWidth={2} />
-          <text x={barPx / 2} y={-6} textAnchor="middle" className="tnum" style={{ font: '500 9px var(--font-data)', fill: 'var(--text-2)' }}>
+          <line x1={0} y1={0} x2={barPx} y2={0} stroke={ink} strokeWidth={2} />
+          <line x1={0} y1={-4} x2={0} y2={4} stroke={ink} strokeWidth={2} />
+          <line x1={barPx} y1={-4} x2={barPx} y2={4} stroke={ink} strokeWidth={2} />
+          <text x={barPx / 2} y={-6} textAnchor="middle" className="tnum" style={{ font: '500 9px var(--font-data)', fill: ink, ...halo }}>
             {labels.scale(barM)}
           </text>
         </g>
+        {onMap && tiles.attribution && (
+          <text x={pad} y={height - 8} style={{ font: '400 8px var(--font-ui)', fill: 'var(--text-2)', ...halo }}>
+            {tiles.attribution}
+          </text>
+        )}
       </svg>
       {profile && (
         <div>

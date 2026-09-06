@@ -28,6 +28,7 @@ import {
 import { getMessages, resolveLocale } from '@/lib/i18n';
 import { dataColor } from '@/lib/metrics';
 import { sportDisplay, sportLabel } from '@/lib/sports';
+import { tileConfig } from '@/lib/tiles';
 import { getSubjectContext } from '@/lib/queries/context';
 import { addDays, dayInZone, todayInZone } from '@/lib/queries/time';
 import { resolveMaxHr, zonesFromSamples } from '@/lib/queries/zones';
@@ -79,6 +80,7 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
   // The GPS fixes, only when the session has some (hasRoute is the cheap
   // existence test; the points table can hold tens of thousands of rows).
   const route = workout.hasRoute ? await workoutRoute(ctx, workout.id) : [];
+  const tiles = route.length > 1 ? tileConfig() : null;
 
   // The reference window is the 90 days BEFORE this session, in the subject's
   // zone: anchoring it on today compared an April session against July ones,
@@ -350,6 +352,7 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
               km: (meters) => fmtKm(meters, locale, 1),
               m: (v) => `${fmtInt(v, locale)} m`,
             }}
+            tiles={tiles ? { attribution: tiles.attribution } : null}
           />
         </Panel>
       )}
