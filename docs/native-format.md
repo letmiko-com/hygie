@@ -256,16 +256,22 @@ labels and 64 associations per entry.
 
 Like heartbeat series, state of mind is **absent from the XML export**.
 
-### The pairing rewind (Hygie Sync 1.2)
+### No pairing bound (Hygie Sync 1.2)
 
 Every other section starts at the pairing instant, because history reaches
 the server through the XML backfill. These two have no such path: HealthKit
-on the phone is the only place they exist. So the app performs a **one-off
-rewind** for these two types only — anchored queries with no start
-predicate, walked in chunks until HealthKit reports the store exhausted,
-then the ordinary anchored regime takes over. The rewind is recorded as done
-in `AnchorStore` so it never runs twice, and it is bounded by chunk, so an
-interrupted rewind resumes where its anchor stopped.
+on the phone is the only place they exist. So the app reads them with **no
+start predicate at all** — anchored queries over the whole store, walked in
+chunks (40 series, 200 entries per request) until HealthKit reports it
+exhausted. The anchor is the only cursor: the first passes after pairing
+catch up with the history, later passes return new samples alone, and an
+interrupted walk resumes where its anchor stopped. No separate "backfill
+done" flag exists, because there is nothing for one to add.
+
+One HealthKit rule worth knowing, undocumented in the headers and found on
+2026-09-06: an authorization request naming the heartbeat series type is
+**refused** unless it also names `HKQuantityTypeIdentifierHeartRateVariabilitySDNN`,
+the same way a workout route request must also name the workout type.
 
 ## Explicitly out of scope (still)
 
