@@ -109,6 +109,37 @@ function beatMetrics(intervals) {
   };
 }
 
+// --- state of mind -------------------------------------------------------------
+// Feelings are drawn from the valence rather than independently: someone who
+// logs "very unpleasant" and picks "joyful" would be noise, not data. The
+// tokens are the snake_case HealthKit enums the native format carries.
+const PLEASANT_LABELS = ['happy', 'calm', 'content', 'grateful', 'proud', 'satisfied', 'peaceful', 'excited', 'hopeful', 'relieved'];
+const UNPLEASANT_LABELS = ['stressed', 'drained', 'worried', 'frustrated', 'irritated', 'anxious', 'overwhelmed', 'disappointed', 'sad', 'annoyed'];
+const NEUTRAL_LABELS = ['indifferent', 'surprised', 'confident'];
+const ASSOCIATIONS = ['work', 'family', 'friends', 'health', 'fitness', 'hobbies', 'money', 'tasks', 'travel', 'weather', 'self_care', 'partner'];
+
+/** Apple's seven regions over [-1, +1], the bucketing the app reports. */
+function valenceClassification(v) {
+  if (v <= -5 / 7) return 1;
+  if (v <= -3 / 7) return 2;
+  if (v <= -1 / 7) return 3;
+  if (v < 1 / 7) return 4;
+  if (v < 3 / 7) return 5;
+  if (v < 5 / 7) return 6;
+  return 7;
+}
+
+function moodLabels(valence) {
+  const pool = valence > 0.15 ? PLEASANT_LABELS : valence < -0.15 ? UNPLEASANT_LABELS : NEUTRAL_LABELS;
+  const n = 1 + Math.floor(rand() * 2);
+  const out = [];
+  while (out.length < n) {
+    const t = pick(pool);
+    if (!out.includes(t)) out.push(t);
+  }
+  return out;
+}
+
 // --- time helpers (subject-local days in TZ, timestamps in UTC) -----------------
 const dayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
 const offsetFmt = new Intl.DateTimeFormat('en-US', { timeZone: TZ, timeZoneName: 'shortOffset' });
@@ -225,6 +256,7 @@ try {
   let workouts = 0;
   let nights = 0;
   let beatSeries = 0;
+  let moods = 0;
   let sleepEndPrev = null;
   for (let i = 0; i < days; i++) {
     const day = addDays(firstDay, i);
@@ -364,6 +396,40 @@ try {
     }
     obs(WALK_HR, localToUtc(day, 17, 40), Math.round(Math.max(80, gauss(104 - 6 * fit, 5))));
 
+    // State of mind (migration 0007): a daily mood most evenings, and now and
+    // then a momentary emotion. Valence follows what the day was made of —
+    // weekend, a session, a short night — so the explorer has something real
+    // to correlate against.
+    if (rand() < 0.75) {
+      const base = 0.15 + (weekend ? 0.2 : 0) + (session ? 0.12 : 0) + 0.25 * fit;
+      const valence = Math.max(-1, Math.min(1, gauss(base, 0.32)));
+      const ts = localToUtc(day, 21, 30 + Math.floor(rand() * 25), Math.floor(rand() * 55));
+      await client.query(
+        `insert into state_of_mind
+           (subject_id, source_id, start_ts, tz_offset_min, kind, valence,
+            valence_classification, labels, associations)
+         values ($1, $2, $3, $4, 'daily_mood', $5, $6, $7::text[], $8::text[])
+         on conflict do nothing`,
+        [subject.id, source.id, ts, tzOffsetMin(ts), valence, valenceClassification(valence),
+         moodLabels(valence), [pick(ASSOCIATIONS)]]
+      );
+      moods++;
+    }
+    if (rand() < 0.35) {
+      const valence = Math.max(-1, Math.min(1, gauss(weekend ? 0.25 : -0.05, 0.4)));
+      const ts = localToUtc(day, 10 + Math.floor(rand() * 9), Math.floor(rand() * 55), Math.floor(rand() * 55));
+      await client.query(
+        `insert into state_of_mind
+           (subject_id, source_id, start_ts, tz_offset_min, kind, valence,
+            valence_classification, labels, associations)
+         values ($1, $2, $3, $4, 'momentary_emotion', $5, $6, $7::text[], $8::text[])
+         on conflict do nothing`,
+        [subject.id, source.id, ts, tzOffsetMin(ts), valence, valenceClassification(valence),
+         moodLabels(valence), [pick(ASSOCIATIONS)]]
+      );
+      moods++;
+    }
+
     // Heartbeat series (migration 0007): a few background measurements a day,
     // more variable at night and when fit, flatter after a hard session.
     const seriesToday = 2 + Math.floor(rand() * 4);
@@ -398,7 +464,7 @@ try {
   }
   await flush(true);
   await client.query('commit');
-  console.log(`written       : ${written} observations, ${workouts} sessions, ${nights} nights, ${beatSeries} heartbeat series`);
+  console.log(`written       : ${written} observations, ${workouts} sessions, ${nights} nights, ${beatSeries} heartbeat series, ${moods} moods`);
   console.log(`subject uuid  : ${subject.id}`);
   console.log(`next          : npm run rollups -- --subject ${subject.id}`);
   console.log(`login         : request a magic link for ${email}`);
