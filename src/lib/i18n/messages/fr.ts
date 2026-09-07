@@ -548,7 +548,6 @@ export const fr: Messages = {
     below: (time: string, pct: string) => `${time} sous Z1 (moins de 50 %, ${pct} % du temps enregistré), hors barre.`,
     noMax: 'FC max inconnue : aucune séance avec fréquence cardiaque sur les 12 derniers mois.',
     noHr: 'Aucune fréquence cardiaque enregistrée en séance sur la période.',
-    tooWide: 'Zones calculées pour une période de trois mois au plus.',
     sessionTitle: 'Temps par zone',
     basisDeclared: (bpm: string, observed: string | null) =>
       `FC max déclarée : ${bpm} bpm${observed ? ` (observée sur 12 mois : ${observed} bpm)` : ''}. Zones à 50, 60, 70, 80 et 90 % de ce maximum.`,

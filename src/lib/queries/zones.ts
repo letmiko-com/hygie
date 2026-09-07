@@ -12,6 +12,7 @@
 //
 // Time in zone: each HR sample owns the interval to the next sample, capped
 // at 60 s; a longer gap is unrecorded time, not time in the last zone seen.
+import { withTransaction } from '@/lib/db';
 import { cached } from './cache';
 import type { SubjectContext } from './context';
 import { getMetricType } from './metric-types';
@@ -130,9 +131,17 @@ export function zonesFromSamples(samples: Array<{ ts: Date; bpm: number }>, maxH
 
 /**
  * Time in zones over every session of a window (subject-local days), one
- * activity type or all. The join walks each session's HR samples: fine for a
- * month, 0.8 s for six months and 1.5 s for a year on production, so callers
- * stop at a quarter.
+ * activity type or all.
+ *
+ * Reads the per-session rows of workout_hr_zones (migration 0008) and fills
+ * whatever is missing on the way in. The walk over raw HR samples now happens
+ * ONCE per session instead of once per view: it used to cost 0.8 s for six
+ * months and 1.5 s for a year against a 500 ms budget, which is why callers
+ * stopped at a quarter. The fill is a no-op as soon as the window is warm.
+ *
+ * The zone cuts depend on the maximum, so a row computed against another
+ * maximum is stale and gets recomputed; that is what makes the cache safe
+ * when the observed maximum moves or the subject declares one.
  */
 export async function timeInZones(
   ctx: SubjectContext,
@@ -140,41 +149,59 @@ export async function timeInZones(
   maxHr: number,
   activityType?: string
 ): Promise<ZoneBreakdown> {
-  const hr = await getMetricType(HR);
-  const params: unknown[] = [ctx.subjectId, hr.id, range.fromDay, range.toDayExcl, ctx.timezone, maxHr, MAX_GAP_S];
+  // The read needs no gap bound: the seconds are already split. Passing one
+  // anyway is not harmless — Postgres refuses a bind with a parameter the
+  // statement never names.
+  const params: unknown[] = [ctx.subjectId, range.fromDay, range.toDayExcl, ctx.timezone, maxHr];
   let filter = '';
   if (activityType) {
     params.push(activityType);
     filter = `and w.activity_type = $${params.length}`;
   }
   interface Row {
-    zone: number;
-    seconds: number;
+    below_s: number;
+    z1_s: number;
+    z2_s: number;
+    z3_s: number;
+    z4_s: number;
+    z5_s: number;
   }
-  const rows = await heavyRead<Row>(
-    `with samples as (
-       select o.value,
-              least(
-                extract(epoch from lead(o.start_ts) over (partition by w.id order by o.start_ts) - o.start_ts),
-                $7::float
-              ) as dt
-       from workouts w
-       join observations o
-         on o.subject_id = w.subject_id and o.type_id = $2
-        and o.start_ts >= w.start_ts and o.start_ts < w.end_ts
-       where w.subject_id = $1
-         and (w.start_ts at time zone $5)::date >= $3::date
-         and (w.start_ts at time zone $5)::date < $4::date
-         ${filter}
-     )
-     select width_bucket(value / $6::float, array[0.5, 0.6, 0.7, 0.8, 0.9]) as zone,
-            sum(dt)::float as seconds
-     from samples
-     where dt is not null and dt > 0
-     group by 1`,
-    params
-  );
-  const acc = [0, 0, 0, 0, 0, 0];
-  for (const r of rows) acc[Math.min(5, Math.max(0, r.zone))] += r.seconds;
+  const rows = await withTransaction(async (client) => {
+    // Same knobs as heavyRead: the fill is the heavy aggregate now, and it is
+    // the one that used to spill the default work_mem.
+    await client.query('set local jit = off');
+    await client.query("set local work_mem = '32MB'");
+    await client.query(
+      `select workout_hr_zones_fill(
+         $1,
+         ($2::date::timestamp at time zone $4),
+         ($3::date::timestamp at time zone $4),
+         $5::smallint,
+         $6::float
+       )`,
+      [ctx.subjectId, range.fromDay, range.toDayExcl, ctx.timezone, maxHr, MAX_GAP_S]
+    );
+    const res = await client.query<Row>(
+      `select coalesce(sum(z.below_s), 0)::float as below_s,
+              coalesce(sum(z.z1_s), 0)::float as z1_s,
+              coalesce(sum(z.z2_s), 0)::float as z2_s,
+              coalesce(sum(z.z3_s), 0)::float as z3_s,
+              coalesce(sum(z.z4_s), 0)::float as z4_s,
+              coalesce(sum(z.z5_s), 0)::float as z5_s
+       from workout_hr_zones z
+       join workouts w on w.id = z.workout_id
+       where z.subject_id = $1
+         and z.max_hr_bpm = $5::smallint
+         and w.start_ts >= ($2::date::timestamp at time zone $4)
+         and w.start_ts < ($3::date::timestamp at time zone $4)
+         ${filter}`,
+      params
+    );
+    return res.rows;
+  });
+  const r = rows[0];
+  const acc = r
+    ? [r.below_s, r.z1_s, r.z2_s, r.z3_s, r.z4_s, r.z5_s]
+    : [0, 0, 0, 0, 0, 0];
   return breakdown(acc, maxHr);
 }

@@ -92,7 +92,46 @@ export async function enqueueDirtyRanges(
       params
     );
   }
+  await invalidateWorkoutHrZones(client, subjectId, values);
   return values.length;
+}
+
+/**
+ * Heart rate arriving inside a session's window makes its precomputed zone
+ * split (workout_hr_zones, migration 0008) wrong, so the row is dropped and
+ * the next read recomputes it. Only the enclosing span of the batch's HR
+ * ranges is used: a batch covers a few hours, and dropping one row too many
+ * costs one recomputation, while keeping one too long would show wrong
+ * seconds. Runs in the caller's transaction, like the enqueue above.
+ */
+async function invalidateWorkoutHrZones(
+  client: pg.PoolClient,
+  subjectId: string,
+  values: Array<{ typeId: number; from: Date; to: Date }>
+): Promise<void> {
+  if (values.length === 0) return;
+  const { rows } = await client.query<{ id: number }>(
+    `select id from metric_types where hk_identifier = 'HKQuantityTypeIdentifierHeartRate'`
+  );
+  const hrTypeId = rows[0]?.id;
+  if (hrTypeId === undefined) return;
+  const hrRanges = values.filter((v) => v.typeId === hrTypeId);
+  if (hrRanges.length === 0) return;
+  let from = hrRanges[0].from;
+  let to = hrRanges[0].to;
+  for (const r of hrRanges) {
+    if (r.from < from) from = r.from;
+    if (r.to > to) to = r.to;
+  }
+  await client.query(
+    `delete from workout_hr_zones z
+     using workouts w
+     where z.workout_id = w.id
+       and z.subject_id = $1
+       and w.start_ts < $3::timestamptz
+       and w.end_ts > $2::timestamptz`,
+    [subjectId, from, to]
+  );
 }
 
 export interface DrainResult {
