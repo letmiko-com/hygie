@@ -118,6 +118,52 @@ export async function resolveMaxHr(ctx: SubjectContext, today: string): Promise<
   return observed ? { bpm: observed.bpm, basis: 'observed', observed } : null;
 }
 
+/**
+ * The pre-0008 path: walk every HR sample of every session in the window.
+ * Kept as the fallback for a server whose migration has not run yet; it is
+ * also the definition the precomputed rows must agree with.
+ */
+async function zonesByDirectScan(
+  ctx: SubjectContext,
+  range: DayRange,
+  maxHr: number,
+  activityType?: string
+): Promise<ZoneBreakdown> {
+  const hr = await getMetricType(HR);
+  const params: unknown[] = [ctx.subjectId, hr.id, range.fromDay, range.toDayExcl, ctx.timezone, maxHr, MAX_GAP_S];
+  let filter = '';
+  if (activityType) {
+    params.push(activityType);
+    filter = `and w.activity_type = $${params.length}`;
+  }
+  const rows = await heavyRead<{ zone: number; seconds: number }>(
+    `with samples as (
+       select o.value,
+              least(
+                extract(epoch from lead(o.start_ts) over (partition by w.id order by o.start_ts) - o.start_ts),
+                $7::float
+              ) as dt
+       from workouts w
+       join observations o
+         on o.subject_id = w.subject_id and o.type_id = $2
+        and o.start_ts >= w.start_ts and o.start_ts < w.end_ts
+       where w.subject_id = $1
+         and (w.start_ts at time zone $5)::date >= $3::date
+         and (w.start_ts at time zone $5)::date < $4::date
+         ${filter}
+     )
+     select width_bucket(value / $6::float, array[0.5, 0.6, 0.7, 0.8, 0.9]) as zone,
+            sum(dt)::float as seconds
+     from samples
+     where dt is not null and dt > 0
+     group by 1`,
+    params
+  );
+  const acc = [0, 0, 0, 0, 0, 0];
+  for (const r of rows) acc[Math.min(5, Math.max(0, r.zone))] += r.seconds;
+  return breakdown(acc, maxHr);
+}
+
 /** Time in zones of one session from its HR samples (already fetched, sorted). */
 export function zonesFromSamples(samples: Array<{ ts: Date; bpm: number }>, maxHr: number): ZoneBreakdown {
   const acc = [0, 0, 0, 0, 0, 0];
@@ -158,14 +204,37 @@ export async function timeInZones(
     params.push(activityType);
     filter = `and w.activity_type = $${params.length}`;
   }
-  interface Row {
-    below_s: number;
-    z1_s: number;
-    z2_s: number;
-    z3_s: number;
-    z4_s: number;
-    z5_s: number;
+  try {
+    return await zonesFromCache(ctx, range, maxHr, params, filter);
+  } catch (err) {
+    // A release can be live before the operator applied the migration it
+    // ships with (docs/architecture.md). Missing table (42P01) or missing
+    // function (42883) means 0008 has not run yet: fall back to the direct
+    // scan, which is what this screen did before it, rather than 500 on a
+    // page that has nothing to do with zones. Every other error still
+    // surfaces.
+    const code = typeof err === 'object' && err !== null ? (err as { code?: unknown }).code : null;
+    if (code !== '42P01' && code !== '42883') throw err;
+    return zonesByDirectScan(ctx, range, maxHr, activityType);
   }
+}
+
+interface ZoneSecondsRow {
+  below_s: number;
+  z1_s: number;
+  z2_s: number;
+  z3_s: number;
+  z4_s: number;
+  z5_s: number;
+}
+
+async function zonesFromCache(
+  ctx: SubjectContext,
+  range: DayRange,
+  maxHr: number,
+  params: unknown[],
+  filter: string
+): Promise<ZoneBreakdown> {
   const rows = await withTransaction(async (client) => {
     // Same knobs as heavyRead: the fill is the heavy aggregate now, and it is
     // the one that used to spill the default work_mem.
@@ -181,7 +250,7 @@ export async function timeInZones(
        )`,
       [ctx.subjectId, range.fromDay, range.toDayExcl, ctx.timezone, maxHr, MAX_GAP_S]
     );
-    const res = await client.query<Row>(
+    const res = await client.query<ZoneSecondsRow>(
       `select coalesce(sum(z.below_s), 0)::float as below_s,
               coalesce(sum(z.z1_s), 0)::float as z1_s,
               coalesce(sum(z.z2_s), 0)::float as z2_s,
