@@ -48,8 +48,6 @@ const ZONE_BTN = {
   cursor: 'pointer',
   font: '500 var(--text-xs)/1 var(--font-ui)',
 } as const;
-/** Widest window the zone accounting is run on (see the panel below). */
-const ZONES_MAX_DAYS = 92;
 
 function pct(cur: number | null, prev: number | null): number | null {
   if (cur === null || prev === null || prev === 0) return null;
@@ -91,12 +89,12 @@ export default async function SportPage({
     monthlyTrainingSilhouette(ctx),
   ]);
 
-  // Time in HR zones over the period's sessions (this sport or all), against the
-  // observed maximum. Stops at a quarter: the join walks every HR sample of
-  // every session in the window (measured on production: 0.8 s on six months,
-  // 1.5 s on a year, against a 500 ms budget).
+  // Time in HR zones over the period's sessions (this sport or all), against
+  // the resolved maximum. No window cap since migration 0008: the split is
+  // precomputed per session, so a year reads a few hundred rows instead of
+  // walking every HR sample of every session.
   const [maxHr, settings] = await Promise.all([
-    rangeDays <= ZONES_MAX_DAYS ? resolveMaxHr(ctx, today) : Promise.resolve(null),
+    resolveMaxHr(ctx, today),
     getSubjectSettings(ctx),
   ]);
   const zones = maxHr ? await timeInZones(ctx, range, maxHr.bpm, sport) : null;
@@ -273,7 +271,7 @@ export default async function SportPage({
             )
           ) : (
             <p style={{ margin: 0, font: 'italic 400 var(--text-sm)/1.4 var(--font-ui)', color: 'var(--text-3)' }}>
-              {rangeDays > ZONES_MAX_DAYS ? m.zones.tooWide : m.zones.noMax}
+              {m.zones.noMax}
             </p>
           )}
           {/* The declared maximum is a setting of the subject, not of the window:

@@ -541,7 +541,6 @@ export const en = {
     below: (time: string, pct: string) => `${time} under Z1 (below 50 %, ${pct} % of recorded time), not painted.`,
     noMax: 'Max HR unknown: no session with heart rate over the last 12 months.',
     noHr: 'No heart rate recorded in sessions on this period.',
-    tooWide: 'Zones are computed for periods up to three months.',
     sessionTitle: 'Time in zones',
     basisDeclared: (bpm: string, observed: string | null) =>
       `Declared max HR: ${bpm} bpm${observed ? ` (observed over 12 months: ${observed} bpm)` : ''}. Zones at 50, 60, 70, 80 and 90 % of that maximum.`,
