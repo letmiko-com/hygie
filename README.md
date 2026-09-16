@@ -16,8 +16,8 @@ Two promises, and everything in this repository serves them:
 
 **Status (September 2026).** In production for its author (7M+ measurements, 14 years of
 history, 96 metric types carrying data out of a catalogue of 190 HealthKit types), pre-1.0
-for everyone else: it works, real-world reports are what it needs now, and the self-hosting
-guide is still the section below. Open source under AGPL-3.0. The iOS companion,
+for everyone else: it works, and real-world reports are what it needs now. Open source
+under AGPL-3.0. The iOS companion,
 [Hygie Sync](https://apps.apple.com/app/id6800605692), is on the App Store: a one-time
 purchase whose price covers the Apple developer account. The server is free and stays free.
 Presentation site: [hygie.letmiko.com](https://hygie.letmiko.com).
@@ -35,7 +35,8 @@ Presentation site: [hygie.letmiko.com](https://hygie.letmiko.com).
 
 ## From zero to the first chart
 
-The short path, until a full `docs/self-hosting.md` exists. You need Docker (or Node 22),
+The short path to a working instance; [`docs/self-hosting.md`](docs/self-hosting.md) covers
+what comes next (TLS, SMTP, backups, updates, replacing the phone). You need Docker (or Node 22),
 PostgreSQL 16+, an SMTP relay (login is by magic link, there are no passwords) and a domain
 with HTTPS in front of the app: **the iPhone refuses plain `http://`**, so a LAN instance
 without TLS cannot be paired.
@@ -170,8 +171,9 @@ this repository.
 Next.js (App Router, standalone output) + PostgreSQL, one Dockerfile for the reference
 deployment (Railway) and self-hosters alike. Forward-only SQL migrations (`npm run migrate`),
 never run automatically at boot. Read `docs/architecture.md` first: it is the contract.
-`docs/native-format.md` is the wire format Hygie Sync speaks; `docs/hae-mapping.md` the
-measured Health Auto Export protocol.
+`docs/self-hosting.md` is the operations guide (reverse proxy, SMTP, backups, updates,
+device cutover); `docs/native-format.md` is the wire format Hygie Sync speaks;
+`docs/hae-mapping.md` the measured Health Auto Export protocol.
 
 ## Try it with synthetic data
 
