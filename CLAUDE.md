@@ -17,7 +17,8 @@ config 100 % par variables d'environnement (`.env.example` = contrat).
    référence, 11 écrans maquettés). Les tokens CSS sont déjà branchés (`src/app/globals.css`).
    Le JSX de `design/` est une RÉFÉRENCE de rendu : les composants applicatifs se réécrivent
    proprement (sémantique, a11y, états, i18n), on ne copie pas tel quel.
-5. La carte de chantier : `~/Letmiko/vault/board/hygie.md` (état vivant, décisions datées).
+5. La fiche de projet : `~/Letmiko/vault/projets/hygie.md` (but, chronologie de synthèse).
+   Les tâches vivent dans Linear depuis le 2026-09-16, projet « Hygie ».
    Journal du cadrage : `~/Letmiko/vault/journal/2026-08-01-hygie-cadrage.md`.
 
 ## Règles non négociables
