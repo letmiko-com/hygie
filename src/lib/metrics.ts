@@ -94,7 +94,7 @@ const RULES: readonly Rule[] = [
   { re: /^HKCategoryTypeIdentifier(AbdominalCramps|Acne|AppetiteChanges|BladderIncontinence|Bloating|BreastPain|ChestTightnessOrPain|Chills|Constipation|Coughing|Diarrhea|Dizziness|DrySkin|Fainting|Fatigue|Fever|GeneralizedBodyAche|HairLoss|Headache|Heartburn|HotFlashes|LossOfSmell|LossOfTaste|LowerBackPain|MemoryLapse|MoodChanges|Nausea|NightSweats|PelvicPain|RapidPoundingOrFlutteringHeartbeat|RunnyNose|ShortnessOfBreath|SinusCongestion|SkippedHeartbeat|SleepChanges|SoreThroat|VaginalDryness|Vomiting|Wheezing)$/, group: 'symptoms', family: 'neutral', icon: 'sick', quality: 'lower-better' },
 
   // --- cycle and reproductive health -----------------------------------------
-  { re: /Menstrual|IntermenstrualBleeding|Ovulation|Cervical|Contraceptive|Pregnancy|Lactation|ProgesteroneTest/, group: 'cycle', family: 'neutral', icon: 'calendar_month', quality: 'neutral' },
+  { re: /Menstrual|IntermenstrualBleeding|Ovulation|Cervical|Contraceptive|Pregnancy|Lactation|ProgesteroneTest|Menopaus/, group: 'cycle', family: 'neutral', icon: 'calendar_month', quality: 'neutral' },
 
   // --- heart: specific cases first, the plain HeartRate catch-all last ------
   { re: /HeartRateVariability/, group: 'heart', family: 'heart', icon: 'ecg', quality: 'higher-better' },
@@ -408,6 +408,8 @@ const LABELS: Readonly<Record<string, readonly [string, string]>> = {
   HKCategoryTypeIdentifierIntermenstrualBleeding: ['Spotting', 'Saignements intermenstruels'],
   HKCategoryTypeIdentifierIrregularMenstrualCycles: ['Irregular cycles', 'Cycles irréguliers'],
   HKCategoryTypeIdentifierLactation: ['Lactation', 'Allaitement'],
+  HKCategoryTypeIdentifierMenopausalState: ['Menopausal state', 'Statut ménopausique'],
+  HKCategoryTypeIdentifierBleedingAfterMenopause: ['Bleeding after menopause', 'Saignements après la ménopause'],
   HKCategoryTypeIdentifierLossOfSmell: ['Loss of smell', 'Perte d’odorat'],
   HKCategoryTypeIdentifierLossOfTaste: ['Loss of taste', 'Perte de goût'],
   HKCategoryTypeIdentifierLowCardioFitnessEvent: ['Low cardio fitness alert', 'Alerte de capacité cardio basse'],
