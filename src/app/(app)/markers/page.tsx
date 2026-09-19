@@ -40,6 +40,7 @@ export const dynamic = 'force-dynamic';
 /** Reading order: heart, breath and temperature, capacity, body. */
 const MARKERS = [
   'HKQuantityTypeIdentifierHeartRateVariabilitySDNN',
+  'HKQuantityTypeIdentifierHeartRateVariabilityRMSSD',
   'HKQuantityTypeIdentifierRestingHeartRate',
   'HKQuantityTypeIdentifierWalkingHeartRateAverage',
   'HKQuantityTypeIdentifierRespiratoryRate',
