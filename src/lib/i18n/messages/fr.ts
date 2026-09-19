@@ -445,13 +445,14 @@ export const fr: Messages = {
     title: 'Variabilité cardiaque',
     subtitle: 'Les intervalles entre battements eux-mêmes, tels que la montre les a enregistrés.',
     intro:
-      'Santé publie un seul nombre, un SDNN sur 60 s. Ces séries contiennent tous les intervalles : RMSSD et pNN50 existent donc ici, et chaque mesure se lit comme une courbe.',
+      'Santé publie un SDNN sur 60 s et, depuis iOS 27 avec une Apple Watch Series 12 ou Ultra 4, une VFC de récupération (RMSSD). Ces séries contiennent tous les intervalles : RMSSD et pNN50 se calculent donc ici sur chaque mesure, et chaque mesure se lit comme une courbe.',
     empty: 'Aucune série sur cette période',
     emptyHint: 'Les séries de battements arrivent uniquement par Hygie Sync 1.2 : un export Santé ne les contient pas.',
     emptyAllTime: 'Aucune série de battements',
     emptyAllTimeHint: 'Appairez Hygie Sync 1.2 ou plus récent et autorisez les séries de battements dans la feuille Santé. L’app remonte ensuite l’historique conservé sur l’iPhone.',
     trend: 'Moyenne par jour',
     rmssd: 'RMSSD',
+    appleRmssd: 'VFC de récupération (Apple)',
     sdnn: 'SDNN',
     pnn50: 'pNN50',
     meanHr: 'Fréquence moyenne',
@@ -472,7 +473,7 @@ export const fr: Messages = {
     notFoundHint: 'Cette série n’existe pas ou appartient à un autre sujet.',
     aboutTitle: 'Comment ces nombres sont calculés',
     aboutBody:
-      'RMSSD et pNN50 comparent chaque intervalle au suivant et ignorent toute paire séparée par des battements manqués. SDNN est l’écart-type des intervalles d’une série. Les trois sont calculés une fois, à l’ingestion, sur les seuls intervalles valides.',
+      'RMSSD et pNN50 comparent chaque intervalle au suivant et ignorent toute paire séparée par des battements manqués. SDNN est l’écart-type des intervalles d’une série. Les trois sont calculés une fois, à l’ingestion, sur les seuls intervalles valides. La VFC de récupération d’Apple est tracée telle que Santé la publie, à côté de la RMSSD calculée ici et jamais moyennée avec elle : deux instruments, sur des instants différents.',
   },
   hearing: {
     title: 'Audition',

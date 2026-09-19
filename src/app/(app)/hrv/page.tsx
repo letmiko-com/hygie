@@ -6,6 +6,10 @@
 // pNN50 possible at all, and what lets one measurement be read as a curve
 // instead of a figure.
 //
+// Since iOS 27 (Apple Watch Series 12 and Ultra 4) Health also publishes a
+// "recovery HRV", an RMSSD the watch computes itself: it is drawn here next to
+// the RMSSD derived from the intervals, and never averaged with it.
+//
 // No target zone, no "recovery" verdict: the window states what was measured
 // and compares it with the previous window, nothing more.
 import type { Metadata } from 'next';
@@ -19,7 +23,14 @@ import { Panel, PanelLabel } from '@/components/ui/Panel';
 import { fmtDateTime, fmtDuration, fmtInt } from '@/lib/format';
 import { getMessages, resolveLocale } from '@/lib/i18n';
 import { getSubjectContext } from '@/lib/queries/context';
-import { hrvDailySeries, hrvTotals, listHeartbeatSeries, type HeartbeatSeriesItem } from '@/lib/queries/hrv';
+import {
+  appleRmssdDaily,
+  appleRmssdEntry,
+  hrvDailySeries,
+  hrvTotals,
+  listHeartbeatSeries,
+  type HeartbeatSeriesItem,
+} from '@/lib/queries/hrv';
 import { todayInZone } from '@/lib/queries/time';
 import { parseTimeParams, type TimeSearchParams } from '@/lib/queries/time-params';
 import { dayAxisLabels } from '@/lib/time-format';
@@ -34,6 +45,13 @@ function mean(values: Array<number | null>): number | null {
   return vs.length === 0 ? null : vs.reduce((a, b) => a + b, 0) / vs.length;
 }
 
+/** The earlier of two ISO days, either of which may be missing. */
+function earliestDay(a: string | null, b: string | null): string | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return a < b ? a : b;
+}
+
 export default async function HrvPage({ searchParams }: { searchParams: Promise<TimeSearchParams> }) {
   const ctx = await getSubjectContext();
   if (!ctx) return null;
@@ -42,12 +60,16 @@ export default async function HrvPage({ searchParams }: { searchParams: Promise<
 
   const sp = await searchParams;
   const today = todayInZone(ctx.timezone);
-  const totals = await hrvTotals(ctx);
-  const { preset, range, compare } = parseTimeParams(sp, today, totals.firstDay);
+  // Apple's RMSSD is only drawn when this subject has some: a null entry is
+  // the type missing from this database or never measured, not an absence.
+  const [totals, apple] = await Promise.all([hrvTotals(ctx), appleRmssdEntry(ctx, today)]);
+  const firstDay = earliestDay(totals.firstDay, apple?.firstDay ?? null);
+  const { preset, range, compare } = parseTimeParams(sp, today, firstDay);
 
-  const [days, series] = await Promise.all([
+  const [days, series, appleByDay] = await Promise.all([
     hrvDailySeries(ctx, range),
     listHeartbeatSeries(ctx, range, MAX_LISTED),
+    apple ? appleRmssdDaily(ctx, range) : Promise.resolve(null),
   ]);
 
   // The chart is indexed by day of the window, so a day without a series is a
@@ -61,13 +83,14 @@ export default async function HrvPage({ searchParams }: { searchParams: Promise<
   const byDay = new Map(days.map((d) => [d.day, d]));
   const rmssd = dayKeys.map((k) => byDay.get(k)?.rmssdMs ?? null);
   const sdnn = dayKeys.map((k) => byDay.get(k)?.sdnnMs ?? null);
+  const appleRmssd = appleByDay ? dayKeys.map((k) => appleByDay.get(k) ?? null) : null;
 
   // The list is capped, the window is not: the tile must count what the window
   // holds, or "200" would be read as a measurement on a three-year view.
   const windowSeries = days.reduce((a, d) => a + d.seriesCount, 0);
   const meanHr = mean(days.map((d) => d.meanHrBpm));
   const fmtMean = (v: number | null) => (v === null ? null : fmtInt(v, locale));
-  const hasHistory = totals.series > 0;
+  const hasHistory = totals.series > 0 || apple !== null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -81,7 +104,7 @@ export default async function HrvPage({ searchParams }: { searchParams: Promise<
             preset={preset}
             range={range}
             compare={compare}
-            firstDataDay={totals.firstDay}
+            firstDataDay={firstDay}
             today={today}
             locale={locale}
             labels={m.timenav}
@@ -102,6 +125,7 @@ export default async function HrvPage({ searchParams }: { searchParams: Promise<
             {/* A window with no series hands StatTile a null, which renders the
                 absence glyph: a mean of nothing is not zero. */}
             <StatTile label={m.hrv.rmssd} value={fmtMean(mean(rmssd))} unit="ms" />
+            {appleRmssd && <StatTile label={m.hrv.appleRmssd} value={fmtMean(mean(appleRmssd))} unit="ms" />}
             <StatTile label={m.hrv.sdnn} value={fmtMean(mean(sdnn))} unit="ms" />
             <StatTile label={m.hrv.meanHr} value={fmtMean(meanHr)} unit="bpm" />
             <StatTile label={m.hrv.series} value={fmtInt(windowSeries, locale)} />
@@ -112,6 +136,9 @@ export default async function HrvPage({ searchParams }: { searchParams: Promise<
             <LineChart
               series={[
                 { data: rmssd, color: 'var(--data-heart)', label: m.hrv.rmssd, connect: true },
+                ...(appleRmssd
+                  ? [{ data: appleRmssd, color: 'var(--data-energy)', label: m.hrv.appleRmssd, connect: true }]
+                  : []),
                 { data: sdnn, color: 'var(--data-sleep)', label: m.hrv.sdnn, connect: true, dashed: true },
               ]}
               xLabels={dayAxisLabels(
@@ -124,7 +151,7 @@ export default async function HrvPage({ searchParams }: { searchParams: Promise<
                   ? { month: 'short', year: '2-digit' }
                   : { day: 'numeric', month: 'short' }
               )}
-              ariaLabel={`${m.hrv.trend} — ${m.hrv.rmssd}, ${m.hrv.sdnn}`}
+              ariaLabel={`${m.hrv.trend} — ${[m.hrv.rmssd, appleRmssd ? m.hrv.appleRmssd : null, m.hrv.sdnn].filter(Boolean).join(', ')}`}
               emptyLabel={m.hrv.empty}
               yFormat={(v, digits) => `${v.toFixed(digits)} ms`}
             />

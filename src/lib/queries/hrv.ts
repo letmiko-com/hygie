@@ -7,8 +7,10 @@
 // Days are computed in the subject's zone like everywhere else, and every
 // read tolerates the table's absence until 0007 is applied.
 import { getDb } from '@/lib/db';
+import { subjectCatalog, type CatalogEntry } from './catalog';
 import type { SubjectContext } from './context';
 import { untilMigrated } from './optional';
+import { dailySeries } from './series';
 import type { DayRange } from './time';
 
 export interface HrvDay {
@@ -220,4 +222,38 @@ export async function getHeartbeatSeries(
     meanRrMs: r.mean_rr_ms,
     intervalsMs: r.intervals_ms ?? [],
   };
+}
+
+// --- Apple's recovery HRV -----------------------------------------------------
+//
+// iOS 27 with an Apple Watch Series 12 or Ultra 4 publishes a second HRV
+// figure, the "recovery HRV": an RMSSD the watch computes itself, several
+// times a night, stored as an ordinary quantity sample (added to the taxonomy
+// on 2026-09-19). Half of the watch's HRV measurements arrive without a
+// heartbeat series behind them, so this is the only RMSSD that covers those
+// moments. It is drawn NEXT TO the RMSSD derived above and never averaged
+// with it: two instruments, on different instants.
+
+export const APPLE_RMSSD = 'HKQuantityTypeIdentifierHeartRateVariabilityRMSSD';
+
+/**
+ * The catalogue entry of Apple's RMSSD for this subject, or null when the
+ * type is unknown to this database (taxonomy not seeded yet) or was never
+ * measured for them. Null must mean "do not draw it", not "draw an absence".
+ */
+export async function appleRmssdEntry(ctx: SubjectContext, today: string): Promise<CatalogEntry | null> {
+  const entries = await subjectCatalog(ctx, today);
+  return entries.find((e) => e.hkIdentifier === APPLE_RMSSD) ?? null;
+}
+
+/**
+ * Daily mean of Apple's RMSSD over the window, keyed by day. Days without a
+ * reading are absent. Same source rule as every quantity (rollups past 31
+ * days), so the curve is consistent with /markers.
+ */
+export async function appleRmssdDaily(ctx: SubjectContext, range: DayRange): Promise<Map<string, number>> {
+  const { points } = await dailySeries(ctx, APPLE_RMSSD, range);
+  const byDay = new Map<string, number>();
+  for (const p of points) if (p.value !== null) byDay.set(p.day, p.value);
+  return byDay;
 }
