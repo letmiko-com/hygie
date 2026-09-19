@@ -186,6 +186,7 @@ try {
   const HR = T('HeartRate');
   const RHR = T('RestingHeartRate');
   const HRV = T('HeartRateVariabilitySDNN');
+  const RMSSD = T('HeartRateVariabilityRMSSD');
   const WALK_HR = T('WalkingHeartRateAverage');
   const RESP = T('RespiratoryRate');
   const SPO2 = T('OxygenSaturation');
@@ -291,6 +292,10 @@ try {
       for (let k = 0; k < 4; k++) obs(RESP, new Date(startTs.getTime() + ((k + 0.5) / 4) * durationH * 3600_000), +Math.max(11, gauss(14.2 - 0.3 * fit, 0.6)).toFixed(1));
       obs(WRIST, new Date(startTs.getTime() + 2 * 3600_000), +gauss(35.9 + 0.15 * sea, 0.12).toFixed(2));
       obs(HRV, new Date(startTs.getTime() + 3 * 3600_000), Math.round(Math.max(20, gauss(48 + 14 * fit - (weekend ? 3 : 0), 8))));
+      // Recovery HRV (RMSSD, iOS 27, Series 12 and Ultra 4): several readings a
+      // night, published by the watch as an ordinary quantity. Lower than the
+      // 60 s SDNN on the same night, as on real recordings.
+      for (let k = 0; k < 3; k++) obs(RMSSD, new Date(startTs.getTime() + ((k + 1) / 4) * durationH * 3600_000), Math.round(Math.max(15, gauss(38 + 12 * fit - (weekend ? 2 : 0), 7))));
       obs(RHR, new Date(endTs.getTime() - 600_000), Math.round(Math.max(44, gauss(60 - 5 * fit + (weekend ? 1 : 0), 2.2))));
     }
 

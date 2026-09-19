@@ -229,6 +229,7 @@ const LABELS: Readonly<Record<string, readonly [string, string]>> = {
   HKQuantityTypeIdentifierRestingHeartRate: ['Resting heart rate', 'FC de repos'],
   HKQuantityTypeIdentifierWalkingHeartRateAverage: ['Walking heart rate', 'FC de marche'],
   HKQuantityTypeIdentifierHeartRateVariabilitySDNN: ['HRV (SDNN)', 'VFC (SDNN)'],
+  HKQuantityTypeIdentifierHeartRateVariabilityRMSSD: ['Recovery HRV (RMSSD)', 'VFC de récupération (RMSSD)'],
   HKQuantityTypeIdentifierHeartRateRecoveryOneMinute: ['1 min HR recovery', 'Récupération FC à 1 min'],
   HKQuantityTypeIdentifierAtrialFibrillationBurden: ['Atrial fibrillation burden', 'Charge de fibrillation atriale'],
   HKQuantityTypeIdentifierBloodPressureSystolic: ['Systolic pressure', 'Tension systolique'],
