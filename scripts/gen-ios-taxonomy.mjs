@@ -26,6 +26,25 @@ const AUTH_DISALLOWED = new Set(['HKDataTypeSleepDurationGoal']);
 const supported = taxonomy.metric_types.filter(
   (t) => t.supported && !AUTH_DISALLOWED.has(t.hk_identifier)
 );
+
+// The French names the web app shows (src/lib/metrics.ts, LABELS: `[en, fr]`
+// per identifier). Read off the source with a regex rather than imported: the
+// module pulls the whole app's TypeScript with it. Presentation only, like on
+// the web: a type without a label keeps its identifier, made readable.
+const metricsSource = await readFile(
+  join(here, '..', 'src', 'lib', 'metrics.ts'),
+  'utf8'
+);
+const LABEL_LINE = /^\s*(HK\w+):\s*\['((?:[^'\\]|\\.)*)',\s*'((?:[^'\\]|\\.)*)'\]/gm;
+const frenchNames = new Map();
+for (const [, id, , fr] of metricsSource.matchAll(LABEL_LINE)) {
+  frenchNames.set(id, fr.replace(/\\'/g, "'"));
+}
+const swiftString = (text) =>
+  `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+const named = supported
+  .filter((t) => frenchNames.has(t.hk_identifier))
+  .map((t) => `        "${t.hk_identifier}": ${swiftString(frenchNames.get(t.hk_identifier))},`);
 const minute = supported.filter(
   (t) => t.kind === 'quantity' && t.hae_regime === 'minute_cumulative'
 );
@@ -62,6 +81,12 @@ ${minute.map(line).join('\n')}
     /// Category types: pushed as raw samples with their HealthKit enum value.
     static let categorySamples: [String] = [
 ${category.map((t) => `        "${t.hk_identifier}",`).join('\n')}
+    ]
+
+    /// French names, the web app's own (src/lib/metrics.ts). Presentation
+    /// only: a type absent here is shown by its identifier made readable.
+    static let frenchNames: [String: String] = [
+${named.join('\n')}
     ]
 }
 `);
