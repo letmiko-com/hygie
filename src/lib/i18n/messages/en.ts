@@ -438,13 +438,14 @@ export const en = {
     title: 'Heart rate variability',
     subtitle: 'The beat-to-beat intervals themselves, as the watch recorded them.',
     intro:
-      'Health publishes one number, an SDNN over 60 s. These series hold every interval, so RMSSD and pNN50 exist here and each measurement can be read as a curve.',
+      'Health publishes an SDNN over 60 s and, since iOS 27 with an Apple Watch Series 12 or Ultra 4, a recovery HRV (RMSSD). These series hold every interval, so RMSSD and pNN50 are computed here on each measurement, and each one can be read as a curve.',
     empty: 'No series in this window',
     emptyHint: 'Heartbeat series arrive through Hygie Sync 1.2 only: an Apple Health export does not contain them.',
     emptyAllTime: 'No heartbeat series yet',
     emptyAllTimeHint: 'Pair Hygie Sync 1.2 or later and authorise heartbeat series in the Health sheet. The app then walks back through the history stored on the iPhone.',
     trend: 'Daily mean',
     rmssd: 'RMSSD',
+    appleRmssd: 'Recovery HRV (Apple)',
     sdnn: 'SDNN',
     pnn50: 'pNN50',
     meanHr: 'Mean rate',
@@ -465,7 +466,7 @@ export const en = {
     notFoundHint: 'This series does not exist, or belongs to another subject.',
     aboutTitle: 'How these numbers are computed',
     aboutBody:
-      'RMSSD and pNN50 compare each interval with the next, and skip any pair separated by missed beats. SDNN is the standard deviation of the intervals of one series. All three are computed once, at ingestion, over the valid intervals only.',
+      'RMSSD and pNN50 compare each interval with the next, and skip any pair separated by missed beats. SDNN is the standard deviation of the intervals of one series. All three are computed once, at ingestion, over the valid intervals only. Apple’s recovery HRV is drawn as Health publishes it, next to the RMSSD computed here and never averaged with it: two instruments, on different moments.',
   },
   hearing: {
     title: 'Hearing',
