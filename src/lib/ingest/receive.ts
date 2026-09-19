@@ -47,7 +47,7 @@ interface DeviceRow {
  * Scans every device row and compares each hash so the response time does not
  * depend on whether or where a match occurs. Revoked devices never match.
  */
-async function authenticateDevice(
+export async function authenticateDevice(
   key: string
 ): Promise<{ deviceId: string; subjectId: string } | null> {
   const presented = createHash('sha256').update(key, 'utf8').digest();

@@ -1,5 +1,6 @@
 // Session gate (Next proxy, Node runtime): everything except /login*, the
-// Auth.js endpoints and /api/v1/ingest/* requires a valid database session.
+// Auth.js endpoints and the device-key API (/api/v1/ingest/*, /api/v1/device/*)
+// requires a valid database session.
 // The check is REAL (auth_sessions lookup + user not disabled), not a mere
 // cookie-presence test: revoking a session in the database takes effect on the
 // next request. Constraint documented in next.config.ts: ingest routes stream
@@ -30,7 +31,8 @@ export default async function proxy(request: NextRequest): Promise<NextResponse>
 export const config = {
   // Everything except: /login* (sign-in flow), /api/auth* (Auth.js endpoints,
   // needed to obtain a session), /api/v1/ingest* (device-key auth, streamed
-  // bodies: keep out of any matcher, see next.config.ts), the whole /_next/*
+  // bodies: keep out of any matcher, see next.config.ts), /api/v1/device*
+  // (device-key auth too, the status read of Hygie Sync), the whole /_next/*
   // internal space (static assets carry no data, and gating the dev HMR
   // websocket leaves dev pages unhydrated), /fonts/* (self-hosted font files:
   // gating them strips the login page of its typography and icons) and the
@@ -40,6 +42,6 @@ export const config = {
   // `/loginfoo` too, `icon\.svg` matched `/icon.svg.bak`. A path is only
   // exempt when it IS the prefix or continues with a slash.
   matcher: [
-    '/((?!login(?:/|$)|api/auth(?:/|$)|api/v1/ingest(?:/|$)|_next(?:/|$)|fonts(?:/|$)|icon\\.svg$|favicon\\.ico$|robots\\.txt$).*)',
+    '/((?!login(?:/|$)|api/auth(?:/|$)|api/v1/ingest(?:/|$)|api/v1/device(?:/|$)|_next(?:/|$)|fonts(?:/|$)|icon\\.svg$|favicon\\.ico$|robots\\.txt$).*)',
   ],
 };
