@@ -1,5 +1,5 @@
 {
-  "comment": "Seed for units/metric_types/metric_category_values. 97 types were inventoried from a real export.xml (2026-08-04: type names, units and category values from the file itself); 93 more were added on 2026-09-06 from the iOS 26.5 SDK (every HKQuantityType and HKCategoryType identifier the native channel can read), with HealthKit's own value enums as their category contracts and the unit the export is expected to carry as xml.unit (unverified against a file: a mismatch is counted by the importer, never converted). xml.unit is the unit expected in export.xml, xml.factor the multiplier to the canonical unit (percent types are 0-1 fractions in the XML; energies are kcal). hae_regime describes the Health Auto Export channel and stays \"unsupported\" for the types HAE has not been measured to send (docs/hae-mapping.md is the contract, 31 verified entries): those are XML-only, which does not stop them from being ingested. HeartRateVariabilityRMSSD was added on 2026-09-19 from the iOS 27 SDK: the recovery HRV that Apple Watch Series 12 and Ultra 4 publish, an ordinary discrete quantity in ms like SDNN. Aggregation choices and their rationale: db/taxonomy.md.",
+  "comment": "Seed for units/metric_types/metric_category_values. 97 types were inventoried from a real export.xml (2026-08-04: type names, units and category values from the file itself); 93 more were added on 2026-09-06 from the iOS 26.5 SDK (every HKQuantityType and HKCategoryType identifier the native channel can read), with HealthKit's own value enums as their category contracts and the unit the export is expected to carry as xml.unit (unverified against a file: a mismatch is counted by the importer, never converted). xml.unit is the unit expected in export.xml, xml.factor the multiplier to the canonical unit (percent types are 0-1 fractions in the XML; energies are kcal). hae_regime describes the Health Auto Export channel and stays \"unsupported\" for the types HAE has not been measured to send (docs/hae-mapping.md is the contract, 31 verified entries): those are XML-only, which does not stop them from being ingested. HeartRateVariabilityRMSSD was added on 2026-09-19 from the iOS 27 SDK: the recovery HRV that Apple Watch Series 12 and Ultra 4 publish, an ordinary discrete quantity in ms like SDNN. MenopausalState and BleedingAfterMenopause (iOS 27, Cycle Tracking on watchOS 27) followed the same day, with HealthKit's enums as their contracts. Aggregation choices and their rationale: db/taxonomy.md.",
   "metric_types": [
     {
       "hk_identifier": "HKQuantityTypeIdentifierHeartRate",
@@ -2398,6 +2398,26 @@
       "canonical_unit": null,
       "quantize_scale": null,
       "supported": true
+    },
+    {
+      "hk_identifier": "HKCategoryTypeIdentifierMenopausalState",
+      "kind": "category",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": null,
+      "quantize_scale": null,
+      "supported": true
+    },
+    {
+      "hk_identifier": "HKCategoryTypeIdentifierBleedingAfterMenopause",
+      "kind": "category",
+      "hae_name": null,
+      "hae_regime": "unsupported",
+      "aggregation": "none",
+      "canonical_unit": null,
+      "quantize_scale": null,
+      "supported": true
     }
   ],
   "metric_category_values": {
@@ -3817,6 +3837,50 @@
         "raw_value": 0,
         "slug": "not_applicable",
         "hk_value": "HKCategoryValueNotApplicable"
+      }
+    ],
+    "HKCategoryTypeIdentifierBleedingAfterMenopause": [
+      {
+        "raw_value": 1,
+        "slug": "unspecified",
+        "hk_value": "HKCategoryValueVaginalBleedingUnspecified"
+      },
+      {
+        "raw_value": 2,
+        "slug": "light",
+        "hk_value": "HKCategoryValueVaginalBleedingLight"
+      },
+      {
+        "raw_value": 3,
+        "slug": "medium",
+        "hk_value": "HKCategoryValueVaginalBleedingMedium"
+      },
+      {
+        "raw_value": 4,
+        "slug": "heavy",
+        "hk_value": "HKCategoryValueVaginalBleedingHeavy"
+      },
+      {
+        "raw_value": 5,
+        "slug": "none",
+        "hk_value": "HKCategoryValueVaginalBleedingNone"
+      }
+    ],
+    "HKCategoryTypeIdentifierMenopausalState": [
+      {
+        "raw_value": 1,
+        "slug": "menopause",
+        "hk_value": "HKCategoryValueMenopausalStateMenopause"
+      },
+      {
+        "raw_value": 2,
+        "slug": "perimenopause",
+        "hk_value": "HKCategoryValueMenopausalStatePerimenopause"
+      },
+      {
+        "raw_value": 3,
+        "slug": "none",
+        "hk_value": "HKCategoryValueMenopausalStateNone"
       }
     ]
   }
