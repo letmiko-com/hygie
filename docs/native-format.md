@@ -273,6 +273,65 @@ One HealthKit rule worth knowing, undocumented in the headers and found on
 **refused** unless it also names `HKQuantityTypeIdentifierHeartRateVariabilitySDNN`,
 the same way a workout route request must also name the workout type.
 
+## Device status (GET `/api/v1/device/status`, since Hygie Sync 1.3)
+
+The ingest endpoint answers `200 {batch_id}` as soon as the batch is durable
+on disk, **before** the worker normalizes it: the ack proves receipt, never
+understanding. This read-only companion tells the calling device what the
+server made of its batches, for the diagnostic screen of the app.
+
+- Same authentication as ingestion: `X-Hygie-Device-Key` header, checked
+  first, `401 missing_device_key` / `401 invalid_device_key`, unknown and
+  revoked keys indistinguishable. Scope: **the calling device only**.
+- No health value ever appears in the response: counters, timestamps and
+  type names. Failed batches carry `code` and `step`, never a raw message.
+- No side effect. In particular `devices.last_seen_at` is **not** touched:
+  it means "sent data", a status poll must not fake it.
+- `Cache-Control: no-store`. Format tag `hygie-device-status/1`; unknown
+  keys must be ignored by the app so the response can grow.
+
+```json
+{
+  "format": "hygie-device-status/1",
+  "server_time": "2026-09-19T14:30:12.418Z",
+  "device": { "name": "iPhone", "created_at": "2026-08-12T10:02:41.000Z",
+              "last_seen_at": "2026-09-19T14:28:03.512Z" },
+  "taxonomy": { "types": [ "HKCategoryTypeIdentifierAbdominalCramps", "…" ] },
+  "batches": {
+    "last_received_at": "2026-09-19T14:28:03.512Z",
+    "last_visible_at": "2026-09-19T14:28:05.101Z",
+    "pending": 0, "failed": 1,
+    "recent_failures": [ { "received_at": "2026-09-18T07:12:00.000Z",
+                           "code": "raw_file_missing", "step": null } ]
+  },
+  "refused_samples": {
+    "window_days": 30,
+    "unit_mismatch": { "HKQuantityTypeIdentifierWalkingSpeed": 412 },
+    "unknown_type": { "HKQuantityTypeIdentifierFutureThing": 3 }
+  }
+}
+```
+
+- `taxonomy.types`: every `hk_identifier` the server can ingest
+  (`metric_types.supported`), sorted. The app diffs it against its generated
+  `Taxonomy.swift`: a type the app reads that the server lacks means "update
+  the server", a type the server knows that the app never sends means "update
+  the app". The app only compares `HKQuantityTypeIdentifier*` and
+  `HKCategoryTypeIdentifier*` names: `HKDataTypeSleepDurationGoal` is a
+  server-side type by construction (see `scripts/gen-ios-taxonomy.mjs`).
+- `batches`: this device's `ingest_batches`. `last_received_at` whatever the
+  state, `last_visible_at` for status ≥ `normalized` (architecture §3.5),
+  `pending` = `received` or `validated`, `failed`, and the five newest
+  failures.
+- `refused_samples`: over the native batches of the last `window_days` days
+  (the raw retention window), `unit_mismatch` and `unknown_type` per wire type
+  name, only the types with a non-zero count. A consistent app/server pair
+  returns two empty objects. Those counters are the two ways the app and the
+  server can disagree on the taxonomy without any HTTP error.
+
+A server that predates this endpoint answers `404`: the app shows the
+diagnostic as unavailable and says to update the server, nothing else changes.
+
 ## Explicitly out of scope (still)
 
 Scored assessments (GAD-7, PHQ-9), vision prescriptions, medications,
