@@ -77,7 +77,8 @@ is an in-process loop; no third service.
    (checksums, counts, status): rotation frees bytes, never audit trail. A batch still
    in flight keeps its body whatever its age.
 5. Sync status endpoint distinguishes "batch received" from "data visible"
-   (status ≥ `normalized`).
+   (status ≥ `normalized`). The device itself reads the same facts, scoped to
+   its own batches, through `GET /api/v1/device/status` (native-format.md).
 
 The XML backfill is a local CLI (streaming, COPY-based; 7.17M rows imported in 91s on the
 bench), never HTTP. Sequence: minimal schema → bulk import → validation/reconciliation →
