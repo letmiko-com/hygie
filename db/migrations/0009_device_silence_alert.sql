@@ -1,0 +1,13 @@
+-- Silence alert (docs/architecture.md §3): when a paired device has sent
+-- nothing for HYGIE_SILENCE_ALERT_HOURS, the worker's hourly maintenance
+-- emails the subject's members and the instance admins, once per episode.
+--
+-- One column is the whole state machine. An episode starts at the device's
+-- last batch (last_seen_at, or created_at for a device that never sent); it
+-- has been alerted when silence_alerted_at is later than that start. A new
+-- batch moves last_seen_at past silence_alerted_at, which re-arms the alert
+-- without any write on the ingest path.
+--
+-- Expand step only: the maintenance skips the check while the column is
+-- absent, so this migration can run before or after the deploy that reads it.
+alter table devices add column silence_alerted_at timestamptz;

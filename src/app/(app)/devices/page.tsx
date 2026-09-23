@@ -14,17 +14,17 @@ import { fmtInt, fmtRelative } from '@/lib/format';
 import { getMessages, resolveLocale } from '@/lib/i18n';
 import { listDevices } from '@/lib/devices';
 import { getSubjectContext } from '@/lib/queries/context';
+import { staleAfterMs } from '@/lib/silence';
 import { revokeDeviceAction } from './actions';
 import { PairPanel, RevokeButton } from './ui';
 
 export const metadata: Metadata = { title: 'Appareils · Hygie' };
 export const dynamic = 'force-dynamic';
 
-const STALE_AFTER_MS = 26 * 60 * 60 * 1000;
-
 function freshness(lastSeen: Date | null): SyncState {
   if (!lastSeen) return 'never';
-  return Date.now() - lastSeen.getTime() < STALE_AFTER_MS ? 'fresh' : 'stale';
+  // Same threshold as the silence alert email (src/lib/silence.ts).
+  return Date.now() - lastSeen.getTime() < staleAfterMs() ? 'fresh' : 'stale';
 }
 
 export default async function DevicesPage() {

@@ -9,7 +9,8 @@
 // 'rollups_ready' is earned, not declared: the normalize transaction queues the
 // UTC hours it touched (src/lib/rollups.ts) and step 3 rebuilds them all first.
 // When idle the loop drains the ranges queued by everyone else (cutovers, XML
-// backfill) and, hourly, rotates raw bodies past their retention.
+// backfill) and, hourly, rotates raw bodies past their retention and emails
+// about devices that have gone silent (src/lib/ingest/silence-alert.ts).
 import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, rename, stat, unlink } from 'node:fs/promises';
 import { hostname } from 'node:os';
@@ -27,6 +28,7 @@ import {
   normalizeNativePayload,
   readAndValidateNativeBatchFile,
 } from '@/lib/ingest/normalize-native';
+import { runSilenceAlerts } from '@/lib/ingest/silence-alert';
 import { drainRollupQueue } from '@/lib/rollups';
 
 const LEASE = "interval '5 minutes'";
@@ -421,19 +423,30 @@ async function purgeExpiredRawBodies(): Promise<void> {
  * Hourly housekeeping piggybacked on the worker loop: expired database
  * sessions and consumed-or-stale magic-link tokens have no reason to
  * outlive their expiry (revocation stays immediate either way; this only
- * keeps the auth tables from growing forever), and raw bodies past their
- * retention. Logs carry counts only.
+ * keeps the auth tables from growing forever), raw bodies past their
+ * retention, and the silence alert. Logs carry counts only.
  */
 async function runMaintenance(): Promise<void> {
-  const db = getDb();
-  const sessions = await db.query(`delete from auth_sessions where expires_at < now()`);
-  const tokens = await db.query(`delete from auth_verification_tokens where expires_at < now()`);
-  if ((sessions.rowCount ?? 0) > 0 || (tokens.rowCount ?? 0) > 0) {
-    console.log(
-      `[worker] maintenance: purged ${sessions.rowCount ?? 0} expired sessions, ${tokens.rowCount ?? 0} expired tokens`
-    );
+  try {
+    const db = getDb();
+    const sessions = await db.query(`delete from auth_sessions where expires_at < now()`);
+    const tokens = await db.query(`delete from auth_verification_tokens where expires_at < now()`);
+    if ((sessions.rowCount ?? 0) > 0 || (tokens.rowCount ?? 0) > 0) {
+      console.log(
+        `[worker] maintenance: purged ${sessions.rowCount ?? 0} expired sessions, ${tokens.rowCount ?? 0} expired tokens`
+      );
+    }
+    await purgeExpiredRawBodies();
+  } finally {
+    // Whatever became of the housekeeping: a failed purge must not silence the
+    // alert. Refused emails are counted in its own log line; what lands here
+    // is a database error, logged under the alert's name.
+    await runSilenceAlerts().catch((err: unknown) => {
+      console.error(
+        `[worker] silence alert failed: ${err instanceof Error ? err.message : 'unknown error'}`
+      );
+    });
   }
-  await purgeExpiredRawBodies();
 }
 
 async function runLoop(workerId: string): Promise<void> {

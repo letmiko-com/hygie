@@ -14,6 +14,7 @@ import { Gauge } from '@/components/charts/Gauge';
 import { BarChart } from '@/components/charts/BarChart';
 import { LineChart } from '@/components/charts/LineChart';
 import { MetricCard } from '@/components/data/MetricCard';
+import { SilenceBanner } from '@/components/data/SilenceBanner';
 import { StatTile } from '@/components/data/StatTile';
 import { TrendChip } from '@/components/data/TrendChip';
 import { Icon } from '@/components/ui/Icon';
@@ -21,7 +22,8 @@ import { Panel, PanelLabel } from '@/components/ui/Panel';
 import { TimeNav } from '@/components/time/TimeNav';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
 import { bucketSpans, drillSet, drillZone, spanQuery } from '@/lib/drill';
-import { ABSENT, fmtDay, fmtHoursMinutes, fmtInt, fmtNumber, kjToKcal } from '@/lib/format';
+import { silentDevices } from '@/lib/devices';
+import { ABSENT, fmtDay, fmtHoursMinutes, fmtInt, fmtNumber, fmtRelative, kjToKcal } from '@/lib/format';
 import { getMessages, resolveLocale, type Locale } from '@/lib/i18n';
 import { dataColor, metricHref, type DataFamily } from '@/lib/metrics';
 import { getSubjectContext, type SubjectContext } from '@/lib/queries/context';
@@ -135,7 +137,7 @@ export default async function DashboardPage({
   const m = getMessages(locale);
   const today = todayInZone(ctx.timezone);
 
-  const totals = await dataTotals(ctx);
+  const [totals, silent] = await Promise.all([dataTotals(ctx), silentDevices(ctx)]);
   const sp = await searchParams;
   const { preset, range, compare } = parseTimeParams(sp, today, totals.firstDay);
   // Cards open the metric's own page on the window being looked at: a figure
@@ -317,6 +319,17 @@ export default async function DashboardPage({
           />
         )}
       </header>
+
+      <SilenceBanner
+        lines={silent.map((d) => ({
+          key: d.id,
+          text: d.lastSeenAt
+            ? m.dash.silentDevice(d.name, fmtRelative(d.lastSeenAt, locale, ctx.timezone))
+            : m.dash.silentDeviceNever(d.name),
+        }))}
+        linkLabel={m.dash.silentDevicesLink}
+        href="/devices"
+      />
 
       <div style={{ ...gridPanel, gridTemplateColumns: 'repeat(auto-fit, minmax(178px, 1fr))', gap: 10 }}>
         {cardSpecs.map((spec, i) => {
