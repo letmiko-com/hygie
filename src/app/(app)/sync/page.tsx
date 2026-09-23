@@ -34,18 +34,17 @@ import {
   type BatchInfo,
 } from '@/lib/queries/sync';
 import { dayInZone } from '@/lib/queries/time';
+import { staleAfterMs } from '@/lib/silence';
 
 export const metadata: Metadata = { title: 'Synchronisation · Hygie' };
 export const dynamic = 'force-dynamic';
-
-/** Data older than this is flagged behind (the companion app pushes at least daily). */
-const STALE_AFTER_MS = 26 * 60 * 60 * 1000;
 
 function freshness(lastSeen: Date | null, failed: boolean, pending: boolean): SyncState {
   if (failed) return 'error';
   if (pending) return 'syncing';
   if (!lastSeen) return 'never';
-  return Date.now() - lastSeen.getTime() < STALE_AFTER_MS ? 'fresh' : 'stale';
+  // Same threshold as the silence alert email (src/lib/silence.ts).
+  return Date.now() - lastSeen.getTime() < staleAfterMs() ? 'fresh' : 'stale';
 }
 
 const BATCH_TONE: Record<BatchInfo['status'], BadgeTone> = {

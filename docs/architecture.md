@@ -79,6 +79,18 @@ is an in-process loop; no third service.
 5. Sync status endpoint distinguishes "batch received" from "data visible"
    (status ≥ `normalized`). The device itself reads the same facts, scoped to
    its own batches, through `GET /api/v1/device/status` (native-format.md).
+6. Silence alert, in the same hourly maintenance (migration 0009): when an active
+   device has sent no batch for `HYGIE_SILENCE_ALERT_HOURS` (default 24, 0 turns it
+   off), the members of its subject AND every instance admin get one email per
+   silence episode. An episode starts at `coalesce(last_seen_at, created_at)`;
+   `devices.silence_alerted_at` later than that start means it was alerted, so the
+   next batch re-arms the alert with no write on the ingest path. The claim is
+   committed before sending (two processes overlapping during a redeploy cannot both
+   send) and given back when no recipient could be reached. The message names the
+   device, the subject and the time of the last batch: instance information, like
+   the per-subject sync state the admin already sees, never a health value. The same
+   threshold drives the "behind" badges of the Devices and Sync screens and the
+   dashboard banner.
 
 The XML backfill is a local CLI (streaming, COPY-based; 7.17M rows imported in 91s on the
 bench), never HTTP. Sequence: minimal schema → bulk import → validation/reconciliation →

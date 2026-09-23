@@ -6,6 +6,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { getDb } from '@/lib/db';
 import type { SubjectContext } from '@/lib/queries/context';
+import { staleAfterMs } from '@/lib/silence';
 
 const KEY_PREFIX_DISPLAY = 10;
 
@@ -80,4 +81,29 @@ export async function listDevices(ctx: SubjectContext): Promise<DeviceRow[]> {
     revokedAt: r.revoked_at,
     pushes: r.pushes,
   }));
+}
+
+export interface SilentDevice {
+  id: string;
+  name: string;
+  lastSeenAt: Date | null;
+}
+
+/**
+ * Active devices of the subject past the silence threshold, longest silence
+ * first: the dashboard banner. Same rule as the alert email (a device that
+ * never sent counts from its pairing), read from last_seen_at only, so it
+ * works whether or not migration 0009 has run.
+ */
+export async function silentDevices(ctx: SubjectContext): Promise<SilentDevice[]> {
+  const { rows } = await getDb().query<{ id: string; name: string; last_seen_at: Date | null }>(
+    `select id, name, last_seen_at
+     from devices
+     where subject_id = $1
+       and revoked_at is null
+       and coalesce(last_seen_at, created_at) < now() - $2::double precision * interval '1 millisecond'
+     order by coalesce(last_seen_at, created_at)`,
+    [ctx.subjectId, staleAfterMs()]
+  );
+  return rows.map((r) => ({ id: r.id, name: r.name, lastSeenAt: r.last_seen_at }));
 }

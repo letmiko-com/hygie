@@ -103,6 +103,9 @@ export const en = {
     ringsNoData: 'No rings for today',
     ringsLast7: 'last 7 days',
     ringsPaused: 'paused',
+    silentDevice: (device: string, ago: string) => `"${device}" has stopped sending: last batch ${ago}.`,
+    silentDeviceNever: (device: string) => `"${device}" has not sent anything yet.`,
+    silentDevicesLink: 'Devices',
   },
   timeline: {
     title: 'Recent activity',
@@ -667,6 +670,23 @@ export const en = {
     lessThanShare: '< 0.1 %',
     receivedVsVisible:
       'A batch is visible once normalized: received does not mean queryable yet.',
+  },
+  // Silence alert email (src/lib/ingest/silence-alert.ts). Plain text and
+  // HTML are built from the same strings; values are escaped by the caller.
+  silenceMail: {
+    subject: (device: string) => `Hygie: "${device}" has stopped sending`,
+    greeting: 'Hello,',
+    body: (device: string, subject: string, since: string, hours: string) =>
+      `The device "${device}" (${subject}) has sent nothing to Hygie since ${since}, more than ${hours} h ago.`,
+    bodyNever: (device: string, subject: string, pairedOn: string, hours: string) =>
+      `The device "${device}" (${subject}), paired on ${pairedOn}, has not sent anything to Hygie yet, more than ${hours} h later.`,
+    memberHint:
+      'Open Hygie Sync on that device: its status screen shows the last sync and what is holding it back.',
+    devicesLink: 'Your devices',
+    devicesLine: (url: string) => `Your devices: ${url}`,
+    adminNote:
+      'You receive this message as an administrator of this instance. It carries no health data.',
+    once: 'This alert is sent once per silence: the next batch from the device re-arms it.',
   },
 };
 

@@ -91,6 +91,11 @@ you need it: the bootstrap admin account is useless until mail leaves the server
 | `SMTP_USER`, `SMTP_PASSWORD` | Relay credentials. |
 | `SMTP_FROM` | Must be an address the relay is allowed to send as, e.g. `"Hygie <hygie@example.com>"`. A sender the provider rejects looks exactly like a working configuration until the first link never arrives. |
 
+The same relay carries the silence alert: when a paired device has sent nothing for
+`HYGIE_SILENCE_ALERT_HOURS` (default `24`, `0` turns it off), the members of its subject
+and every admin get one email, and the next batch re-arms it. A broken relay therefore
+also means a phone can stop sending without anyone being told.
+
 `HYGIE_MAIL_CAPTURE_DIR` writes the messages to disk as JSON instead of sending them.
 It exists for development and tests. Never set it in production: it turns every login
 into a file on the server.

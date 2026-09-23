@@ -103,6 +103,9 @@ export const fr: Messages = {
     ringsNoData: 'Pas d’anneaux pour aujourd’hui',
     ringsLast7: '7 derniers jours',
     ringsPaused: 'en pause',
+    silentDevice: (device: string, ago: string) => `« ${device} » n’envoie plus rien : dernier envoi ${ago}.`,
+    silentDeviceNever: (device: string) => `« ${device} » n’a encore rien envoyé.`,
+    silentDevicesLink: 'Appareils',
   },
   timeline: {
     title: 'Activité récente',
@@ -674,5 +677,20 @@ export const fr: Messages = {
     lessThanShare: '< 0,1 %',
     receivedVsVisible:
       'Un batch est visible une fois normalisé : reçu ne veut pas encore dire interrogeable.',
+  },
+  silenceMail: {
+    subject: (device: string) => `Hygie : « ${device} » n’envoie plus rien`,
+    greeting: 'Bonjour,',
+    body: (device: string, subject: string, since: string, hours: string) =>
+      `L’appareil « ${device} » (${subject}) n’a rien envoyé à Hygie depuis le ${since}, soit plus de ${hours} h.`,
+    bodyNever: (device: string, subject: string, pairedOn: string, hours: string) =>
+      `L’appareil « ${device} » (${subject}), appairé le ${pairedOn}, n’a encore rien envoyé à Hygie, plus de ${hours} h après.`,
+    memberHint:
+      'Ouvrez Hygie Sync sur cet appareil : son écran d’état indique la dernière synchronisation et ce qui la bloque.',
+    devicesLink: 'Vos appareils',
+    devicesLine: (url: string) => `Vos appareils : ${url}`,
+    adminNote:
+      'Vous recevez ce message en tant qu’administrateur de cette instance. Il ne contient aucune donnée de santé.',
+    once: 'Cette alerte part une fois par silence : le prochain envoi de l’appareil la réarme.',
   },
 };
