@@ -36,20 +36,32 @@ Set a lifecycle rule on the bucket for retention (e.g. keep 30 daily, 12 monthly
 
 ## Running
 
-Manually, from the app container:
+The job has **its own image**, `Dockerfile.backup` at the repository root: `pg_dump`,
+`age`, the AWS CLI and `curl` on `postgres:<major>-alpine`, running `dump.sh` once and
+exiting. The app image carries none of these tools, so `dump.sh` cannot run from the app
+container. `pg_dump` must be at least the server's major version: bump the base image
+when the database moves to a new major.
+
+On Railway: a second service on the same repository, set to build `Dockerfile.backup`
+(variable `RAILWAY_DOCKERFILE_PATH=Dockerfile.backup`), with a cron schedule, restart
+policy **never** (a failed run must stay failed, not loop), watch paths limited to
+`Dockerfile.backup` and `scripts/backup/**`, and the variables above plus
+`DATABASE_URL` as a reference to the Postgres service's private URL. Railway crons are
+UTC, the minute is not guaranteed, and a run is skipped if the previous one is still
+going: all fine for a nightly dump.
+
+Anywhere else, build the image and let the host's scheduler run it:
 
 ```sh
-railway ssh --service app -- 'cd /app && sh scripts/backup/dump.sh'
+docker build -f Dockerfile.backup -t hygie-backup .
+docker run --rm --network <network-of-the-database> --env-file backup.env hygie-backup
 ```
-
-Scheduled: a Railway cron service on the same repo with
-`sh scripts/backup/dump.sh` as its start command. Railway crons are UTC, the minute is
-not guaranteed, and a run is skipped if the previous one is still going: all fine for a
-nightly dump.
 
 The dump streams `pg_dump | age` so the plaintext never lands on disk, and the job
 refuses to upload anything under 1 MB, because a backup that looks successful and
-contains nothing is worse than a failure.
+contains nothing is worse than a failure. A `pg_dump` that dies halfway fails the run
+instead of shipping a truncated archive: its exit status is checked explicitly, since
+the status of a shell pipeline is only that of its last command (`age`).
 
 ## Restoring, and the drill
 

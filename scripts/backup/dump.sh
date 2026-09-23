@@ -1,8 +1,10 @@
 #!/bin/sh
 # Hygie encrypted off-platform backup.
 #
-# Runs inside the app container (Railway cron or manual), reaches Postgres over the
-# private network, and pushes an age-encrypted dump to S3-compatible object storage.
+# Runs in its own image (Dockerfile.backup: pg_dump, age, AWS CLI; the app image has none
+# of them), as a Railway cron service or a `docker run --rm` from the host's scheduler.
+# Reaches Postgres over the private network and pushes an age-encrypted dump to
+# S3-compatible object storage.
 #
 # The dump is encrypted to a PUBLIC key held in HYGIE_BACKUP_PUBKEY. The matching
 # private key never exists on this platform: whoever holds the storage credentials
