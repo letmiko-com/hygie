@@ -21,11 +21,15 @@ electrocardiograms/
 # local databases and dumps
 *.sql.gz
 *.dump
+*.dump.age
 *.sqlite
 
 # OS / editor noise
 .DS_Store
 tsconfig.tsbuildinfo
 
-# Claude Code local settings (per-machine, never shared)
-.claude/settings.local.json
+# Agent instructions and settings describe one maintainer's workstation: local only.
+# `next dev` regenerates CLAUDE.md and AGENTS.md, keep them out of the tree too.
+.claude/
+CLAUDE.md
+AGENTS.md
