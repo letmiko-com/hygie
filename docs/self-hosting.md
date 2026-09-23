@@ -140,7 +140,8 @@ docker build -f Dockerfile.backup -t hygie-backup .
 ```
 
 On Railway, a second service on the same repository builds `Dockerfile.backup` on a cron
-schedule; `scripts/backup/README.md` lists its settings.
+schedule; `scripts/backup/README.md` lists its settings. Set `HYGIE_BACKUP_HEARTBEAT_URL`
+to a heartbeat monitor: a nightly job that silently stops is the failure nobody notices.
 
 Two behaviours worth knowing before you trust the job:
 
