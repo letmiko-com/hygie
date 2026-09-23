@@ -32,16 +32,23 @@ WORKDIR="${HYGIE_DATA_DIR:-/data}/backup"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 NAME="${PREFIX}-${STAMP}.dump.age"
 TMP="${WORKDIR}/.${NAME}.part"
+RC_FILE="${TMP}.pg_dump_failed"
 OUT="${WORKDIR}/${NAME}"
 
 mkdir -p "$WORKDIR"
-trap 'rm -f "$TMP"' EXIT
+trap 'rm -f "$TMP" "$RC_FILE"' EXIT
 
 # pg_dump custom format (-Fc): compressed, parallel-restorable, and it fails loudly
 # rather than truncating. Streamed straight into age so the plaintext dump never
-# touches the disk.
-pg_dump --format=custom --no-owner --no-privileges "$DATABASE_URL" \
+# touches the disk. A pipeline's status is its LAST command's: a pg_dump dying halfway
+# would leave age exiting 0 on a truncated archive. Its status travels through a marker
+# file instead of `set -o pipefail`, which not every /bin/sh has.
+{ pg_dump --format=custom --no-owner --no-privileges "$DATABASE_URL" || echo "$?" > "$RC_FILE"; } \
   | age --encrypt --recipient "$HYGIE_BACKUP_PUBKEY" --output "$TMP"
+if [ -e "$RC_FILE" ]; then
+  echo "backup aborted: pg_dump exited with status $(cat "$RC_FILE")" >&2
+  exit 1
+fi
 
 mv "$TMP" "$OUT"
 SIZE=$(wc -c < "$OUT" | tr -d ' ')
