@@ -28,6 +28,7 @@ grep 'public key:' hygie-backup.key # -> HYGIE_BACKUP_PUBKEY (safe to put in Rai
 | `HYGIE_BACKUP_S3_REGION` | e.g. `fr-par` |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | credentials scoped to **write-only on this bucket** |
 | `HYGIE_BACKUP_PREFIX` | optional key prefix, default `hygie` |
+| `HYGIE_BACKUP_HEARTBEAT_URL` | optional: pinged after each successful upload, with `/fail` appended when a run fails (Better Stack heartbeat convention). It embeds a token: keep it secret |
 
 Scope the credentials to object creation on this bucket only. A backup job never needs
 to read, and a write-only key cannot be used to exfiltrate the archive it just wrote.

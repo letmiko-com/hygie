@@ -21,6 +21,9 @@
 # Optional:
 #   HYGIE_BACKUP_PREFIX     key prefix (default: hygie)
 #   HYGIE_BACKUP_KEEP_LOCAL keep the local artifact for inspection (default: no)
+#   HYGIE_BACKUP_HEARTBEAT_URL  pinged after a successful upload, and with /fail
+#                               appended when the run fails (Better Stack heartbeat
+#                               convention). The URL embeds a token: treat it as a secret.
 
 set -eu
 
@@ -38,7 +41,21 @@ RC_FILE="${TMP}.pg_dump_failed"
 OUT="${WORKDIR}/${NAME}"
 
 mkdir -p "$WORKDIR"
-trap 'rm -f "$TMP" "$RC_FILE"' EXIT
+
+# A backup nobody hears about when it fails is not a backup: report both outcomes to the
+# heartbeat when one is configured. Best effort, a ping failure never changes the result.
+heartbeat() {
+  [ -n "${HYGIE_BACKUP_HEARTBEAT_URL:-}" ] || return 0
+  curl -fsS --max-time 10 -o /dev/null "${HYGIE_BACKUP_HEARTBEAT_URL}$1" \
+    || echo "heartbeat ping failed" >&2
+}
+on_exit() {
+  rc=$?
+  rm -f "$TMP" "$RC_FILE"
+  [ "$rc" -eq 0 ] || heartbeat /fail
+}
+trap on_exit EXIT
+STARTED=$(date +%s)
 
 # pg_dump custom format (-Fc): compressed, parallel-restorable, and it fails loudly
 # rather than truncating. Streamed straight into age so the plaintext dump never
@@ -69,6 +86,7 @@ aws s3 cp "$OUT" "s3://${HYGIE_BACKUP_S3_BUCKET}/${NAME}" \
   ${HYGIE_BACKUP_S3_REGION:+--region "$HYGIE_BACKUP_S3_REGION"} \
   --only-show-errors
 
-echo "backup ok: ${NAME} size=${SIZE} sha256=${SHA}"
+echo "backup ok: ${NAME} size=${SIZE} sha256=${SHA} seconds=$(( $(date +%s) - STARTED ))"
+heartbeat ""
 
 [ "${HYGIE_BACKUP_KEEP_LOCAL:-no}" = "yes" ] || rm -f "$OUT"
