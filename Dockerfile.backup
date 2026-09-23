@@ -1,0 +1,16 @@
+# Hygie off-platform backup job (scripts/backup/README.md): one run of dump.sh, then exit.
+# A separate image from the app on purpose: the app runtime carries neither pg_dump nor
+# age nor an S3 client, and should not. On Railway it is a cron service built from this
+# file; self-hosters run it with `docker run --rm` from their scheduler.
+#
+# pg_dump must be at least the server's major version: the base image is pinned to the
+# Postgres major the instance runs (18 on Railway since 2026-09).
+FROM postgres:18-alpine
+RUN apk add --no-cache age aws-cli curl
+COPY scripts/backup/dump.sh /usr/local/bin/hygie-backup
+RUN chmod 0755 /usr/local/bin/hygie-backup
+# The dump is staged in /tmp and deleted after upload: nothing to persist, no volume.
+ENV HYGIE_DATA_DIR=/tmp
+USER postgres
+ENTRYPOINT []
+CMD ["hygie-backup"]

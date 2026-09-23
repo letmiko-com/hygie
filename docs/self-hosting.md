@@ -130,14 +130,17 @@ uploads it to S3-compatible storage. That is the entire scope. **Not** in the ba
 
 ### Scheduling
 
-Nothing is scheduled for you. A nightly cron on the Docker host is enough:
+Nothing is scheduled for you. The job runs in its own image, `Dockerfile.backup` (the app
+image has no `pg_dump`, `age` or S3 client), once per invocation. A nightly cron on the
+Docker host is enough:
 
 ```sh
-15 3 * * * docker exec hygie sh -c 'cd /app && sh scripts/backup/dump.sh'
+docker build -f Dockerfile.backup -t hygie-backup .
+15 3 * * * docker run --rm --network <network-of-the-database> --env-file /etc/hygie/backup.env hygie-backup
 ```
 
-On Railway, a cron service on the same repository with `sh scripts/backup/dump.sh` as its
-start command does the same job.
+On Railway, a second service on the same repository builds `Dockerfile.backup` on a cron
+schedule; `scripts/backup/README.md` lists its settings.
 
 Two behaviours worth knowing before you trust the job:
 
