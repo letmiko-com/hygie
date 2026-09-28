@@ -18,6 +18,18 @@ exactly one subject and authenticates with its own API key.
   structural (enforced in the query layer, which requires a subject context derived from
   the session's grants), not a setting. It is applicative honesty, not cryptography: whoever
   controls Postgres can read everything.
+- What "per-subject sync state" means (decided 2026-09-28). The Administration section
+  (`/admin`, admins only, with or without a grant) reads through its own layer,
+  `queries/instance.ts`, which takes an `InstanceContext` and never a `SubjectContext`;
+  neither can be built from the other. For a subject the admin holds no grant on, it shows:
+  the accounts and their addresses; per device, name, platform, key prefix, pairing date,
+  last push, and a revoke action (a lost phone), but never key creation: an admin never
+  holds a key that writes into someone else's subject; batches with their status, size,
+  total points, and error as code and step (never the message); and received volumes per
+  day over 30 days, **all types summed**. Never the list of types a subject records nor
+  their counts, and never the per-type keys of `ingest_batches.counts`: the mere presence
+  of a type (a menopause symptom, an ECG, a state of mind) is a health fact. Creating a
+  subject for an invitee grants `owner` to the invitee only, never to the admin.
 - Deleting a member = revoke sessions, device keys, and grants immediately (data becomes
   unreachable), then a background job physically purges rows and raw files, verifiably.
   Restores from backup must not resurrect revoked keys: a tombstone registry (purged subjects, revoked keys) is stored outside the main backup set and re-applied after any restore. Purge runs table by table in batches; ON DELETE CASCADE is an integrity net, not the purge algorithm.
