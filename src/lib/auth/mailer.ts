@@ -1,5 +1,6 @@
-// Outgoing email over SMTP (nodemailer): the magic link, and the silence alert
-// of the worker (src/lib/ingest/silence-alert.ts). Configuration is env-driven
+// Outgoing email over SMTP (nodemailer): the magic link, the invitation of a
+// new member, and the silence alert of the worker
+// (src/lib/ingest/silence-alert.ts). Configuration is env-driven
 // (.env.example: SMTP_HOST/PORT/USER/PASSWORD/FROM; port 2587 works from
 // Railway). Test escape hatch: when HYGIE_MAIL_CAPTURE_DIR is set, the message
 // goes through nodemailer's jsonTransport and is written to a file in that
@@ -8,6 +9,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createTransport, type Transporter } from 'nodemailer';
+import { getMessages } from '@/lib/i18n';
 
 function buildTransport(): Transporter {
   if (process.env.HYGIE_MAIL_CAPTURE_DIR) {
@@ -85,6 +87,33 @@ export async function sendMagicLinkEmail(to: string, verifyUrl: string): Promise
       `<p><a href="${verifyUrl}">Se connecter à Hygie</a></p>`,
       '<p>Ce lien est valable 15 minutes et ne peut être utilisé qu\'une fois.<br>',
       'Si vous n\'êtes pas à l\'origine de cette demande, ignorez ce message.</p>',
+    ].join('\n'),
+  });
+}
+
+/**
+ * Sends the invitation of a new member (Administration section). It carries
+ * no token: the invitee requests an ordinary magic link on the sign-in page,
+ * whenever they get to it, instead of racing a 15-minute link.
+ */
+export async function sendInvitationEmail(invite: {
+  to: string;
+  name: string;
+  inviter: string;
+  locale: string;
+  loginUrl: string;
+}): Promise<void> {
+  const m = getMessages(invite.locale).inviteMail;
+  const lines = [m.greeting(invite.name), m.body(invite.inviter), m.signIn(invite.to)];
+  await sendMail({
+    to: invite.to,
+    subject: m.subject(invite.inviter),
+    text: [lines[0], '', lines[1], '', lines[2], invite.loginUrl, '', m.pair, '', m.ignore].join('\n'),
+    html: [
+      ...lines.map((l) => `<p>${escapeHtml(l)}</p>`),
+      `<p><a href="${escapeHtml(invite.loginUrl)}">${escapeHtml(m.signInLink)}</a></p>`,
+      `<p>${escapeHtml(m.pair)}</p>`,
+      `<p>${escapeHtml(m.ignore)}</p>`,
     ].join('\n'),
   });
 }

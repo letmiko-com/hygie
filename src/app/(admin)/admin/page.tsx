@@ -13,6 +13,7 @@ import { fmtDay, fmtRelative } from '@/lib/format';
 import { getMessages, resolveLocale } from '@/lib/i18n';
 import { getInstanceContext, listAdmins, listMembers } from '@/lib/queries/instance';
 import { dayInZone } from '@/lib/queries/time';
+import { InvitePanel } from './invite';
 import { memberState } from './state';
 
 export const metadata: Metadata = { title: 'Membres · Hygie' };
@@ -50,6 +51,27 @@ export default async function AdminPage() {
         <Icon name="shield_person" size={16} />
         <span>{m.admin.boundary}</span>
       </div>
+
+      <InvitePanel
+        defaultLocale={locale}
+        defaultTimezone={members[0]?.timezone ?? 'UTC'}
+        invitedTitle={m.admin.invitedTitle('{email}')}
+        invitedNoMail={m.admin.invitedNoMail('{email}')}
+        labels={{
+          button: m.admin.inviteButton,
+          name: m.admin.inviteName,
+          namePlaceholder: m.admin.inviteNamePlaceholder,
+          email: m.admin.inviteEmail,
+          locale: m.admin.inviteLocale,
+          timezone: m.admin.inviteTimezone,
+          submit: m.admin.inviteSubmit,
+          cancel: m.admin.inviteCancel,
+          hint: m.admin.inviteHint,
+          invalid: m.admin.inviteInvalid,
+          exists: m.admin.inviteExists,
+          proxy: m.admin.invitedProxy,
+        }}
+      />
 
       {members.length === 0 ? (
         <Panel>

@@ -37,6 +37,7 @@ interface ContextRow {
 export interface SessionUser {
   userId: string;
   email: string;
+  displayName: string;
   isAdmin: boolean;
   locale: string;
 }
@@ -56,16 +57,23 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   const { rows } = await getDb().query<{
     id: string;
     email: string;
+    display_name: string;
     is_admin: boolean;
     locale: string;
   }>(
-    `select id, email, is_admin, locale
+    `select id, email, display_name, is_admin, locale
      from users where email = $1 and disabled_at is null`,
     [email]
   );
   const row = rows[0];
   if (!row) return null;
-  return { userId: row.id, email: row.email, isAdmin: row.is_admin, locale: row.locale };
+  return {
+    userId: row.id,
+    email: row.email,
+    displayName: row.display_name,
+    isAdmin: row.is_admin,
+    locale: row.locale,
+  };
 }
 
 /**

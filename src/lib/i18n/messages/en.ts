@@ -705,6 +705,36 @@ export const en = {
     batches30d: 'Batches, 30 d',
     points30d: 'Measures, 30 d',
     notFound: 'This member does not exist, or is no longer active.',
+    inviteButton: 'Invite a member',
+    inviteName: 'Name',
+    inviteNamePlaceholder: 'Alex',
+    inviteEmail: 'Email',
+    inviteLocale: 'Language',
+    inviteTimezone: 'Time zone',
+    inviteSubmit: 'Create and invite',
+    inviteCancel: 'Cancel',
+    inviteHint:
+      'Creates their account and their own subject. You get no access to their data; they sign in with a magic link, then pair their own devices.',
+    inviteInvalid: 'Check the name, the address and the time zone.',
+    inviteExists: 'An account already uses this address.',
+    invitedTitle: (email: string) => `Invitation sent to ${email}`,
+    invitedNoMail: (email: string) =>
+      `Account created for ${email}, but the email did not leave: check SMTP, they can still request a link on the sign-in page.`,
+    invitedProxy:
+      'If this instance sits behind an access proxy (Cloudflare Access, Authelia…), allow this address there too, or they will never reach the sign-in page.',
+  },
+  // Invitation email (src/lib/auth/mailer.ts). No token in it: the invitee
+  // requests an ordinary magic link on the sign-in page.
+  inviteMail: {
+    subject: (inviter: string) => `Hygie: ${inviter} invites you`,
+    greeting: (name: string) => `Hello ${name},`,
+    body: (inviter: string) =>
+      `${inviter} has created an account for you on Hygie, a self-hosted instance that keeps your Apple Health history. Your data stays yours: the administrator of the instance does not see it in Hygie.`,
+    signIn: (email: string) =>
+      `To sign in, open the page below and enter this address (${email}), then open the link you receive. There is no password.`,
+    signInLink: 'Sign in to Hygie',
+    pair: 'To send your data: install Hygie Sync on your iPhone, then in Hygie open Devices, Pair a device.',
+    ignore: 'If you were not expecting this message, ignore it: nothing happens until you sign in.',
   },
   // Silence alert email (src/lib/ingest/silence-alert.ts). Plain text and
   // HTML are built from the same strings; values are escaped by the caller.

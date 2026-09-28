@@ -710,6 +710,34 @@ export const fr: Messages = {
     batches30d: 'Batchs, 30 j',
     points30d: 'Mesures, 30 j',
     notFound: 'Ce membre n’existe pas, ou n’est plus actif.',
+    inviteButton: 'Inviter un membre',
+    inviteName: 'Nom',
+    inviteNamePlaceholder: 'Alex',
+    inviteEmail: 'Adresse e-mail',
+    inviteLocale: 'Langue',
+    inviteTimezone: 'Fuseau',
+    inviteSubmit: 'Créer et inviter',
+    inviteCancel: 'Annuler',
+    inviteHint:
+      'Crée son compte et son propre sujet. Vous n’obtenez aucun accès à ses données ; la personne se connecte par lien magique, puis appaire elle-même ses appareils.',
+    inviteInvalid: 'Vérifiez le nom, l’adresse et le fuseau.',
+    inviteExists: 'Un compte utilise déjà cette adresse.',
+    invitedTitle: (email: string) => `Invitation envoyée à ${email}`,
+    invitedNoMail: (email: string) =>
+      `Compte créé pour ${email}, mais l’e-mail n’est pas parti : vérifiez le SMTP. La personne peut quand même demander un lien sur la page de connexion.`,
+    invitedProxy:
+      'Si cette instance est derrière un proxy d’accès (Cloudflare Access, Authelia…), autorisez-y aussi cette adresse, sinon la page de connexion lui restera fermée.',
+  },
+  inviteMail: {
+    subject: (inviter: string) => `Hygie : ${inviter} vous invite`,
+    greeting: (name: string) => `Bonjour ${name},`,
+    body: (inviter: string) =>
+      `${inviter} vous a créé un compte sur Hygie, une instance auto-hébergée qui garde votre historique Apple Santé. Vos données restent à vous : l’administrateur de l’instance ne les voit pas dans Hygie.`,
+    signIn: (email: string) =>
+      `Pour vous connecter, ouvrez la page ci-dessous et saisissez cette adresse (${email}), puis ouvrez le lien reçu. Il n’y a pas de mot de passe.`,
+    signInLink: 'Se connecter à Hygie',
+    pair: 'Pour envoyer vos données : installez Hygie Sync sur votre iPhone, puis dans Hygie ouvrez Appareils, Appairer un appareil.',
+    ignore: 'Si vous n’attendiez pas ce message, ignorez-le : rien ne se passe tant que vous ne vous connectez pas.',
   },
   silenceMail: {
     subject: (device: string) => `Hygie : « ${device} » n’envoie plus rien`,

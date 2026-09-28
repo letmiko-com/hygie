@@ -11,7 +11,7 @@
 // The health read layer takes a SubjectContext and nothing else; this layer
 // takes an InstanceContext and nothing else. Neither can be built from the
 // other, so the boundary holds in the query layer, not in the screens.
-import { getDb } from '@/lib/db';
+import { getDb, withTransaction } from '@/lib/db';
 import { getSessionUser } from './context';
 import { todayInZone } from './time';
 
@@ -19,6 +19,8 @@ declare const instanceScope: unique symbol;
 
 export interface InstanceContext {
   readonly userId: string;
+  /** The admin's display name: signs the invitation email. */
+  readonly displayName: string;
   readonly locale: string;
   /** Brand: only getInstanceContext() produces one. */
   readonly [instanceScope]: true;
@@ -28,7 +30,7 @@ export interface InstanceContext {
 export async function getInstanceContext(): Promise<InstanceContext | null> {
   const user = await getSessionUser();
   if (!user?.isAdmin) return null;
-  return { userId: user.userId, locale: user.locale } as InstanceContext;
+  return { userId: user.userId, displayName: user.displayName, locale: user.locale } as InstanceContext;
 }
 
 export interface MemberAccount {
@@ -310,4 +312,50 @@ export async function revokeMemberDevice(
     [deviceId, subjectId]
   );
   return (res.rowCount ?? 0) > 0;
+}
+
+export interface InviteInput {
+  /** The member's name: the account's display name and the subject's. */
+  name: string;
+  email: string;
+  locale: 'fr' | 'en';
+  /** IANA zone of the new subject: cuts its days. */
+  timezone: string;
+}
+
+export type InviteOutcome = { ok: true; subjectId: string } | { ok: false; error: 'exists' };
+
+const UNIQUE_VIOLATION = '23505';
+
+/**
+ * Creates a member in one transaction: the account, a subject of the same
+ * name, and the owner grant, for the invitee ONLY. The admin who invites gets
+ * no grant (decision of 2026-09-28): inviting someone is not a way to read
+ * their data. The member then signs in with the ordinary magic link.
+ */
+export async function inviteMember(ictx: InstanceContext, input: InviteInput): Promise<InviteOutcome> {
+  void ictx;
+  try {
+    return await withTransaction(async (client) => {
+      const user = await client.query<{ id: string }>(
+        `insert into users (email, display_name, locale) values ($1, $2, $3) returning id`,
+        [input.email, input.name, input.locale]
+      );
+      const subject = await client.query<{ id: string }>(
+        `insert into subjects (display_name, timezone) values ($1, $2) returning id`,
+        [input.name, input.timezone]
+      );
+      await client.query(
+        `insert into access_grants (user_id, subject_id, role) values ($1, $2, 'owner')`,
+        [user.rows[0].id, subject.rows[0].id]
+      );
+      return { ok: true as const, subjectId: subject.rows[0].id };
+    });
+  } catch (err) {
+    // users.email is unique (citext): an existing account, enabled or not.
+    if (typeof err === 'object' && err !== null && (err as { code?: unknown }).code === UNIQUE_VIOLATION) {
+      return { ok: false, error: 'exists' };
+    }
+    throw err;
+  }
 }

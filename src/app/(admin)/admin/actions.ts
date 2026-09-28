@@ -3,7 +3,8 @@
 // action is a public endpoint, the layout that rendered the button proves
 // nothing.
 import { revalidatePath } from 'next/cache';
-import { getInstanceContext, revokeMemberDevice } from '@/lib/queries/instance';
+import { sendInvitationEmail } from '@/lib/auth/mailer';
+import { getInstanceContext, inviteMember, revokeMemberDevice } from '@/lib/queries/instance';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -16,4 +17,56 @@ export async function revokeMemberDeviceAction(formData: FormData): Promise<void
   await revokeMemberDevice(ictx, subjectId, deviceId);
   revalidatePath('/admin');
   revalidatePath(`/admin/members/${subjectId}`);
+}
+
+export type InviteResult =
+  | { ok: true; email: string; mailSent: boolean }
+  | { ok: false; error: 'invalid' | 'exists' | 'unauthorized' };
+
+function validTimezone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function inviteMemberAction(_prev: InviteResult | null, formData: FormData): Promise<InviteResult> {
+  const ictx = await getInstanceContext();
+  if (!ictx) return { ok: false, error: 'unauthorized' };
+
+  const name = String(formData.get('name') ?? '').trim();
+  const email = String(formData.get('email') ?? '')
+    .trim()
+    .toLowerCase();
+  const locale = formData.get('locale') === 'en' ? 'en' : 'fr';
+  const timezone = String(formData.get('timezone') ?? '').trim();
+  if (
+    name.length === 0 ||
+    name.length > 80 ||
+    email.length > 254 ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+    timezone.length > 64 ||
+    !validTimezone(timezone)
+  ) {
+    return { ok: false, error: 'invalid' };
+  }
+
+  const outcome = await inviteMember(ictx, { name, email, locale, timezone });
+  if (!outcome.ok) return { ok: false, error: outcome.error };
+  revalidatePath('/admin');
+
+  // The account exists whatever happens to the email: the invitee can still
+  // request a link on the sign-in page. Awaited, unlike the login email: this
+  // path is admin-only, so its timing reveals nothing to anyone.
+  const base = (process.env.HYGIE_BASE_URL ?? '').replace(/\/$/, '');
+  let mailSent = false;
+  try {
+    await sendInvitationEmail({ to: email, name, inviter: ictx.displayName, locale, loginUrl: `${base}/login` });
+    mailSent = true;
+  } catch (err) {
+    console.error(`[admin] invitation email failed: ${err instanceof Error ? err.name : 'error'}`);
+  }
+  return { ok: true, email, mailSent };
 }
