@@ -103,6 +103,13 @@ into a file on the server.
 The first account comes from `HYGIE_BOOTSTRAP_ADMIN_EMAIL`, which only applies while the
 database has no user. Remove the variable after the first login.
 
+Every other member is invited from **Administration › Members**: Hygie creates their
+account and their own subject, and emails them the sign-in page (no token in that email;
+they request an ordinary magic link when they get to it). The admin gets no access to the
+new member's data. If the web interface sits behind an access proxy (Cloudflare Access,
+Authelia, an IP allowlist), allow the new address there as well, or the invitation leads
+to a page they cannot open.
+
 How magic links are hardened (single use, expiry, no account-existence oracle, rate
 limiting) is described in `docs/architecture.md` §5.
 
