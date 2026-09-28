@@ -30,11 +30,13 @@ export const en = {
     overview: 'Overview',
     analysis: 'Analysis',
     data: 'Data',
-    instance: 'Instance',
+    collection: 'Collection',
+    admin: 'Administration',
+    members: 'Members',
   },
   noSubject: {
     title: 'No health data linked to this account',
-    hint: 'This account has no subject grant. Administration accounts see sync state only, never health data.',
+    hint: 'This account has no subject grant. Administration accounts see instance state only, never health data.',
   },
   syncStatus: {
     fresh: 'Up to date',
@@ -670,6 +672,39 @@ export const en = {
     lessThanShare: '< 0.1 %',
     receivedVsVisible:
       'A batch is visible once normalized: received does not mean queryable yet.',
+  },
+  // Administration section (src/app/(admin)): instance state only, never a
+  // health value nor the name of a data type (architecture §1).
+  admin: {
+    title: 'Members',
+    subtitle: 'Who sends data to this instance, and whether it arrives.',
+    boundary:
+      'Instance state only: devices, batches and daily totals. The data itself, and even which types a member records, stay with the member.',
+    empty: 'No member yet',
+    memberSince: 'member since',
+    noAccount: 'No account linked',
+    adminBadge: 'Admin',
+    activeDevices: (n: number) => (n === 1 ? '1 active device' : `${n} active devices`),
+    noDevice: 'No device paired',
+    lastBatch: 'Last batch',
+    failed30d: (n: number) => (n === 1 ? '1 failed batch in 30 d' : `${n} failed batches in 30 d`),
+    pending: (n: number) => (n === 1 ? '1 batch in progress' : `${n} batches in progress`),
+    details: 'Details',
+    admins: 'Administrators',
+    adminsHint: 'Every administrator receives the silence alerts.',
+    back: 'All members',
+    timezone: 'Time zone',
+    accounts: 'Accounts',
+    devicesTitle: 'Devices',
+    devicesHint: 'Only the member creates a key for their devices. You can revoke one, for a lost phone.',
+    confirmRevoke:
+      'Revoke this key? The device will stop pushing immediately, and only the member can pair it again.',
+    volumesTitle: 'Received per day, all types, 30 days',
+    volumesNote:
+      'Measures made visible per day in the member’s time zone, all data types added together. Dashed bars are days with no batch.',
+    batches30d: 'Batches, 30 d',
+    points30d: 'Measures, 30 d',
+    notFound: 'This member does not exist, or is no longer active.',
   },
   // Silence alert email (src/lib/ingest/silence-alert.ts). Plain text and
   // HTML are built from the same strings; values are escaped by the caller.

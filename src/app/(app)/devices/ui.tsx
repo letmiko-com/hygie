@@ -1,7 +1,8 @@
 'use client';
 // Client widgets of the devices screen: the pairing panel (the raw key
 // arrives through the action state and lives only in this component's
-// memory until the page is left) and the revoke confirmation.
+// memory until the page is left). The revoke confirmation lives in
+// components/ui/RevokeButton, shared with the Administration section.
 import { useActionState, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { pairDeviceAction, type PairResult } from './actions';
@@ -230,33 +231,5 @@ export function PairPanel({
         </div>
       )}
     </div>
-  );
-}
-
-export function RevokeButton({ label, confirmText }: { label: string; confirmText: string }) {
-  return (
-    <button
-      type="submit"
-      className="hy-btn hy-ghost"
-      onClick={(e) => {
-        if (!window.confirm(confirmText)) e.preventDefault();
-      }}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 5,
-        height: 26,
-        padding: '0 9px',
-        borderRadius: 'var(--r-md)',
-        border: 'none',
-        background: 'transparent',
-        color: 'var(--danger)',
-        font: '500 var(--text-sm)/1 var(--font-ui)',
-        cursor: 'pointer',
-      }}
-    >
-      <Icon name="link_off" size={15} />
-      {label}
-    </button>
   );
 }

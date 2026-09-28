@@ -16,7 +16,8 @@ import { listDevices } from '@/lib/devices';
 import { getSubjectContext } from '@/lib/queries/context';
 import { staleAfterMs } from '@/lib/silence';
 import { revokeDeviceAction } from './actions';
-import { PairPanel, RevokeButton } from './ui';
+import { RevokeButton } from '@/components/ui/RevokeButton';
+import { PairPanel } from './ui';
 
 export const metadata: Metadata = { title: 'Appareils · Hygie' };
 export const dynamic = 'force-dynamic';

@@ -30,11 +30,13 @@ export const fr: Messages = {
     overview: 'Vue d’ensemble',
     analysis: 'Analyse',
     data: 'Données',
-    instance: 'Instance',
+    collection: 'Collecte',
+    admin: 'Administration',
+    members: 'Membres',
   },
   noSubject: {
     title: 'Aucune donnée de santé liée à ce compte',
-    hint: 'Ce compte ne porte aucun droit sur un sujet. Les comptes d’administration voient l’état de synchronisation, jamais les données de santé.',
+    hint: 'Ce compte ne porte aucun droit sur un sujet. Les comptes d’administration voient l’état de l’instance, jamais les données de santé.',
   },
   syncStatus: {
     fresh: 'À jour',
@@ -677,6 +679,37 @@ export const fr: Messages = {
     lessThanShare: '< 0,1 %',
     receivedVsVisible:
       'Un batch est visible une fois normalisé : reçu ne veut pas encore dire interrogeable.',
+  },
+  admin: {
+    title: 'Membres',
+    subtitle: 'Qui envoie des données à cette instance, et si elles arrivent.',
+    boundary:
+      'État de l’instance seulement : appareils, batchs et totaux par jour. Les données elles-mêmes, et jusqu’aux types qu’un membre enregistre, restent au membre.',
+    empty: 'Aucun membre pour le moment',
+    memberSince: 'membre depuis le',
+    noAccount: 'Aucun compte rattaché',
+    adminBadge: 'Admin',
+    activeDevices: (n: number) => (n <= 1 ? `${n} appareil actif` : `${n} appareils actifs`),
+    noDevice: 'Aucun appareil appairé',
+    lastBatch: 'Dernier batch',
+    failed30d: (n: number) => (n <= 1 ? `${n} batch en échec sur 30 j` : `${n} batchs en échec sur 30 j`),
+    pending: (n: number) => (n <= 1 ? `${n} batch en cours` : `${n} batchs en cours`),
+    details: 'Détail',
+    admins: 'Administrateurs',
+    adminsHint: 'Chaque administrateur reçoit les alertes de silence.',
+    back: 'Tous les membres',
+    timezone: 'Fuseau',
+    accounts: 'Comptes',
+    devicesTitle: 'Appareils',
+    devicesHint: 'Seul le membre crée la clé de ses appareils. Vous pouvez en révoquer une, pour un téléphone perdu.',
+    confirmRevoke:
+      'Révoquer cette clé ? L’appareil cesse d’envoyer immédiatement, et seul le membre pourra l’appairer à nouveau.',
+    volumesTitle: 'Reçu par jour, tous types confondus, 30 jours',
+    volumesNote:
+      'Mesures rendues visibles par jour, dans le fuseau du membre, tous types de données additionnés. Les barres en pointillé sont des jours sans batch.',
+    batches30d: 'Batchs, 30 j',
+    points30d: 'Mesures, 30 j',
+    notFound: 'Ce membre n’existe pas, ou n’est plus actif.',
   },
   silenceMail: {
     subject: (device: string) => `Hygie : « ${device} » n’envoie plus rien`,
