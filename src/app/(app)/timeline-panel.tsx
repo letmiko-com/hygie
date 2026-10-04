@@ -12,15 +12,8 @@ import {
   type TimelineGroup,
   type TimelineItem,
 } from '@/components/data/ActivityTimeline';
-import {
-  fmtDay,
-  fmtDuration,
-  fmtHoursMinutes,
-  fmtInt,
-  fmtKm,
-  fmtNumber,
-  fmtPace,
-} from '@/lib/format';
+import { fmtDay, fmtDistance, fmtDuration, fmtHoursMinutes, fmtInt, type UnitSystem } from '@/lib/format';
+import { fmtRecordValue, recordKindLabel } from '@/lib/records-format';
 import { getMessages, resolveLocale, type Locale, type Messages } from '@/lib/i18n';
 import { dataColor } from '@/lib/metrics';
 import { sportDisplay, sportLabel } from '@/lib/sports';
@@ -45,24 +38,8 @@ function hhmm(date: Date | null, locale: Locale, timeZone: string): string | nul
   }).format(date);
 }
 
-/** Record value in the unit its kind is measured in. */
-function recordValue(entry: TimelineRecord, locale: Locale): string {
-  switch (entry.recordKind) {
-    case 'longest_distance':
-      return fmtKm(entry.value, locale);
-    case 'longest_duration':
-      return fmtDuration(entry.value);
-    case 'best_pace':
-      return fmtPace(entry.value);
-    case 'best_speed':
-      return `${fmtNumber(entry.value, locale, 1)} km/h`;
-    case 'biggest_climb':
-      return `${fmtInt(entry.value, locale)} m`;
-  }
-}
-
-function recordPrevious(entry: TimelineRecord, locale: Locale): string {
-  return recordValue({ ...entry, value: entry.previous }, locale);
+function recordPrevious(entry: TimelineRecord, locale: Locale, units: UnitSystem): string {
+  return fmtRecordValue(entry.recordKind, entry.previous, locale, units);
 }
 
 function nightItem(entry: TimelineNight, locale: Locale, m: Messages, timeZone: string): TimelineItem {
@@ -99,6 +76,7 @@ function nightItem(entry: TimelineNight, locale: Locale, m: Messages, timeZone: 
 function workoutItem(
   entry: TimelineWorkout,
   locale: Locale,
+  units: UnitSystem,
   m: Messages,
   timeZone: string
 ): TimelineItem {
@@ -106,7 +84,7 @@ function workoutItem(
   const meta = [
     hhmm(entry.ts, locale, timeZone),
     fmtDuration(entry.durationS),
-    entry.distanceM === null ? null : fmtKm(entry.distanceM, locale),
+    entry.distanceM === null ? null : fmtDistance(entry.distanceM, locale, units),
   ]
     .filter(Boolean)
     .join(' · ');
@@ -127,30 +105,36 @@ function workoutItem(
   };
 }
 
-function recordItem(entry: TimelineRecord, locale: Locale, m: Messages): TimelineItem {
+function recordItem(entry: TimelineRecord, locale: Locale, units: UnitSystem, m: Messages): TimelineItem {
   return {
     key: `record-${entry.workoutId}-${entry.recordKind}`,
     href: `/sport/${entry.workoutId}`,
     icon: 'trophy',
     color: dataColor('power'),
     title: m.timeline.recordTitle(
-      m.records.kinds[entry.recordKind] ?? entry.recordKind,
+      recordKindLabel(entry.recordKind, m, locale, units),
       sportLabel(entry.activityType, locale)
     ),
-    meta: m.timeline.beats(recordPrevious(entry, locale)),
-    stats: [{ label: m.records.recordCol, value: recordValue(entry, locale), color: dataColor('power') }],
+    meta: m.timeline.beats(recordPrevious(entry, locale, units)),
+    stats: [
+      {
+        label: m.records.recordCol,
+        value: fmtRecordValue(entry.recordKind, entry.value, locale, units),
+        color: dataColor('power'),
+      },
+    ],
     badge: { label: m.timeline.recordBadge, tone: 'accent' },
   };
 }
 
-function toItem(entry: TimelineEntry, locale: Locale, m: Messages, timeZone: string): TimelineItem {
+function toItem(entry: TimelineEntry, locale: Locale, units: UnitSystem, m: Messages, timeZone: string): TimelineItem {
   switch (entry.kind) {
     case 'night':
       return nightItem(entry, locale, m, timeZone);
     case 'workout':
-      return workoutItem(entry, locale, m, timeZone);
+      return workoutItem(entry, locale, units, m, timeZone);
     case 'record':
-      return recordItem(entry, locale, m);
+      return recordItem(entry, locale, units, m);
   }
 }
 
@@ -192,7 +176,7 @@ export async function TimelinePanel({
   const groups: TimelineGroup[] = timeline.days.map((d) => ({
     day: d.day,
     ...dayLabel(d.day, today, locale, m),
-    items: d.entries.map((entry) => toItem(entry, locale, m, ctx.timezone)),
+    items: d.entries.map((entry) => toItem(entry, locale, ctx.unitSystem, m, ctx.timezone)),
   }));
 
   return <ActivityTimeline groups={groups} />;

@@ -27,7 +27,7 @@ import { Skeleton, SkeletonLines } from '@/components/data/Skeleton';
 import { StatTile } from '@/components/data/StatTile';
 import { Icon } from '@/components/ui/Icon';
 import { Panel } from '@/components/ui/Panel';
-import { displayUnit, fmtCompact, fmtDay, fmtInt, metricWriter } from '@/lib/format';
+import { displayUnit, fmtCompact, fmtDay, fmtInt, metricWriter, type UnitSystem } from '@/lib/format';
 import { getMessages, resolveLocale, type Locale, type Messages } from '@/lib/i18n';
 import {
   dataColor,
@@ -67,15 +67,15 @@ function coverageLabel(entry: InventoryEntry, locale: Locale): string {
  * an occurrence type a count — the same reduction the chart of that type would
  * draw, so the two agree.
  */
-function lastValueLabel(entry: InventoryEntry, locale: Locale): string | null {
+function lastValueLabel(entry: InventoryEntry, locale: Locale, units: UnitSystem): string | null {
   if (entry.lastValue === null) return null;
-  const writer = metricWriter(entry.aggregation, entry.unit, entry.lastValue, locale);
+  const writer = metricWriter(entry.aggregation, entry.unit, entry.lastValue, locale, units);
   return writer.write(entry.lastValue);
 }
 
 /** Sparkline values in display units: a curve in kJ under a value in kcal would jar. */
-function sparkValues(entry: InventoryEntry): Array<number | null> {
-  const display = displayUnit(entry.unit);
+function sparkValues(entry: InventoryEntry, units: UnitSystem): Array<number | null> {
+  const display = displayUnit(entry.unit, units);
   return entry.recent.map((v) => (v === null ? null : display.convert(v)));
 }
 
@@ -155,10 +155,10 @@ function DedicatedPanel({
   );
 }
 
-function toRow(entry: InventoryEntry, locale: Locale, today: string, m: Messages): CatalogRow {
+function toRow(entry: InventoryEntry, locale: Locale, units: UnitSystem, today: string, m: Messages): CatalogRow {
   const display = metricDisplay(entry.hkIdentifier);
   const label = metricLabel(entry.hkIdentifier, locale);
-  const unit = displayUnit(entry.unit).unit;
+  const unit = displayUnit(entry.unit, units).unit;
   return {
     hk: entry.hkIdentifier,
     // The link opens the detail on the window this row already draws, anchored
@@ -178,11 +178,11 @@ function toRow(entry: InventoryEntry, locale: Locale, today: string, m: Messages
     icon: display.icon,
     color: dataColor(display.family),
     unit,
-    lastValue: lastValueLabel(entry, locale),
+    lastValue: lastValueLabel(entry, locale, units),
     lastWhen: entry.lastValueDay === null ? null : fmtDay(entry.lastValueDay, locale),
     measures: fmtInt(entry.measures, locale),
     coverage: coverageLabel(entry, locale),
-    spark: sparkValues(entry),
+    spark: sparkValues(entry, units),
     dormant: daysBetween(entry.lastDay, today) > DORMANT_DAYS,
     occurrences: entry.kind !== 'quantity' || entry.aggregation === 'none',
   };
@@ -233,7 +233,7 @@ async function CatalogueBody({
   // LABEL inside: the reader scans words, not identifiers, and the order must
   // not shuffle itself as the taxonomy grows.
   const collator = new Intl.Collator(locale === 'fr' ? 'fr' : 'en');
-  const rows = entries.map((e) => ({ entry: e, row: toRow(e, locale, today, m) }));
+  const rows = entries.map((e) => ({ entry: e, row: toRow(e, locale, ctx.unitSystem, today, m) }));
   const groups: CatalogGroupData[] = METRIC_GROUPS.map((group) => ({
     key: group,
     label: m.groups[group] ?? group,

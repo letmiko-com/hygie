@@ -71,9 +71,68 @@ export function fmtHoursMinutes(seconds: number | null): string {
   return `${h} h ${String(m).padStart(2, '0')}`;
 }
 
-export function fmtKm(meters: number | null, locale: Locale, digits = 1): string {
+/**
+ * The account's unit system (users.unit_system). Conversion is display only:
+ * the database keeps its canonical units (km, m, kg, degC...), and every
+ * function below that prints a quantity takes the system explicitly, so a
+ * screen cannot forget it without the compiler noticing.
+ */
+export type UnitSystem = 'metric' | 'imperial';
+
+const M_PER_MI = 1609.344;
+const MI_PER_KM = 1000 / M_PER_MI;
+const FT_PER_M = 1 / 0.3048;
+const IN_PER_CM = 1 / 2.54;
+const LB_PER_KG = 1 / 0.45359237;
+const FLOZ_PER_ML = 1 / 29.5735295625;
+
+/** Unit of a long distance: kilometres or miles. */
+export function distanceUnit(system: UnitSystem): 'km' | 'mi' {
+  return system === 'imperial' ? 'mi' : 'km';
+}
+
+/** Meters (canonical for workouts) to the long-distance unit of the system. */
+export function metersToDistance(meters: number, system: UnitSystem): number {
+  return system === 'imperial' ? meters / M_PER_MI : meters / 1000;
+}
+
+/** Length of one split, in meters: a kilometre or a mile. */
+export function splitMeters(system: UnitSystem): number {
+  return system === 'imperial' ? M_PER_MI : 1000;
+}
+
+export function fmtDistance(meters: number | null, locale: Locale, system: UnitSystem, digits = 1): string {
   if (meters === null || !Number.isFinite(meters)) return ABSENT;
-  return `${fmtNumber(meters / 1000, locale, digits)} km`;
+  return `${fmtNumber(metersToDistance(meters, system), locale, digits)} ${distanceUnit(system)}`;
+}
+
+/** Unit of a speed: km/h or mph. */
+export function speedUnit(system: UnitSystem): string {
+  return system === 'imperial' ? 'mph' : 'km/h';
+}
+
+/** km/h (canonical for speeds) to the speed unit of the system. */
+export function kmhToSpeed(kmh: number, system: UnitSystem): number {
+  return system === 'imperial' ? kmh * MI_PER_KM : kmh;
+}
+
+export function fmtSpeed(kmh: number | null, locale: Locale, system: UnitSystem): string {
+  if (kmh === null || !Number.isFinite(kmh)) return ABSENT;
+  return `${fmtNumber(kmhToSpeed(kmh, system), locale, 1)} ${speedUnit(system)}`;
+}
+
+/** Unit of a height difference or short length: meters or feet. */
+export function elevationUnit(system: UnitSystem): 'm' | 'ft' {
+  return system === 'imperial' ? 'ft' : 'm';
+}
+
+export function metersToElevation(meters: number, system: UnitSystem): number {
+  return system === 'imperial' ? meters * FT_PER_M : meters;
+}
+
+export function fmtElevation(meters: number | null, locale: Locale, system: UnitSystem): string {
+  if (meters === null || !Number.isFinite(meters)) return ABSENT;
+  return `${fmtInt(metersToElevation(meters, system), locale)} ${elevationUnit(system)}`;
 }
 
 const KCAL_PER_KJ = 1 / 4.184;
@@ -87,11 +146,26 @@ export function fmtKcalFromKj(kj: number | null, locale: Locale): string {
   return kcal === null ? ABSENT : `${fmtInt(kcal, locale)} kcal`;
 }
 
-/** Pace from seconds per km: "4:52 /km". */
-export function fmtPace(secPerKm: number | null): string {
+/** Seconds per km (canonical pace) to seconds per km or per mile. */
+export function paceToSystem(secPerKm: number, system: UnitSystem): number {
+  return system === 'imperial' ? secPerKm * (M_PER_MI / 1000) : secPerKm;
+}
+
+/** Unit of a pace: "/km" or "/mi". */
+export function paceUnit(system: UnitSystem): string {
+  return `/${distanceUnit(system)}`;
+}
+
+/** Minutes and seconds of an already converted pace: "4:52". */
+export function fmtPaceClock(secPerUnit: number): string {
+  const s = Math.round(secPerUnit);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+/** Pace from seconds per km: "4:52 /km", or "7:50 /mi" in imperial. */
+export function fmtPace(secPerKm: number | null, system: UnitSystem): string {
   if (secPerKm === null || !Number.isFinite(secPerKm) || secPerKm <= 0) return ABSENT;
-  const s = Math.round(secPerKm);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} /km`;
+  return `${fmtPaceClock(paceToSystem(secPerKm, system))} ${paceUnit(system)}`;
 }
 
 export interface MetricWriter {
@@ -122,7 +196,8 @@ export function metricWriter(
   aggregation: string,
   canonicalUnit: string | null,
   magnitude: number,
-  locale: Locale
+  locale: Locale,
+  system: UnitSystem
 ): MetricWriter {
   if (aggregation === 'duration') {
     const write = (v: number | null) => (v === null ? null : fmtHoursMinutes(v));
@@ -134,7 +209,7 @@ export function metricWriter(
     const write = (v: number | null) => (v === null ? null : fmtInt(v, locale));
     return { unit: null, convert: (v) => v, write, writeDisplay: write };
   }
-  const display = displayUnit(canonicalUnit);
+  const display = displayUnit(canonicalUnit, system);
   const format = magnitudeFormat(Math.abs(display.convert(magnitude)), locale);
   const writeDisplay = (v: number | null): string | null => {
     if (v === null) return null;
@@ -165,8 +240,33 @@ export interface UnitDisplay {
  *
  * An unknown unit passes through unchanged: a type promoted tomorrow with a
  * unit nobody mapped still displays its real unit, never a blank.
+ *
+ * In the imperial system, lengths, masses, speeds, temperatures and drink
+ * volumes convert; grams, milligrams, litres of lung volume, mmHg and the
+ * rest stay as US nutrition labels and clinics write them. Temperatures are
+ * absolute readings here, so °F takes the +32 offset.
  */
-export function displayUnit(unit: string | null): UnitDisplay {
+export function displayUnit(unit: string | null, system: UnitSystem): UnitDisplay {
+  if (system === 'imperial') {
+    switch (unit) {
+      case 'km':
+        return { unit: 'mi', convert: (v) => v * MI_PER_KM };
+      case 'km/hr':
+        return { unit: 'mph', convert: (v) => v * MI_PER_KM };
+      case 'm':
+        return { unit: 'ft', convert: (v) => v * FT_PER_M };
+      case 'm/s':
+        return { unit: 'ft/s', convert: (v) => v * FT_PER_M };
+      case 'cm':
+        return { unit: 'in', convert: (v) => v * IN_PER_CM };
+      case 'kg':
+        return { unit: 'lb', convert: (v) => v * LB_PER_KG };
+      case 'mL':
+        return { unit: 'fl oz', convert: (v) => v * FLOZ_PER_ML };
+      case 'degC':
+        return { unit: '°F', convert: (v) => (v * 9) / 5 + 32 };
+    }
+  }
   switch (unit) {
     case 'kJ':
       return { unit: 'kcal', convert: (v) => v * KCAL_PER_KJ };

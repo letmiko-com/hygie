@@ -262,7 +262,7 @@ export default async function MetricDetailPage({
   const display = metricDisplay(hk);
   const label = metricLabel(hk, locale);
   const color = dataColor(display.family);
-  const unitDisplay = displayUnit(type.canonicalUnit);
+  const unitDisplay = displayUnit(type.canonicalUnit, ctx.unitSystem);
   const chartable = isChartable(type);
   const cumulative = isCumulative(type.aggregation);
   const granularity = chartable ? chooseGranularity(range) : 'day';
@@ -543,7 +543,8 @@ export default async function MetricDetailPage({
       Math.abs(stats.current ?? 0),
       Math.abs(stats.high?.value ?? 0)
     ),
-    locale
+    locale,
+    ctx.unitSystem
   );
   const convert = (v: number | null): number | null => (v === null ? null : writer.convert(v));
   const dayValues = stats.values.map(convert);

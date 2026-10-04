@@ -21,9 +21,16 @@ import {
   fmtDuration,
   fmtInt,
   fmtKcalFromKj,
-  fmtKm,
+  distanceUnit,
+  fmtDistance,
+  fmtElevation,
   fmtNumber,
   fmtPace,
+  fmtPaceClock,
+  kmhToSpeed,
+  metersToDistance,
+  paceUnit,
+  speedUnit,
 } from '@/lib/format';
 import { getMessages, resolveLocale } from '@/lib/i18n';
 import { dataColor } from '@/lib/metrics';
@@ -111,6 +118,7 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
       ? ((workout.avgHrBpm - sameSport90.avgHrBpm) / sameSport90.avgHrBpm) * 100
       : null;
 
+  const units = ctx.unitSystem;
   const km = workout.distanceM === null ? null : workout.distanceM / 1000;
   const paceSecPerKm = km !== null && km > 0 && PACE_SPORTS.has(workout.activityType) ? workout.durationS / km : null;
   const speedKmh =
@@ -188,12 +196,12 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
           <StatTile label={m.session.duration} value={durationLabel} />
           <StatTile
             label={m.session.distance}
-            value={km === null ? null : fmtKm(workout.distanceM, locale, 2)}
+            value={km === null ? null : fmtDistance(workout.distanceM, locale, units, 2)}
             sub={km === null ? m.session.notMeasured : undefined}
           />
-          {paceSecPerKm !== null && <StatTile label={m.session.pace} value={fmtPace(paceSecPerKm)} />}
+          {paceSecPerKm !== null && <StatTile label={m.session.pace} value={fmtPace(paceSecPerKm, units)} />}
           {speedKmh !== null && (
-            <StatTile label={m.session.speed} value={fmtNumber(speedKmh, locale, 1)} unit="km/h" />
+            <StatTile label={m.session.speed} value={fmtNumber(kmhToSpeed(speedKmh, units), locale, 1)} unit={speedUnit(units)} />
           )}
           <StatTile
             label={m.session.avgHr}
@@ -218,7 +226,7 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
           />
           <StatTile
             label={m.session.elevation}
-            value={workout.elevationUpM === null ? null : `${fmtInt(workout.elevationUpM, locale)} m`}
+            value={workout.elevationUpM === null ? null : fmtElevation(workout.elevationUpM, locale, units)}
             sub={workout.elevationUpM === null && !workout.hasRoute ? m.session.noGps : undefined}
           />
         </div>
@@ -300,9 +308,9 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
               </div>
               <DataTable
                 dense
-                rowKey={(r) => String(r.km)}
+                rowKey={(r) => String(r.n)}
                 columns={[
-                  { key: 'km', label: m.session.splitKm, mono: true, width: 50 },
+                  { key: 'n', label: m.session.splitKm(distanceUnit(units)), mono: true, width: 50 },
                   {
                     key: 'time',
                     label: m.session.splitTime,
@@ -316,10 +324,11 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
                     align: 'right',
                     mono: true,
                     muted: true,
-                    render: (r) => fmtPace(Number(r.durationS)),
+                    // A split is one km (or one mile): its time is its pace.
+                    render: (r) => `${fmtPaceClock(Number(r.durationS))} ${paceUnit(units)}`,
                   },
                 ]}
-                rows={splits.map((s) => ({ km: s.km, durationS: s.durationS }))}
+                rows={splits.map((s) => ({ n: s.n, durationS: s.durationS }))}
               />
             </Panel>
           )}
@@ -346,11 +355,14 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
               end: m.session.routeEnd,
               elevation: m.session.routeElevation,
               distance: m.session.routeDistance,
-              scale: (meters) => (meters >= 1000 ? `${fmtNumber(meters / 1000, locale, 0)} km` : `${fmtInt(meters, locale)} m`),
+              scale: (meters) =>
+                metersToDistance(meters, units) >= 1
+                  ? `${fmtNumber(metersToDistance(meters, units), locale, 0)} ${distanceUnit(units)}`
+                  : fmtElevation(meters, locale, units),
             }}
             format={{
-              km: (meters) => fmtKm(meters, locale, 1),
-              m: (v) => `${fmtInt(v, locale)} m`,
+              km: (meters) => fmtDistance(meters, locale, units, 1),
+              m: (v) => fmtElevation(v, locale, units),
             }}
             tiles={tiles ? { attribution: tiles.attribution } : null}
           />

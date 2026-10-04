@@ -22,6 +22,8 @@ export interface Profile {
   locale: 'fr' | 'en';
   /** ISO weekday the account's weeks start on (users.week_start, 1 = Monday). */
   weekStart: number;
+  /** Display units (users.unit_system); the database stays metric. */
+  unitSystem: 'metric' | 'imperial';
   /** The subject this account owns, when it owns one (a pure admin does not). */
   subject: OwnedSubject | null;
 }
@@ -47,13 +49,17 @@ async function ownedSubject(userId: string): Promise<OwnedSubject | null> {
 export async function getProfile(user: SessionUser): Promise<Profile> {
   const [subject, prefs] = await Promise.all([
     ownedSubject(user.userId),
-    getDb().query<{ week_start: number }>('select week_start from users where id = $1', [user.userId]),
+    getDb().query<{ week_start: number; unit_system: 'metric' | 'imperial' }>(
+      'select week_start, unit_system from users where id = $1',
+      [user.userId]
+    ),
   ]);
   return {
     name: user.displayName,
     email: user.email,
     locale: user.locale === 'en' ? 'en' : 'fr',
     weekStart: prefs.rows[0]?.week_start ?? 1,
+    unitSystem: prefs.rows[0]?.unit_system ?? 'metric',
     subject,
   };
 }
@@ -72,6 +78,7 @@ export interface ProfileUpdate {
   locale: 'fr' | 'en';
   /** ISO weekday, 1 = Monday ... 7 = Sunday. */
   weekStart: number;
+  unitSystem: 'metric' | 'imperial';
   /** Ignored when the account owns no subject. */
   timezone: string | null;
 }
@@ -79,8 +86,9 @@ export interface ProfileUpdate {
 export async function updateProfile(user: SessionUser, update: ProfileUpdate): Promise<void> {
   await withTransaction(async (client) => {
     await client.query(
-      `update users set display_name = $2, locale = $3, week_start = $4 where id = $1 and disabled_at is null`,
-      [user.userId, update.name, update.locale, update.weekStart]
+      `update users set display_name = $2, locale = $3, week_start = $4, unit_system = $5
+        where id = $1 and disabled_at is null`,
+      [user.userId, update.name, update.locale, update.weekStart, update.unitSystem]
     );
     // Only the subject this account owns, through its own grant.
     await client.query(

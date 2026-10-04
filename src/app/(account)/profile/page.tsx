@@ -45,6 +45,7 @@ export default async function ProfilePage() {
         locale={profile.locale}
         weekStart={profile.weekStart}
         weekDays={weekDayChoices(profile.locale, profile.weekStart)}
+        unitSystem={profile.unitSystem}
         timezone={profile.subject?.timezone ?? null}
         zones={Intl.supportedValuesOf('timeZone')}
         labels={{
@@ -53,6 +54,10 @@ export default async function ProfilePage() {
           locale: m.profile.locale,
           weekStart: m.profile.weekStart,
           weekStartHint: m.profile.weekStartHint,
+          units: m.profile.units,
+          unitsMetric: m.profile.unitsMetric,
+          unitsImperial: m.profile.unitsImperial,
+          unitsHint: m.profile.unitsHint,
           timezone: m.profile.timezone,
           timezoneHint: m.profile.timezoneHint,
           save: m.profile.save,

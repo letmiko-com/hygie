@@ -196,7 +196,7 @@ export default async function ExplorePage({
       label: labelOf(entry.key, locale, m),
       icon: iconOf(entry.key),
       color: dataColor(familyOf(entry.key)),
-      unit: displayUnit(entry.unit).unit,
+      unit: displayUnit(entry.unit, ctx.unitSystem).unit,
       group: m.explore.families[familyOf(entry.key)] ?? familyOf(entry.key),
       dailyOnly: entry.dailyOnly,
       disabled: entry.dailyOnly && granularity !== 'day',
@@ -211,7 +211,7 @@ export default async function ExplorePage({
 
   const converted: Array<{ series: ExploreSeries; display: UnitDisplay; values: Array<number | null> }> =
     (chart?.series ?? []).map((series) => {
-      const display = displayUnit(series.unit);
+      const display = displayUnit(series.unit, ctx.unitSystem);
       return {
         series,
         display,

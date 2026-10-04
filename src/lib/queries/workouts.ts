@@ -8,6 +8,7 @@ import { getDb } from '@/lib/db';
 import type { SubjectContext } from './context';
 import { getMetricType } from './metric-types';
 import { heavyRead } from './read';
+import { splitMeters } from '@/lib/format';
 import { addDays, weekStartOf, type DayRange } from './time';
 
 export interface WorkoutListItem {
@@ -465,14 +466,16 @@ export async function monthlyTrainingSilhouette(ctx: SubjectContext): Promise<nu
 }
 
 export interface WorkoutSplit {
-  km: number;
+  /** Rank of the split: 1 for the first kilometre (or mile), and so on. */
+  n: number;
+  /** Time over that split, which is also its pace per unit of distance. */
   durationS: number;
 }
 
 /**
- * Kilometer splits from the cumulative per-minute distance series, stored in
- * meters (HAE workouts only). Null when the series is absent — no splits is
- * not the same as zero splits.
+ * Kilometre splits, or mile splits for an imperial account, from the
+ * cumulative per-minute distance series, stored in meters (HAE workouts
+ * only). Null when the series is absent: no splits is not zero splits.
  */
 export async function workoutSplits(ctx: SubjectContext, workoutId: string): Promise<WorkoutSplit[] | null> {
   const points = await workoutSeries(ctx, workoutId, 'walking_running_distance');
@@ -481,7 +484,8 @@ export async function workoutSplits(ctx: SubjectContext, workoutId: string): Pro
   const splits: WorkoutSplit[] = [];
   let cumulativeM = 0;
   let lastBoundaryMs = points[0].ts.getTime();
-  let nextBoundaryM = 1000;
+  const stepM = splitMeters(ctx.unitSystem);
+  let nextBoundaryM = stepM;
 
   for (const p of points) {
     const beforeM = cumulativeM;
@@ -491,11 +495,11 @@ export async function workoutSplits(ctx: SubjectContext, workoutId: string): Pro
       const frac = p.value > 0 ? (nextBoundaryM - beforeM) / p.value : 1;
       const crossingMs = p.ts.getTime() + frac * 60_000;
       splits.push({
-        km: nextBoundaryM / 1000,
+        n: Math.round(nextBoundaryM / stepM),
         durationS: Math.round((crossingMs - lastBoundaryMs) / 1000),
       });
       lastBoundaryMs = crossingMs;
-      nextBoundaryM += 1000;
+      nextBoundaryM += stepM;
     }
   }
   return splits.length > 0 ? splits : null;

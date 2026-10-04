@@ -13,7 +13,21 @@ import { TrendChip } from '@/components/data/TrendChip';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { Panel, PanelLabel } from '@/components/ui/Panel';
-import { fmtDuration, fmtInt, fmtNumber, fmtPace } from '@/lib/format';
+import {
+  distanceUnit,
+  elevationUnit,
+  fmtInt,
+  fmtNumber,
+  fmtPaceClock,
+  kmhToSpeed,
+  metersToDistance,
+  metersToElevation,
+  paceToSystem,
+  paceUnit,
+  speedUnit,
+  type UnitSystem,
+} from '@/lib/format';
+import { fmtRecordValue, recordKindLabel } from '@/lib/records-format';
 import { getMessages, resolveLocale, type Locale, type Messages } from '@/lib/i18n';
 import { dataColor } from '@/lib/metrics';
 import { sportDisplay, sportLabel } from '@/lib/sports';
@@ -28,21 +42,6 @@ import {
 export const metadata: Metadata = { title: 'Records · Hygie' };
 export const dynamic = 'force-dynamic';
 
-function fmtRecordValue(r: SportRecord, locale: Locale): string {
-  switch (r.kind) {
-    case 'longest_distance':
-      return `${fmtNumber(r.value / 1000, locale, 1)} km`;
-    case 'longest_duration':
-      return fmtDuration(r.value);
-    case 'best_pace':
-      return fmtPace(r.value);
-    case 'best_speed':
-      return `${fmtNumber(r.value, locale, 1)} km/h`;
-    case 'biggest_climb':
-      return `${fmtInt(r.value, locale)} m`;
-  }
-}
-
 /**
  * Progression axis: the record card reads "21,5 km", the chart under it must
  * not read "21536". Canonical units live in the database, the axis converts
@@ -51,22 +50,20 @@ function fmtRecordValue(r: SportRecord, locale: Locale): string {
  */
 function progressionAxis(
   kind: RecordKind,
-  locale: Locale
+  locale: Locale,
+  units: UnitSystem
 ): { unit: string; format: (v: number) => string } {
   switch (kind) {
     case 'longest_distance':
-      return { unit: 'km', format: (v) => fmtNumber(v / 1000, locale, 1) };
+      return { unit: distanceUnit(units), format: (v) => fmtNumber(metersToDistance(v, units), locale, 1) };
     case 'longest_duration':
       return { unit: 'h', format: (v) => fmtNumber(v / 3600, locale, 1) };
     case 'best_pace':
-      return {
-        unit: '/km',
-        format: (v) => `${Math.floor(Math.round(v) / 60)}:${String(Math.round(v) % 60).padStart(2, '0')}`,
-      };
+      return { unit: paceUnit(units), format: (v) => fmtPaceClock(paceToSystem(v, units)) };
     case 'best_speed':
-      return { unit: 'km/h', format: (v) => fmtNumber(v, locale, 1) };
+      return { unit: speedUnit(units), format: (v) => fmtNumber(kmhToSpeed(v, units), locale, 1) };
     case 'biggest_climb':
-      return { unit: 'm', format: (v) => fmtInt(v, locale) };
+      return { unit: elevationUnit(units), format: (v) => fmtInt(metersToElevation(v, units), locale) };
   }
 }
 
@@ -81,11 +78,13 @@ function emblematicKind(activityType: string): RecordKind[] {
 function RecordCard({
   record,
   locale,
+  units,
   m,
   tz,
 }: {
   record: SportRecord;
   locale: Locale;
+  units: UnitSystem;
   m: Messages;
   tz: string;
 }) {
@@ -117,7 +116,7 @@ function RecordCard({
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <Icon name={sport.icon} size={15} color={color} />
         <span className="hy-label" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {sportLabel(record.activityType, locale)} · {m.records.kinds[record.kind]}
+          {sportLabel(record.activityType, locale)} · {recordKindLabel(record.kind, m, locale, units)}
         </span>
         {record.recent && (
           <Badge tone="accent" dot>
@@ -127,7 +126,7 @@ function RecordCard({
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <span className="tnum" style={{ font: '600 var(--text-2xl)/1 var(--font-ui)' }}>
-          {fmtRecordValue(record, locale)}
+          {fmtRecordValue(record.kind, record.value, locale, units)}
         </span>
         <span className="tnum" style={{ font: '400 var(--text-xs)/1 var(--font-data)', color: 'var(--text-3)', marginLeft: 'auto' }}>
           {dateFmt.format(record.date)}
@@ -210,7 +209,14 @@ export default async function RecordsPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 10 }}>
         {featured.map((r) => (
-          <RecordCard key={`${r.activityType}-${r.kind}`} record={r} locale={locale} m={m} tz={ctx.timezone} />
+          <RecordCard
+            key={`${r.activityType}-${r.kind}`}
+            record={r}
+            locale={locale}
+            units={ctx.unitSystem}
+            m={m}
+            tz={ctx.timezone}
+          />
         ))}
       </div>
 
@@ -273,8 +279,8 @@ export default async function RecordsPage() {
             rows={allRecords.map((r) => ({
               sport: r.activityType,
               kind: r.kind,
-              event: m.records.kinds[r.kind],
-              value: fmtRecordValue(r, locale),
+              event: recordKindLabel(r.kind, m, locale, ctx.unitSystem),
+              value: fmtRecordValue(r.kind, r.value, locale, ctx.unitSystem),
               date: r.date,
               deltaPct: r.deltaPct,
               invert: r.invert,
@@ -291,14 +297,14 @@ export default async function RecordsPage() {
               }
             >
               {`${m.records.progressionTitle(
-                `${sportLabel(progRecord.activityType, locale)} · ${m.records.kinds[progRecord.kind]}`
-              )} (${progressionAxis(progRecord.kind, locale).unit})`}
+                `${sportLabel(progRecord.activityType, locale)} · ${recordKindLabel(progRecord.kind, m, locale, ctx.unitSystem)}`
+              )} (${progressionAxis(progRecord.kind, locale, ctx.unitSystem).unit})`}
             </PanelLabel>
             <LineChart
               height={168}
-              ariaLabel={m.records.progressionTitle(m.records.kinds[progRecord.kind])}
+              ariaLabel={m.records.progressionTitle(recordKindLabel(progRecord.kind, m, locale, ctx.unitSystem))}
               emptyLabel={m.common.noData}
-              yFormat={progressionAxis(progRecord.kind, locale).format}
+              yFormat={progressionAxis(progRecord.kind, locale, ctx.unitSystem).format}
               xLabels={progYears.filter((_, i) => i % Math.ceil(progYears.length / 8) === 0)}
               series={[{ data: progValues, color: dataColor(progSport.family), area: true }]}
             />

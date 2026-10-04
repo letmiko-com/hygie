@@ -25,6 +25,7 @@ export async function updateProfileAction(_prev: ProfileResult | null, formData:
   const name = String(formData.get('name') ?? '').trim();
   const locale = formData.get('locale') === 'en' ? 'en' : 'fr';
   const weekStart = Number(formData.get('weekStart') ?? 1);
+  const unitSystem = formData.get('unitSystem') === 'imperial' ? 'imperial' : 'metric';
   const rawZone = formData.get('timezone');
   const timezone = rawZone === null ? null : String(rawZone).trim();
   if (name.length === 0 || name.length > 80) return { ok: false, error: 'invalid' };
@@ -34,7 +35,7 @@ export async function updateProfileAction(_prev: ProfileResult | null, formData:
     return { ok: false, error: 'invalid' };
   }
 
-  await updateProfile(user, { name, locale, weekStart, timezone });
+  await updateProfile(user, { name, locale, weekStart, unitSystem, timezone });
   // The name and the language show on every screen, through the shell.
   revalidatePath('/', 'layout');
   return { ok: true };

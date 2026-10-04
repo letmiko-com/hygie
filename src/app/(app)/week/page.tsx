@@ -18,7 +18,19 @@ import { TrendChip } from '@/components/data/TrendChip';
 import { Icon } from '@/components/ui/Icon';
 import { Panel, PanelLabel } from '@/components/ui/Panel';
 import { drillSet, drillZone } from '@/lib/drill';
-import { ABSENT, fmtDay, fmtDuration, fmtHoursMinutes, fmtInt, fmtKm, fmtNumber, kjToKcal } from '@/lib/format';
+import {
+  ABSENT,
+  distanceUnit,
+  fmtDay,
+  fmtDistance,
+  fmtDuration,
+  fmtHoursMinutes,
+  fmtInt,
+  fmtNumber,
+  kjToKcal,
+  metersToDistance,
+  type UnitSystem,
+} from '@/lib/format';
 import { getMessages, resolveLocale, type Locale, type Messages } from '@/lib/i18n';
 import { dataColor } from '@/lib/metrics';
 import { getSubjectContext, type SubjectContext } from '@/lib/queries/context';
@@ -109,7 +121,7 @@ interface Tile {
 }
 
 /** Week figures over the first `n` days, so a week in progress compares like for like. */
-function tiles(cur: WeekFacts, prev: WeekFacts, n: number, locale: Locale, m: Messages): Tile[] {
+function tiles(cur: WeekFacts, prev: WeekFacts, n: number, locale: Locale, units: UnitSystem, m: Messages): Tile[] {
   const head = <T,>(xs: T[]) => xs.slice(0, n);
   const sessions = (f: WeekFacts) => head(f.days).reduce((acc, d) => acc + (f.workoutsByDay.get(d)?.length ?? 0), 0);
   const training = (f: WeekFacts) => sum(head(f.trainingS));
@@ -129,7 +141,14 @@ function tiles(cur: WeekFacts, prev: WeekFacts, n: number, locale: Locale, m: Me
   return [
     tile('sessions', m.week.sessions, curSessions, sessions(prev), (v) => fmtInt(v, locale)),
     tile('training', m.week.training, training(cur), training(prev), (v) => fmtDuration(v)),
-    tile('distance', m.week.distance, distance(cur), distance(prev), (v) => fmtNumber(v / 1000, locale, 1), 'km'),
+    tile(
+      'distance',
+      m.week.distance,
+      distance(cur),
+      distance(prev),
+      (v) => fmtNumber(metersToDistance(v, units), locale, 1),
+      distanceUnit(units)
+    ),
     tile('energy', m.week.energy, sum(head(cur.energyKj)), sum(head(prev.energyKj)), (v) => fmtInt(kjToKcal(v), locale), 'kcal'),
     tile('steps', m.week.stepsPerDay, mean(head(cur.steps)), mean(head(prev.steps)), (v) => fmtInt(v, locale)),
     tile('sleep', m.week.sleepAvg, sleep(cur), sleep(prev), (v) => fmtHoursMinutes(v)),
@@ -184,7 +203,7 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
   const series = { restingHr: restingHr.points, hrv: hrv.points, steps: steps.points, energy: energy.points };
   const curFacts = facts(curDays, curWorkouts, curNights, series, today, ctx.timezone);
   const prevFacts = facts(prevDays, prevWorkouts, prevNights, series, today, ctx.timezone);
-  const cards = tiles(curFacts, prevFacts, elapsed, locale, m);
+  const cards = tiles(curFacts, prevFacts, elapsed, locale, ctx.unitSystem, m);
 
   const weekdayFmt = new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', { weekday: 'short', timeZone: 'UTC' });
   const dayLetter = (d: string) => weekdayFmt.format(new Date(`${d}T00:00:00Z`)).replace('.', '');
@@ -233,7 +252,7 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
                   <span>{sportLabel(w.activityType, locale)}</span>
                   <span className="tnum" style={{ color: 'var(--text-3)' }}>
                     {timeFmt.format(w.startTs)} · {fmtDuration(w.durationS)}
-                    {w.distanceM !== null ? ` · ${fmtKm(w.distanceM, locale)}` : ''}
+                    {w.distanceM !== null ? ` · ${fmtDistance(w.distanceM, locale, ctx.unitSystem)}` : ''}
                   </span>
                 </Link>
               );

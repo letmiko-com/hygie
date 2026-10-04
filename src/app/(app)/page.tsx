@@ -25,12 +25,15 @@ import { bucketSpans, drillSet, drillZone, spanQuery } from '@/lib/drill';
 import { silentDevices } from '@/lib/devices';
 import {
   ABSENT,
+  displayUnit,
+  distanceUnit,
   fmtDay,
   fmtHoursMinutes,
   fmtInt,
   fmtNumber,
   fmtRelative,
   kjToKcal,
+  metersToDistance,
   weekdayInitials,
 } from '@/lib/format';
 import { getMessages, resolveLocale, type Locale } from '@/lib/i18n';
@@ -152,12 +155,22 @@ export default async function DashboardPage({
   const elapsed = elapsedDays(range, today);
   const prevRange = comparisonRange(preset, range, elapsed);
 
+  // Distances follow the account's unit system (users.unit_system).
+  const units = ctx.unitSystem;
+  const kmDisplay = displayUnit('km', units);
   const cardSpecs: CardSpec[] = [
     { hk: HK.restingHr, icon: 'favorite', label: m.dash.restingHr, family: 'heart', invert: true, unit: 'bpm', fmt: (v, l) => fmtInt(v, l) },
     { hk: HK.hrv, icon: 'ecg', label: m.dash.hrv, family: 'heart', unit: 'ms', fmt: (v, l) => fmtInt(v, l) },
     { hk: HK.energy, icon: 'local_fire_department', label: m.dash.activeEnergyPerDay, family: 'energy', unit: 'kcal', fmt: (v, l) => fmtInt(kjToKcal(v), l) },
     { hk: HK.steps, icon: 'steps', label: m.dash.stepsPerDay, family: 'activity', fmt: (v, l) => fmtInt(v, l) },
-    { hk: HK.distance, icon: 'directions_walk', label: m.dash.distancePerDay, family: 'activity', unit: 'km', fmt: (v, l) => fmtNumber(v, l, 1) },
+    {
+      hk: HK.distance,
+      icon: 'directions_walk',
+      label: m.dash.distancePerDay,
+      family: 'activity',
+      unit: kmDisplay.unit ?? 'km',
+      fmt: (v, l) => fmtNumber(kmDisplay.convert(v), l, 1),
+    },
   ];
 
   const todayRange: DayRange = { fromDay: today, toDayExcl: addDays(today, 1) };
@@ -269,7 +282,7 @@ export default async function DashboardPage({
 
   // --- weekly volume: a week without sessions is a real 0 (training is
   // observed through workouts themselves), not a data gap.
-  const weekBars = weeks.map((w) => (w.distanceM ?? 0) / 1000);
+  const weekBars = weeks.map((w) => metersToDistance(w.distanceM ?? 0, units));
   // ISO week numbers only mean something for Monday weeks; other starts are
   // labelled by their first day.
   const weekLabels = weeks.map((w) =>
@@ -459,9 +472,9 @@ export default async function DashboardPage({
                   value={
                     todayDistance.points[0]?.value === null || todayDistance.points[0] === undefined
                       ? null
-                      : fmtNumber(todayDistance.points[0].value, locale, 1)
+                      : fmtNumber(kmDisplay.convert(todayDistance.points[0].value), locale, 1)
                   }
-                  unit="km"
+                  unit={kmDisplay.unit ?? 'km'}
                 />
               </div>
             </div>
@@ -524,13 +537,13 @@ export default async function DashboardPage({
           </Panel>
 
           <Panel>
-            <PanelLabel>{m.dash.weeklyVolumeTitle}</PanelLabel>
+            <PanelLabel>{m.dash.weeklyVolumeTitle(distanceUnit(units))}</PanelLabel>
             <BarChart
               data={weekBars}
               labels={weekLabels}
               color={dataColor('distance')}
               height={86}
-              ariaLabel={m.dash.weeklyVolumeTitle}
+              ariaLabel={m.dash.weeklyVolumeTitle(distanceUnit(units))}
               noDataLabel={m.common.noData}
               format={(v) => fmtNumber(v, locale, 1)}
               drill={drillSet(
@@ -577,8 +590,10 @@ export default async function DashboardPage({
             <StatTile label={m.dash.sessionsTile} value={fmtInt(heatSummary.count, locale)} />
             <StatTile label={m.dash.hoursTile} value={fmtNumber(heatSummary.totalDurationS / 3600, locale, 1)} />
             <StatTile
-              label={m.dash.kmTile}
-              value={heatSummary.totalDistanceM === null ? null : fmtInt(heatSummary.totalDistanceM / 1000, locale)}
+              label={m.dash.kmTile(distanceUnit(units))}
+              value={
+                heatSummary.totalDistanceM === null ? null : fmtInt(metersToDistance(heatSummary.totalDistanceM, units), locale)
+              }
             />
           </div>
         </Panel>

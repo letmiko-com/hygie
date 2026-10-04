@@ -21,7 +21,7 @@ import { TimeNav } from '@/components/time/TimeNav';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
 import { downsample } from '@/lib/downsample';
 import { bucketSpans, drillSet, drillZone, spanQuery } from '@/lib/drill';
-import { displayUnit, fmtDay, magnitudeFormat } from '@/lib/format';
+import { displayUnit, fmtDay, magnitudeFormat, type UnitSystem } from '@/lib/format';
 import { getMessages, resolveLocale, type Locale, type Messages } from '@/lib/i18n';
 import { dataColor, metricFamily, metricHref, metricIcon, metricLabel, metricQuality } from '@/lib/metrics';
 import { subjectCatalog, type CatalogEntry } from '@/lib/queries/catalog';
@@ -113,12 +113,14 @@ function MarkerPanel({
   marker,
   compare,
   locale,
+  units,
   m,
   windowQuery,
 }: {
   marker: Marker;
   compare: boolean;
   locale: Locale;
+  units: UnitSystem;
   m: Messages;
   windowQuery: string;
 }) {
@@ -126,7 +128,7 @@ function MarkerPanel({
   const label = metricLabel(hk, locale);
   const color = dataColor(metricFamily(hk));
   const quality = metricQuality(hk);
-  const display = displayUnit(entry.unit);
+  const display = displayUnit(entry.unit, units);
   const all = [...points, ...(previousPoints ?? [])].map((p) => p.value).filter((v): v is number => v !== null);
   const magnitude = all.length === 0 ? 1 : Math.max(...all.map((v) => Math.abs(v)));
   const format = magnitudeFormat(Math.abs(display.convert(magnitude)), locale);
@@ -302,7 +304,7 @@ export default async function MarkersPage({ searchParams }: { searchParams: Prom
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(178px, 1fr))', gap: 10 }}>
             {markers.map((marker) => {
-              const display = displayUnit(marker.entry.unit);
+              const display = displayUnit(marker.entry.unit, ctx.unitSystem);
               const quality = metricQuality(marker.hk);
               const magnitude = marker.mean === null ? 1 : Math.abs(display.convert(marker.mean));
               const format = magnitudeFormat(magnitude, locale);
@@ -331,7 +333,15 @@ export default async function MarkersPage({ searchParams }: { searchParams: Prom
           </div>
           <div className="hy-split" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: 12 }}>
             {markers.map((marker) => (
-              <MarkerPanel key={marker.hk} marker={marker} compare={compare} locale={locale} m={m} windowQuery={windowQuery} />
+              <MarkerPanel
+                key={marker.hk}
+                marker={marker}
+                compare={compare}
+                locale={locale}
+                units={ctx.unitSystem}
+                m={m}
+                windowQuery={windowQuery}
+              />
             ))}
           </div>
         </>

@@ -23,6 +23,10 @@ export interface ProfileLabels {
   locale: string;
   weekStart: string;
   weekStartHint: string;
+  units: string;
+  unitsMetric: string;
+  unitsImperial: string;
+  unitsHint: string;
   timezone: string;
   timezoneHint: string;
   save: string;
@@ -87,6 +91,7 @@ export function ProfileForm({
   locale,
   weekStart,
   weekDays,
+  unitSystem,
   timezone,
   zones,
 }: {
@@ -97,6 +102,7 @@ export function ProfileForm({
   weekStart: number;
   /** The choices offered, named in the account's language. */
   weekDays: Array<{ value: number; label: string }>;
+  unitSystem: 'metric' | 'imperial';
   /** Null when the account owns no subject: no time zone to edit. */
   timezone: string | null;
   zones: string[];
@@ -136,6 +142,15 @@ export function ProfileForm({
           ))}
         </select>
         <span style={hintStyle}>{labels.weekStartHint}</span>
+      </label>
+
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span className="hy-label">{labels.units}</span>
+        <select name="unitSystem" defaultValue={unitSystem} style={{ ...fieldStyle, maxWidth: 280 }}>
+          <option value="metric">{labels.unitsMetric}</option>
+          <option value="imperial">{labels.unitsImperial}</option>
+        </select>
+        <span style={hintStyle}>{labels.unitsHint}</span>
       </label>
 
       {timezone !== null && (

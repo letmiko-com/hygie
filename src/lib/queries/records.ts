@@ -4,6 +4,7 @@
 // inside a longer session would need the fine-grained distance series,
 // which only HAE workouts carry): a record here is always one real session.
 // 962 workouts fit in memory; one light query, reductions in JS.
+import { MIN_PACE_DISTANCE_M, MIN_SPEED_DISTANCE_M } from '@/lib/records-format';
 import { getDb } from '@/lib/db';
 import type { SubjectContext } from './context';
 
@@ -69,9 +70,6 @@ export interface SportRecord {
   recent: boolean;
 }
 
-/** Minimum distance for average pace/speed records, per sport family. */
-const MIN_PACE_DISTANCE_M = 5000;
-const MIN_SPEED_DISTANCE_M = 20000;
 
 interface Candidate {
   workout: WorkoutLite;

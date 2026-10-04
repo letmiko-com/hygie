@@ -14,7 +14,7 @@ import { StatTile } from '@/components/data/StatTile';
 import { TrendChip } from '@/components/data/TrendChip';
 import { Icon } from '@/components/ui/Icon';
 import { Panel } from '@/components/ui/Panel';
-import { fmtDay, fmtDuration, fmtHoursMinutes, fmtInt, fmtKm, fmtNumber } from '@/lib/format';
+import { distanceUnit, fmtDay, fmtDistance, fmtDuration, fmtHoursMinutes, fmtInt, fmtNumber, metersToDistance } from '@/lib/format';
 import { getMessages, resolveLocale } from '@/lib/i18n';
 import { dataColor } from '@/lib/metrics';
 import { getSubjectContext } from '@/lib/queries/context';
@@ -152,8 +152,14 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           />
           <StatTile
             label={m.calendar.distance}
-            value={cur.sessions === 0 ? fmtNumber(0, locale, 1) : cur.distanceM === null ? null : fmtNumber(cur.distanceM / 1000, locale, 1)}
-            unit="km"
+            value={
+              cur.sessions === 0
+                ? fmtNumber(0, locale, 1)
+                : cur.distanceM === null
+                  ? null
+                  : fmtNumber(metersToDistance(cur.distanceM, ctx.unitSystem), locale, 1)
+            }
+            unit={distanceUnit(ctx.unitSystem)}
             sub={<TrendChip deltaPct={deltaPct(cur.distanceM, prev.distanceM)} label={m.calendar.vsPrevMonth} locale={locale} />}
           />
           <StatTile
@@ -244,7 +250,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                         key={w.id}
                         href={`/sport/${w.id}`}
                         className="hy-row"
-                        title={`${sportLabel(w.activityType, locale)} · ${timeFmt.format(w.startTs)} · ${fmtDuration(w.durationS)}${w.distanceM !== null ? ` · ${fmtKm(w.distanceM, locale)}` : ''}`}
+                        title={`${sportLabel(w.activityType, locale)} · ${timeFmt.format(w.startTs)} · ${fmtDuration(w.durationS)}${w.distanceM !== null ? ` · ${fmtDistance(w.distanceM, locale, ctx.unitSystem)}` : ''}`}
                         style={{
                           display: 'flex',
                           alignItems: 'center',

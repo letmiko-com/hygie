@@ -13,7 +13,7 @@ import { LinkTabs, type LinkTab } from '@/components/ui/LinkTabs';
 import { Panel, PanelLabel } from '@/components/ui/Panel';
 import { TimeNav } from '@/components/time/TimeNav';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
-import { fmtDay, fmtDuration, fmtHoursMinutes, fmtInt, fmtKcalFromKj, fmtKm } from '@/lib/format';
+import { fmtDay, fmtDistance, fmtDuration, fmtHoursMinutes, fmtInt, fmtKcalFromKj } from '@/lib/format';
 import { getMessages, resolveLocale } from '@/lib/i18n';
 import { dataColor } from '@/lib/metrics';
 import { sportDisplay, sportLabel } from '@/lib/sports';
@@ -176,7 +176,7 @@ export default async function SportPage({
     },
     {
       label: m.sport.distance,
-      value: summary.totalDistanceM === null ? null : fmtKm(summary.totalDistanceM, locale, 0),
+      value: summary.totalDistanceM === null ? null : fmtDistance(summary.totalDistanceM, locale, ctx.unitSystem, 0),
       delta: pct(summary.totalDistanceM, prevSummary.totalDistanceM),
       invert: false,
     },
@@ -340,7 +340,7 @@ export default async function SportPage({
                     icon={s.icon}
                     color={dataColor(s.family)}
                     title={sportLabel(w.activityType, locale)}
-                    meta={[dayFmt.format(w.startTs), fmtDuration(w.durationS), w.distanceM === null ? null : fmtKm(w.distanceM, locale)]
+                    meta={[dayFmt.format(w.startTs), fmtDuration(w.durationS), w.distanceM === null ? null : fmtDistance(w.distanceM, locale, ctx.unitSystem)]
                       .filter(Boolean)
                       .join(' · ')}
                     stats={[
