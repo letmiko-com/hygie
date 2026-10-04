@@ -98,7 +98,6 @@ export const fr: Messages = {
     recentSessions: 'Séances récentes',
     seeAll: 'Tout voir',
     noSessions: 'Pas de séance sur la période',
-    dayInitials: ['L', '', 'M', '', 'V', '', ''],
     ringsTitle: 'Anneaux d’activité',
     ringMove: 'Bouger',
     ringExercise: 'S’exercer',
@@ -690,6 +689,8 @@ export const fr: Messages = {
     email: 'Adresse e-mail',
     emailHint: 'Votre adresse de connexion : le lien magique part là.',
     locale: 'Langue',
+    weekStart: 'Premier jour de la semaine',
+    weekStartHint: 'Calendrier, bilan hebdo et toutes les vues semaine par semaine.',
     timezone: 'Fuseau',
     timezoneHint:
       'Découpe vos jours, vos nuits et vos cumuls. Les nuits déjà enregistrées gardent le fuseau de leur enregistrement.',

@@ -49,6 +49,7 @@ import {
   fmtNumber,
   fmtPercent,
   metricWriter,
+  weekdayInitials,
 } from '@/lib/format';
 import { bucketSpans, drillSet, drillZone, spanQuery } from '@/lib/drill';
 import { getMessages, resolveLocale, type Locale, type Messages } from '@/lib/i18n';
@@ -77,7 +78,7 @@ import {
 } from '@/lib/queries/metric-detail';
 import { getMetricType } from '@/lib/queries/metric-types';
 import { dataTotals } from '@/lib/queries/sync';
-import { comparisonRange, elapsedDays, todayInZone, type DayRange } from '@/lib/queries/time';
+import { comparisonRange, elapsedDays, todayInZone, weekStartOf, type DayRange } from '@/lib/queries/time';
 import { parseTimeParams, type TimeSearchParams } from '@/lib/queries/time-params';
 import { bucketAxisLabels, dayAxisLabels } from '@/lib/time-format';
 import { sportDisplay, sportLabel } from '@/lib/sports';
@@ -110,12 +111,6 @@ function downsample(values: Array<number | null>, target: number): Array<number 
 function rollingWindow(length: number): number | undefined {
   if (length <= 21) return undefined;
   return Math.max(2, Math.min(14, Math.round(length / 12)));
-}
-
-function mondayOf(day: string): string {
-  const t = Date.parse(`${day}T00:00:00Z`);
-  const dow = new Date(t).getUTCDay(); // 0 = Sunday
-  return new Date(t - ((dow + 6) % 7) * 86_400_000).toISOString().slice(0, 10);
 }
 
 function trendProps(quality: MetricQuality): { invert: boolean; neutral: boolean } {
@@ -603,7 +598,7 @@ export default async function MetricDetailPage({
       : m.metric.mean;
   const heatmap =
     cumulative && stats.daysTotal >= HEATMAP_MIN_DAYS && stats.daysTotal <= HEATMAP_MAX_DAYS
-      ? buildHeatmap(stats.days, stats.values, locale, writer.write, m)
+      ? buildHeatmap(stats.days, stats.values, locale, ctx.weekStart, writer.write, m)
       : null;
 
   interface SampleRowView extends Record<string, unknown> {
@@ -775,7 +770,7 @@ export default async function MetricDetailPage({
               values={heatmap.values}
               titles={heatmap.titles}
               color={color}
-              dayLabels={m.dash.dayInitials}
+              dayLabels={weekdayInitials(locale, ctx.weekStart)}
               ariaLabel={`${label} — ${m.metric.heatmapTitle}`}
               drill={heatmap.days.map((d) =>
                 d === '' ? null : drillZone({ fromDay: d, toDay: d }, metricHref(hk, `from=${d}&to=${d}`), locale, m)
@@ -812,20 +807,21 @@ export default async function MetricDetailPage({
 /**
  * Calendar grid for a daily cumulative. The three states of the heatmap are
  * kept distinct: null (no data at all) is not 0 (data present, nothing
- * counted). Leading days are padded to the Monday of the first week so the
- * seven rows line up with the day initials.
+ * counted). Leading days are padded to the start of the first week (the
+ * account's week start) so the seven rows line up with the day initials.
  */
 function buildHeatmap(
   days: string[],
   values: Array<number | null>,
   locale: Locale,
+  weekStart: number,
   withUnit: (v: number | null) => string | null,
   m: Messages
 ): { values: Array<number | null>; titles: string[]; days: string[] } {
   const first = days[0];
   if (!first) return { values: [], titles: [], days: [] };
   const pad = Math.round(
-    (Date.parse(`${first}T00:00:00Z`) - Date.parse(`${mondayOf(first)}T00:00:00Z`)) / 86_400_000
+    (Date.parse(`${first}T00:00:00Z`) - Date.parse(`${weekStartOf(first, weekStart)}T00:00:00Z`)) / 86_400_000
   );
   const cells: Array<number | null> = Array.from({ length: pad }, () => null);
   const titles: string[] = Array.from({ length: pad }, () => '');

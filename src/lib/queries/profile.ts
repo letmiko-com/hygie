@@ -20,6 +20,8 @@ export interface Profile {
   name: string;
   email: string;
   locale: 'fr' | 'en';
+  /** ISO weekday the account's weeks start on (users.week_start, 1 = Monday). */
+  weekStart: number;
   /** The subject this account owns, when it owns one (a pure admin does not). */
   subject: OwnedSubject | null;
 }
@@ -43,11 +45,16 @@ async function ownedSubject(userId: string): Promise<OwnedSubject | null> {
 }
 
 export async function getProfile(user: SessionUser): Promise<Profile> {
+  const [subject, prefs] = await Promise.all([
+    ownedSubject(user.userId),
+    getDb().query<{ week_start: number }>('select week_start from users where id = $1', [user.userId]),
+  ]);
   return {
     name: user.displayName,
     email: user.email,
     locale: user.locale === 'en' ? 'en' : 'fr',
-    subject: await ownedSubject(user.userId),
+    weekStart: prefs.rows[0]?.week_start ?? 1,
+    subject,
   };
 }
 
@@ -63,6 +70,8 @@ export async function isKnownTimezone(tz: string): Promise<boolean> {
 export interface ProfileUpdate {
   name: string;
   locale: 'fr' | 'en';
+  /** ISO weekday, 1 = Monday ... 7 = Sunday. */
+  weekStart: number;
   /** Ignored when the account owns no subject. */
   timezone: string | null;
 }
@@ -70,8 +79,8 @@ export interface ProfileUpdate {
 export async function updateProfile(user: SessionUser, update: ProfileUpdate): Promise<void> {
   await withTransaction(async (client) => {
     await client.query(
-      `update users set display_name = $2, locale = $3 where id = $1 and disabled_at is null`,
-      [user.userId, update.name, update.locale]
+      `update users set display_name = $2, locale = $3, week_start = $4 where id = $1 and disabled_at is null`,
+      [user.userId, update.name, update.locale, update.weekStart]
     );
     // Only the subject this account owns, through its own grant.
     await client.query(

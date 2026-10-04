@@ -23,7 +23,16 @@ import { TimeNav } from '@/components/time/TimeNav';
 import { TimeScrubber } from '@/components/time/TimeScrubber';
 import { bucketSpans, drillSet, drillZone, spanQuery } from '@/lib/drill';
 import { silentDevices } from '@/lib/devices';
-import { ABSENT, fmtDay, fmtHoursMinutes, fmtInt, fmtNumber, fmtRelative, kjToKcal } from '@/lib/format';
+import {
+  ABSENT,
+  fmtDay,
+  fmtHoursMinutes,
+  fmtInt,
+  fmtNumber,
+  fmtRelative,
+  kjToKcal,
+  weekdayInitials,
+} from '@/lib/format';
 import { getMessages, resolveLocale, type Locale } from '@/lib/i18n';
 import { dataColor, metricHref, type DataFamily } from '@/lib/metrics';
 import { getSubjectContext, type SubjectContext } from '@/lib/queries/context';
@@ -37,6 +46,7 @@ import {
   comparisonRange,
   elapsedDays,
   todayInZone,
+  weekStartOf,
   type DayRange,
 } from '@/lib/queries/time';
 import { parseTimeParams, timeQuery, type TimeSearchParams } from '@/lib/queries/time-params';
@@ -76,11 +86,6 @@ function downsample(values: Array<number | null>, target: number): Array<number 
     out.push(bucket.length === 0 ? null : bucket.reduce((a, b) => a + b, 0) / bucket.length);
   }
   return out;
-}
-
-function mondayOf(day: string): string {
-  const dow = new Date(`${day}T00:00:00Z`).getUTCDay(); // 0 = Sunday
-  return addDays(day, -((dow + 6) % 7));
 }
 
 function isoWeek(day: string): number {
@@ -158,10 +163,12 @@ export default async function DashboardPage({
   const todayRange: DayRange = { fromDay: today, toDayExcl: addDays(today, 1) };
   const last90: DayRange = { fromDay: addDays(today, -90), toDayExcl: today };
   const heatEndExcl = addDays(today, 1);
-  const heatStart = addDays(mondayOf(today), -51 * 7);
+  // Weeks start on the account's day (users.week_start), Monday by default.
+  const thisWeek = weekStartOf(today, ctx.weekStart);
+  const heatStart = addDays(thisWeek, -51 * 7);
   const heatRange: DayRange = { fromDay: heatStart, toDayExcl: heatEndExcl };
   const prev52: DayRange = { fromDay: addDays(heatStart, -364), toDayExcl: heatStart };
-  const volRange: DayRange = { fromDay: addDays(mondayOf(today), -49), toDayExcl: heatEndExcl };
+  const volRange: DayRange = { fromDay: addDays(thisWeek, -49), toDayExcl: heatEndExcl };
 
   const [
     cards,
@@ -263,7 +270,11 @@ export default async function DashboardPage({
   // --- weekly volume: a week without sessions is a real 0 (training is
   // observed through workouts themselves), not a data gap.
   const weekBars = weeks.map((w) => (w.distanceM ?? 0) / 1000);
-  const weekLabels = weeks.map((w) => `W${isoWeek(w.weekStart)}`);
+  // ISO week numbers only mean something for Monday weeks; other starts are
+  // labelled by their first day.
+  const weekLabels = weeks.map((w) =>
+    ctx.weekStart === 1 ? `W${isoWeek(w.weekStart)}` : fmtDay(w.weekStart, locale, { day: 'numeric', month: 'short' })
+  );
 
   // --- heatmap -----------------------------------------------------------------
   const heatDays: string[] = [];
@@ -555,7 +566,7 @@ export default async function DashboardPage({
             values={heatValues}
             titles={heatTitles}
             color={dataColor('activity')}
-            dayLabels={m.dash.dayInitials}
+            dayLabels={weekdayInitials(locale, ctx.weekStart)}
             ariaLabel={m.dash.regularityTitle}
             drill={heatDays.map((d) =>
               d === '' ? null : drillZone({ fromDay: d, toDay: d }, `/sport?from=${d}&to=${d}`, locale, m)

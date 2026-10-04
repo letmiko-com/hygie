@@ -2,7 +2,8 @@
 // through the sessions themselves, so that zero is a fact, not a gap (a month
 // whose sessions carry no distance keeps the absence glyph).
 // Month calendar (product phase 2, 2026-09-04: fitIQ's "Calendar" read through
-// the charter). One month, Monday-first grid: each day shows its sessions
+// the charter). One month, in a grid that starts on the account's week start
+// (Monday by default, users.week_start): each day shows its sessions
 // (sport, start time, duration) and its night (time asleep). The month's
 // totals sit above. A day without a session shows nothing, which is what a
 // calendar does; a future day is dimmed. Each session opens its detail, each
@@ -18,7 +19,7 @@ import { getMessages, resolveLocale } from '@/lib/i18n';
 import { dataColor } from '@/lib/metrics';
 import { getSubjectContext } from '@/lib/queries/context';
 import { sleepNights, type SleepNight } from '@/lib/queries/sleep';
-import { addDays, addMonths, daysBetween, todayInZone, type DayRange } from '@/lib/queries/time';
+import { addDays, addMonths, daysBetween, todayInZone, weekStartOf, type DayRange } from '@/lib/queries/time';
 import { workoutsInRange, type WorkoutListItem } from '@/lib/queries/workouts';
 import { sportDisplay, sportLabel } from '@/lib/sports';
 
@@ -26,11 +27,6 @@ export const metadata: Metadata = { title: 'Calendrier · Hygie' };
 export const dynamic = 'force-dynamic';
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
-
-function mondayOf(day: string): string {
-  const dow = new Date(`${day}T00:00:00Z`).getUTCDay(); // 0 = Sunday
-  return addDays(day, -((dow + 6) % 7));
-}
 
 function localDay(ts: Date, timeZone: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(ts);
@@ -77,10 +73,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const prevFirst = addMonths(first, -1);
   const range: DayRange = { fromDay: first, toDayExcl: nextFirst };
   const prevRange: DayRange = { fromDay: prevFirst, toDayExcl: first };
-  // Grid: from the Monday on or before the 1st to the Sunday on or after the last day.
-  const gridStart = mondayOf(first);
+  // Grid: from the week start on or before the 1st to the end of the week
+  // holding the last day. Weeks start on the account's day (users.week_start).
+  const gridStart = weekStartOf(first, ctx.weekStart);
   const lastDay = addDays(nextFirst, -1);
-  const gridEndExcl = addDays(mondayOf(lastDay), 7);
+  const gridEndExcl = addDays(weekStartOf(lastDay, ctx.weekStart), 7);
   const gridDays = Array.from({ length: daysBetween(gridStart, gridEndExcl) }, (_, i) => addDays(gridStart, i));
 
   const [workouts, nights, prevWorkouts, prevNights] = await Promise.all([

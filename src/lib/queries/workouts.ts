@@ -8,7 +8,7 @@ import { getDb } from '@/lib/db';
 import type { SubjectContext } from './context';
 import { getMetricType } from './metric-types';
 import { heavyRead } from './read';
-import type { DayRange } from './time';
+import { addDays, weekStartOf, type DayRange } from './time';
 
 export interface WorkoutListItem {
   id: string;
@@ -375,7 +375,7 @@ export async function workoutMinutesPerDay(
 }
 
 export interface WeekVolume {
-  /** ISO week start (Monday), local to the subject. */
+  /** First day of the week (the account's week start), local to the subject. */
   weekStart: string;
   sessions: number;
   distanceM: number | null;
@@ -390,17 +390,21 @@ export async function weeklyVolume(ctx: SubjectContext, range: DayRange): Promis
     distance_m: number | null;
     duration_s: number | null;
   }
+  // Weeks start on the account's day (users.week_start, ISO weekday), not
+  // on date_trunc's fixed Monday: a day d belongs to the week starting
+  // d - ((isodow(d) - start + 7) % 7).
   const { rows } = await getDb().query<Row>(
     `with weeks as (
        select w::date as week_start
-       from generate_series(date_trunc('week', $2::date), date_trunc('week', $3::date - 1), interval '1 week') w
+       from generate_series($5::date, $6::date, interval '1 week') w
      ),
      agg as (
-       select date_trunc('week', (w.start_ts at time zone $4)::date)::date as week_start,
+       select (d - ((extract(isodow from d)::int - $7 + 7) % 7))::date as week_start,
               count(*)::int as sessions,
               sum(w.distance_m) as distance_m,
               sum(w.duration_s) as duration_s
        from workouts w
+       cross join lateral (select (w.start_ts at time zone $4)::date as d) local_day
        where w.subject_id = $1
          and w.start_ts >= ($2::date::timestamp at time zone $4)
          and w.start_ts < ($3::date::timestamp at time zone $4)
@@ -410,7 +414,15 @@ export async function weeklyVolume(ctx: SubjectContext, range: DayRange): Promis
             agg.distance_m, agg.duration_s
      from weeks left join agg using (week_start)
      order by weeks.week_start`,
-    [ctx.subjectId, range.fromDay, range.toDayExcl, ctx.timezone]
+    [
+      ctx.subjectId,
+      range.fromDay,
+      range.toDayExcl,
+      ctx.timezone,
+      weekStartOf(range.fromDay, ctx.weekStart),
+      weekStartOf(addDays(range.toDayExcl, -1), ctx.weekStart),
+      ctx.weekStart,
+    ]
   );
   return rows.map((r) => ({
     weekStart: r.week_start,

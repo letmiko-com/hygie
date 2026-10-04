@@ -11,6 +11,21 @@ import { EmailPanel, ProfileForm } from './ui';
 export const metadata: Metadata = { title: 'Profil · Hygie' };
 export const dynamic = 'force-dynamic';
 
+/**
+ * Monday, Saturday and Sunday: the starts in actual use. A stored value
+ * outside them (users.week_start allows 1 to 7) stays listed, so saving the
+ * form never changes it silently.
+ */
+function weekDayChoices(locale: 'fr' | 'en', current: number): Array<{ value: number; label: string }> {
+  const fmt = new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', { weekday: 'long', timeZone: 'UTC' });
+  const values = [1, 6, 7].includes(current) ? [1, 6, 7] : [1, 6, 7, current].sort((a, b) => a - b);
+  // 2024-01-01 was a Monday: ISO weekday d falls on 2024-01-0d.
+  return values.map((d) => {
+    const name = fmt.format(new Date(Date.UTC(2024, 0, d)));
+    return { value: d, label: name.charAt(0).toUpperCase() + name.slice(1) };
+  });
+}
+
 export default async function ProfilePage() {
   const user = await getSessionUser();
   if (!user) redirect('/login');
@@ -28,12 +43,16 @@ export default async function ProfilePage() {
       <ProfileForm
         name={profile.name}
         locale={profile.locale}
+        weekStart={profile.weekStart}
+        weekDays={weekDayChoices(profile.locale, profile.weekStart)}
         timezone={profile.subject?.timezone ?? null}
         zones={Intl.supportedValuesOf('timeZone')}
         labels={{
           name: m.profile.name,
           nameHint: profile.subject ? m.profile.nameHint : m.profile.nameHintNoSubject,
           locale: m.profile.locale,
+          weekStart: m.profile.weekStart,
+          weekStartHint: m.profile.weekStartHint,
           timezone: m.profile.timezone,
           timezoneHint: m.profile.timezoneHint,
           save: m.profile.save,

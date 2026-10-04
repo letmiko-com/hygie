@@ -21,6 +21,8 @@ export interface ProfileLabels {
   name: string;
   nameHint: string;
   locale: string;
+  weekStart: string;
+  weekStartHint: string;
   timezone: string;
   timezoneHint: string;
   save: string;
@@ -83,12 +85,18 @@ export function ProfileForm({
   labels,
   name,
   locale,
+  weekStart,
+  weekDays,
   timezone,
   zones,
 }: {
   labels: ProfileLabels;
   name: string;
   locale: 'fr' | 'en';
+  /** ISO weekday the weeks start on. */
+  weekStart: number;
+  /** The choices offered, named in the account's language. */
+  weekDays: Array<{ value: number; label: string }>;
   /** Null when the account owns no subject: no time zone to edit. */
   timezone: string | null;
   zones: string[];
@@ -116,6 +124,18 @@ export function ProfileForm({
           <option value="fr">Français</option>
           <option value="en">English</option>
         </select>
+      </label>
+
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span className="hy-label">{labels.weekStart}</span>
+        <select name="weekStart" defaultValue={weekStart} style={{ ...fieldStyle, maxWidth: 200 }}>
+          {weekDays.map((d) => (
+            <option key={d.value} value={d.value}>
+              {d.label}
+            </option>
+          ))}
+        </select>
+        <span style={hintStyle}>{labels.weekStartHint}</span>
       </label>
 
       {timezone !== null && (

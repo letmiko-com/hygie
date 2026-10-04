@@ -254,3 +254,18 @@ export function fmtRelative(date: Date | null, locale: Locale, timeZone: string)
   if (abs < 7 * 86_400) return rtf.format(Math.round(deltaS / 86_400), 'day');
   return fmtDateTime(date, locale, timeZone);
 }
+
+/**
+ * Row labels of a week-by-column heatmap whose first row is `weekStart` (ISO
+ * weekday, 1 = Monday): the narrow names of rows 1, 3 and 5, blanks between,
+ * so the grid reads at a glance without crowding its edge.
+ */
+export function weekdayInitials(locale: Locale, weekStart: number): string[] {
+  const fmt = new Intl.DateTimeFormat(intlLocale(locale), { weekday: 'narrow', timeZone: 'UTC' });
+  // 2024-01-01 was a Monday: ISO weekday d falls on 2024-01-0d.
+  return Array.from({ length: 7 }, (_, i) => {
+    if (i % 2 === 1 || i === 6) return '';
+    const iso = ((weekStart - 1 + i) % 7) + 1;
+    return fmt.format(new Date(Date.UTC(2024, 0, iso)));
+  });
+}

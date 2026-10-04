@@ -1,5 +1,6 @@
 // Weekly review (product phase 2, 2026-09-04: fitIQ's "Training load" week read
-// through the charter). One ISO week, Monday to Sunday: what was trained, how
+// through the charter). One week, from the account's week start (Monday by
+// default, users.week_start) over seven days: what was trained, how
 // the nights went, what the resting markers did, day by day, against the
 // previous week. No strain, no recovery score, no balance verdict: the week's
 // facts side by side, the reader draws the line.
@@ -23,7 +24,7 @@ import { dataColor } from '@/lib/metrics';
 import { getSubjectContext, type SubjectContext } from '@/lib/queries/context';
 import { dailySeries, type DailyPoint } from '@/lib/queries/series';
 import { sleepNights, type SleepNight } from '@/lib/queries/sleep';
-import { addDays, daysBetween, isDay, todayInZone, type DayRange } from '@/lib/queries/time';
+import { addDays, daysBetween, isDay, todayInZone, weekStartOf, type DayRange } from '@/lib/queries/time';
 import { workoutsInRange, type WorkoutListItem } from '@/lib/queries/workouts';
 import { sportDisplay, sportLabel } from '@/lib/sports';
 import { rangeLabel } from '@/lib/time-format';
@@ -37,11 +38,6 @@ const HK = {
   steps: 'HKQuantityTypeIdentifierStepCount',
   energy: 'HKQuantityTypeIdentifierActiveEnergyBurned',
 };
-
-function mondayOf(day: string): string {
-  const dow = new Date(`${day}T00:00:00Z`).getUTCDay(); // 0 = Sunday
-  return addDays(day, -((dow + 6) % 7));
-}
 
 /** Sum of the non-null values, null when there is none. */
 function sum(values: Array<number | null>): number | null {
@@ -162,17 +158,18 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
 
   const sp = await searchParams;
   const rawW = Array.isArray(sp.w) ? sp.w[0] : sp.w;
-  const thisMonday = mondayOf(today);
-  // The URL carries the week's Monday; anything else snaps to its own Monday.
-  const monday = rawW && isDay(rawW) ? mondayOf(rawW) : thisMonday;
-  const isCurrent = monday === thisMonday;
-  const cur: DayRange = { fromDay: monday, toDayExcl: addDays(monday, 7) };
-  const prev: DayRange = { fromDay: addDays(monday, -7), toDayExcl: monday };
+  const thisStart = weekStartOf(today, ctx.weekStart);
+  // The URL carries the week's first day; anything else snaps to the start
+  // of its own week.
+  const start = rawW && isDay(rawW) ? weekStartOf(rawW, ctx.weekStart) : thisStart;
+  const isCurrent = start === thisStart;
+  const cur: DayRange = { fromDay: start, toDayExcl: addDays(start, 7) };
+  const prev: DayRange = { fromDay: addDays(start, -7), toDayExcl: start };
   const both: DayRange = { fromDay: prev.fromDay, toDayExcl: cur.toDayExcl };
-  const curDays = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+  const curDays = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const prevDays = Array.from({ length: 7 }, (_, i) => addDays(prev.fromDay, i));
   // Days of the week that are over or in progress: the comparison basis.
-  const elapsed = monday > today ? 0 : Math.min(7, daysBetween(monday, today) + 1);
+  const elapsed = start > today ? 0 : Math.min(7, daysBetween(start, today) + 1);
 
   const [curWorkouts, prevWorkouts, curNights, prevNights, restingHr, hrv, steps, energy] = await Promise.all([
     workoutsInRange(ctx, cur),
@@ -284,7 +281,7 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
           <span className="tnum" style={{ font: '500 var(--text-sm)/1 var(--font-data)', padding: '0 6px' }}>
             {rangeLabel(null, cur, locale)}
           </span>
-          {monday < thisMonday && navLink(`/week?w=${addDays(monday, 7)}`, m.week.nextWeek, 'chevron_right')}
+          {start < thisStart && navLink(`/week?w=${addDays(start, 7)}`, m.week.nextWeek, 'chevron_right')}
           {!isCurrent && navLink('/week', m.week.thisWeek)}
         </div>
       </header>

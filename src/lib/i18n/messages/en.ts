@@ -98,7 +98,6 @@ export const en = {
     recentSessions: 'Recent sessions',
     seeAll: 'See all',
     noSessions: 'No session on this period',
-    dayInitials: ['M', '', 'W', '', 'F', '', ''],
     ringsTitle: 'Activity rings',
     ringMove: 'Move',
     ringExercise: 'Exercise',
@@ -684,6 +683,8 @@ export const en = {
     email: 'Email',
     emailHint: 'Your sign-in address: the magic link goes there.',
     locale: 'Language',
+    weekStart: 'First day of the week',
+    weekStartHint: 'Calendar, weekly review, and every week-by-week view.',
     timezone: 'Time zone',
     timezoneHint:
       'Cuts your days, nights and totals. Nights already recorded keep the zone they were recorded in.',

@@ -51,6 +51,15 @@ export function addDays(day: string, n: number): string {
   return fromUtcMs(toUtcMs(day) + n * 86_400_000);
 }
 
+/**
+ * First day of the week holding `day`, for weeks that start on `weekStart`,
+ * an ISO weekday (1 = Monday ... 7 = Sunday): the account's users.week_start.
+ */
+export function weekStartOf(day: string, weekStart: number): string {
+  const isoDow = ((new Date(toUtcMs(day)).getUTCDay() + 6) % 7) + 1;
+  return addDays(day, -((isoDow - weekStart + 7) % 7));
+}
+
 /** Whole days from fromDay to toDay (positive when toDay is later). */
 export function daysBetween(fromDay: string, toDay: string): number {
   return Math.round((toUtcMs(toDay) - toUtcMs(fromDay)) / 86_400_000);
