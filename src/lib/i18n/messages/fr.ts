@@ -786,6 +786,15 @@ export const fr: Messages = {
     invitedTitle: (email: string) => `Invitation envoyée à ${email}`,
     invitedNoMail: (email: string) =>
       `Compte créé pour ${email}, mais l’e-mail n’est pas parti : vérifiez le SMTP. La personne peut quand même demander un lien sur la page de connexion.`,
+    correctTitle: 'Corriger l’invitation',
+    correctHint:
+      'Possible tant que ce membre n’a ni appareil ni données. Ensuite, seul le membre change son adresse, depuis son profil.',
+    correctSubmit: 'Enregistrer et renvoyer',
+    correctSaved: (email: string) => `Corrigé : une nouvelle invitation est partie à ${email}.`,
+    correctSavedName: 'Nom corrigé.',
+    correctNoMail: (email: string) =>
+      `Corrigé, mais l’invitation à ${email} n’est pas partie : vérifiez le SMTP. La personne peut quand même demander un lien sur la page de connexion.`,
+    correctLocked: 'Ce membre a désormais un appareil ou des données : seul lui peut changer son adresse.',
     invitedProxy:
       'Si cette instance est derrière un proxy d’accès (Cloudflare Access, Authelia…), autorisez-y aussi cette adresse, sinon la page de connexion lui restera fermée.',
   },

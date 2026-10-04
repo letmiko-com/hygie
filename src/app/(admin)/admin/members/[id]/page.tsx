@@ -1,5 +1,6 @@
 // One member's instance state: accounts, devices (revocable, never created
-// here), daily totals received over 30 days, and the recent batches. Reads the
+// here), the correction of a mistyped invitation while nothing reached it,
+// daily totals received over 30 days, and the recent batches. Reads the
 // instance layer only: all types summed, batch errors as code and step, no
 // health value and no data type (architecture §1).
 import type { Metadata } from 'next';
@@ -21,6 +22,7 @@ import { dayInZone } from '@/lib/queries/time';
 import { staleAfterMs } from '@/lib/silence';
 import { revokeMemberDeviceAction } from '../../actions';
 import { memberState } from '../../state';
+import { CorrectInvitation } from './correct';
 
 export const metadata: Metadata = { title: 'Membre · Hygie' };
 export const dynamic = 'force-dynamic';
@@ -58,7 +60,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
       </Panel>
     );
   }
-  const { summary, devices, batches, volumes } = detail;
+  const { summary, devices, batches, volumes, invitation } = detail;
   const tz = summary.timezone;
   const state = memberState(summary);
   const batches30d = volumes.reduce((a, v) => a + v.batches, 0);
@@ -117,6 +119,31 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
           <StatTile label={m.admin.points30d} value={points30d === null ? null : fmtInt(points30d, locale)} />
         </div>
       </Panel>
+
+      {invitation && (
+        <Panel>
+          <PanelLabel>{m.admin.correctTitle}</PanelLabel>
+          <CorrectInvitation
+            subjectId={summary.subjectId}
+            name={invitation.name}
+            email={invitation.email}
+            labels={{
+              title: m.admin.correctTitle,
+              hint: m.admin.correctHint,
+              name: m.admin.inviteName,
+              email: m.admin.inviteEmail,
+              submit: m.admin.correctSubmit,
+              saved: m.admin.correctSaved('{email}'),
+              savedName: m.admin.correctSavedName,
+              noMail: m.admin.correctNoMail('{email}'),
+              locked: m.admin.correctLocked,
+              exists: m.admin.inviteExists,
+              invalid: m.admin.inviteInvalid,
+              proxy: m.admin.invitedProxy,
+            }}
+          />
+        </Panel>
+      )}
 
       <Panel>
         <PanelLabel>{m.admin.devicesTitle}</PanelLabel>

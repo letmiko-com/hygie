@@ -4,7 +4,7 @@
 // nothing.
 import { revalidatePath } from 'next/cache';
 import { sendInvitationEmail } from '@/lib/auth/mailer';
-import { getInstanceContext, inviteMember, revokeMemberDevice } from '@/lib/queries/instance';
+import { correctInvitation, getInstanceContext, inviteMember, revokeMemberDevice } from '@/lib/queries/instance';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -69,4 +69,53 @@ export async function inviteMemberAction(_prev: InviteResult | null, formData: F
     console.error(`[admin] invitation email failed: ${err instanceof Error ? err.name : 'error'}`);
   }
   return { ok: true, email, mailSent };
+}
+
+export type CorrectionResult =
+  | { ok: true; email: string; emailChanged: boolean; mailSent: boolean }
+  | { ok: false; error: 'invalid' | 'exists' | 'locked' | 'unauthorized' };
+
+export async function correctInvitationAction(
+  _prev: CorrectionResult | null,
+  formData: FormData
+): Promise<CorrectionResult> {
+  const ictx = await getInstanceContext();
+  if (!ictx) return { ok: false, error: 'unauthorized' };
+
+  const subjectId = String(formData.get('subjectId') ?? '');
+  const name = String(formData.get('name') ?? '').trim();
+  const email = String(formData.get('email') ?? '')
+    .trim()
+    .toLowerCase();
+  if (
+    !UUID.test(subjectId) ||
+    name.length === 0 ||
+    name.length > 80 ||
+    email.length > 254 ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  ) {
+    return { ok: false, error: 'invalid' };
+  }
+
+  const outcome = await correctInvitation(ictx, subjectId, { name, email });
+  if (!outcome.ok) return { ok: false, error: outcome.error };
+  revalidatePath('/admin');
+  revalidatePath(`/admin/members/${subjectId}`);
+  if (!outcome.emailChanged) return { ok: true, email, emailChanged: false, mailSent: false };
+
+  const base = (process.env.HYGIE_BASE_URL ?? '').replace(/\/$/, '');
+  let mailSent = false;
+  try {
+    await sendInvitationEmail({
+      to: email,
+      name,
+      inviter: ictx.displayName,
+      locale: outcome.locale,
+      loginUrl: `${base}/login`,
+    });
+    mailSent = true;
+  } catch (err) {
+    console.error(`[admin] corrected invitation email failed: ${err instanceof Error ? err.name : 'error'}`);
+  }
+  return { ok: true, email, emailChanged: true, mailSent };
 }

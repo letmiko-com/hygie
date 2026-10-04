@@ -784,6 +784,15 @@ export const en = {
     invitedTitle: (email: string) => `Invitation sent to ${email}`,
     invitedNoMail: (email: string) =>
       `Account created for ${email}, but the email did not leave: check SMTP, they can still request a link on the sign-in page.`,
+    correctTitle: 'Correct the invitation',
+    correctHint:
+      'Possible while this member has no device and no data. After that, only the member changes their address, from their profile.',
+    correctSubmit: 'Save and resend',
+    correctSaved: (email: string) => `Corrected: a new invitation went to ${email}.`,
+    correctSavedName: 'Name corrected.',
+    correctNoMail: (email: string) =>
+      `Corrected, but the invitation to ${email} did not leave: check SMTP, they can still request a link on the sign-in page.`,
+    correctLocked: 'This member now has a device or data: only they can change their address.',
     invitedProxy:
       'If this instance sits behind an access proxy (Cloudflare Access, Authelia…), allow this address there too, or they will never reach the sign-in page.',
   },

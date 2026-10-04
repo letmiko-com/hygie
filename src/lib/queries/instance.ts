@@ -168,6 +168,12 @@ export interface MemberDetail {
   devices: MemberDevice[];
   batches: MemberBatch[];
   volumes: MemberDayVolume[];
+  /**
+   * The invitation as typed, while the admin may still correct it: the
+   * subject never had a device nor a batch (so no health data reached it),
+   * and its only account is a non-admin owner. Null otherwise.
+   */
+  invitation: { name: string; email: string } | null;
 }
 
 /** One live subject's instance state, or null when it does not exist or is not live. */
@@ -260,8 +266,17 @@ export async function memberDetail(
     ),
   ]);
 
+  // devices lists revoked ones too, and any batch would be the newest one
+  // returned: both empty means none ever existed.
+  const only = summary.accounts.length === 1 ? summary.accounts[0] : null;
+  const invitation =
+    devices.rows.length === 0 && batches.rows.length === 0 && only && !only.isAdmin
+      ? { name: only.displayName, email: only.email }
+      : null;
+
   return {
     summary,
+    invitation,
     devices: devices.rows.map((r) => ({
       id: r.id,
       name: r.name,
@@ -353,6 +368,75 @@ export async function inviteMember(ictx: InstanceContext, input: InviteInput): P
     });
   } catch (err) {
     // users.email is unique (citext): an existing account, enabled or not.
+    if (typeof err === 'object' && err !== null && (err as { code?: unknown }).code === UNIQUE_VIOLATION) {
+      return { ok: false, error: 'exists' };
+    }
+    throw err;
+  }
+}
+
+export type CorrectionOutcome =
+  | { ok: true; emailChanged: boolean; locale: string }
+  | { ok: false; error: 'locked' | 'exists' };
+
+/**
+ * Corrects a mistyped invitation (decision of 2026-10-04): the owner's name
+ * and address, and the subject's name. Only while the subject never had a
+ * device nor a batch and its only account is a non-admin owner. Past that
+ * point an admin who could rewrite a member's address could put their own
+ * there and read the member's data; the member changes it from the profile.
+ *
+ * The subject row is locked first: pairing a device or receiving a batch
+ * inserts a row that references it, which takes a key-share lock on it, so a
+ * device cannot land between the check and the update.
+ */
+export async function correctInvitation(
+  ictx: InstanceContext,
+  subjectId: string,
+  input: { name: string; email: string }
+): Promise<CorrectionOutcome> {
+  void ictx;
+  try {
+    return await withTransaction(async (client) => {
+      const subject = await client.query(
+        `select 1 from subjects where id = $1 and purge_state = 'live' for update`,
+        [subjectId]
+      );
+      if (subject.rows.length === 0) return { ok: false as const, error: 'locked' as const };
+      const { rows } = await client.query<{
+        user_id: string;
+        email: string;
+        locale: string;
+        grants: number;
+        used: boolean;
+      }>(
+        `select g.user_id, u.email, u.locale,
+                (select count(*)::int from access_grants a where a.subject_id = $1) as grants,
+                exists (select 1 from devices d where d.subject_id = $1)
+                  or exists (select 1 from ingest_batches b where b.subject_id = $1) as used
+         from access_grants g
+         join users u on u.id = g.user_id and u.disabled_at is null and not u.is_admin
+         where g.subject_id = $1 and g.role = 'owner'`,
+        [subjectId]
+      );
+      const owner = rows.length === 1 && rows[0].grants === 1 && !rows[0].used ? rows[0] : null;
+      if (!owner) return { ok: false as const, error: 'locked' as const };
+
+      const emailChanged = owner.email.toLowerCase() !== input.email.toLowerCase();
+      await client.query(`update users set email = $2, display_name = $3 where id = $1`, [
+        owner.user_id,
+        input.email,
+        input.name,
+      ]);
+      await client.query(`update subjects set display_name = $2 where id = $1`, [subjectId, input.name]);
+      if (emailChanged) {
+        // Whoever held the mistyped address loses any session and pending link.
+        await client.query('delete from auth_sessions where user_id = $1', [owner.user_id]);
+        await client.query('delete from auth_verification_tokens where identifier = $1', [owner.email]);
+      }
+      return { ok: true as const, emailChanged, locale: owner.locale };
+    });
+  } catch (err) {
     if (typeof err === 'object' && err !== null && (err as { code?: unknown }).code === UNIQUE_VIOLATION) {
       return { ok: false, error: 'exists' };
     }
