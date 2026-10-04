@@ -29,7 +29,11 @@ exactly one subject and authenticates with its own API key.
   day over 30 days, **all types summed**. Never the list of types a subject records nor
   their counts, and never the per-type keys of `ingest_batches.counts`: the mere presence
   of a type (a menopause symptom, an ECG, a state of mind) is a health fact. Creating a
-  subject for an invitee grants `owner` to the invitee only, never to the admin.
+  subject for an invitee grants `owner` to the invitee only, never to the admin. The admin
+  may correct a mistyped invitation (name, address, resent) only while the subject never
+  had a device nor a batch and its only account is a non-admin owner: nothing has reached
+  it yet. The check locks the subject row, which any device or batch insert must
+  key-share lock, so none can land in between.
 - Deleting a member = revoke sessions, device keys, and grants immediately (data becomes
   unreachable), then a background job physically purges rows and raw files, verifiably.
   Restores from backup must not resurrect revoked keys: a tombstone registry (purged subjects, revoked keys) is stored outside the main backup set and re-applied after any restore. Purge runs table by table in batches; ON DELETE CASCADE is an integrity net, not the purge algorithm.
