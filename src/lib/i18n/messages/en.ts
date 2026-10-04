@@ -690,6 +690,52 @@ export const en = {
     save: 'Save',
     saved: 'Profile saved.',
     invalid: 'Check the name and the time zone.',
+    emailChange: 'Change address',
+    emailNew: 'New address',
+    emailSend: 'Send the link',
+    emailCancel: 'Cancel',
+    emailSent: (to: string) =>
+      `Link sent to ${to}. It is valid for one hour; your current address keeps working until you click it.`,
+    emailSame: 'This is already your address.',
+    emailTaken: 'Another account already uses this address.',
+    emailInvalid: 'Invalid address.',
+    emailCooldown: 'A link has just been sent: wait a minute before asking for another one.',
+    emailMailFailed: 'The link could not be sent: the instance’s SMTP needs checking.',
+  },
+  // Email change (src/lib/auth/email-change.ts): the link goes to the NEW
+  // address, notices to the old one.
+  emailChangeMail: {
+    subject: 'Hygie: confirm your new address',
+    greeting: (name: string) => `Hello ${name},`,
+    body: (from: string) =>
+      `You asked for your Hygie account, currently signed in with ${from}, to use this address from now on.`,
+    action: 'Open the link below and confirm. It is valid for one hour.',
+    link: 'Confirm the new address',
+    ignore: 'If you did not ask for this, ignore this message: nothing changes without confirmation.',
+  },
+  emailNoticeMail: {
+    requestedSubject: 'Hygie: address change requested',
+    requested: (to: string) =>
+      `A change of your Hygie sign-in address to ${to} has just been requested. It only takes effect if that new address confirms it.`,
+    changedSubject: 'Hygie: your sign-in address has changed',
+    changed: (to: string) =>
+      `Your Hygie account now signs in with ${to}. This address no longer receives sign-in links.`,
+    notYou: 'If this was not you, tell the administrator of your Hygie instance.',
+  },
+  emailConfirm: {
+    title: 'Confirm the new address',
+    body: (from: string, to: string) =>
+      `Your account will sign in with ${to} instead of ${from}. Your other open sessions will be closed.`,
+    button: 'Confirm the new address',
+    done: 'Address changed',
+    doneSignedIn: 'Your other sessions are closed; this one stays open.',
+    doneSignIn: 'From now on, sign in with this address. Your open sessions were closed.',
+    back: 'Back to Hygie',
+    signIn: 'Sign in',
+    invalid: 'Invalid or expired link',
+    invalidBody:
+      'This link no longer works: it expired, was already used, or the address changed since. Ask for a new change from your profile.',
+    taken: 'Another account uses this address now: the change cannot be made.',
   },
   // Administration section (src/app/(admin)): instance state only, never a
   // health value nor the name of a data type (architecture §1).

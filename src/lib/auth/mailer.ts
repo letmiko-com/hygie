@@ -1,6 +1,6 @@
 // Outgoing email over SMTP (nodemailer): the magic link, the invitation of a
-// new member, and the silence alert of the worker
-// (src/lib/ingest/silence-alert.ts). Configuration is env-driven
+// new member, the email change link and its notices, and the silence alert
+// of the worker (src/lib/ingest/silence-alert.ts). Configuration is env-driven
 // (.env.example: SMTP_HOST/PORT/USER/PASSWORD/FROM; port 2587 works from
 // Railway). Test escape hatch: when HYGIE_MAIL_CAPTURE_DIR is set, the message
 // goes through nodemailer's jsonTransport and is written to a file in that
@@ -115,5 +115,44 @@ export async function sendInvitationEmail(invite: {
       `<p>${escapeHtml(m.pair)}</p>`,
       `<p>${escapeHtml(m.ignore)}</p>`,
     ].join('\n'),
+  });
+}
+
+/** The email change link, sent to the NEW address (src/lib/auth/email-change.ts). */
+export async function sendEmailChangeLink(change: {
+  to: string;
+  from: string;
+  name: string;
+  locale: string;
+  confirmUrl: string;
+}): Promise<void> {
+  const m = getMessages(change.locale).emailChangeMail;
+  const lines = [m.greeting(change.name), m.body(change.from), m.action];
+  await sendMail({
+    to: change.to,
+    subject: m.subject,
+    text: [lines[0], '', lines[1], '', lines[2], change.confirmUrl, '', m.ignore].join('\n'),
+    html: [
+      ...lines.map((l) => `<p>${escapeHtml(l)}</p>`),
+      `<p><a href="${escapeHtml(change.confirmUrl)}">${escapeHtml(m.link)}</a></p>`,
+      `<p>${escapeHtml(m.ignore)}</p>`,
+    ].join('\n'),
+  });
+}
+
+/** Tells the OLD address that a change was requested, or that it happened. */
+export async function sendEmailChangeNotice(notice: {
+  to: string;
+  newEmail: string;
+  locale: string;
+  kind: 'requested' | 'changed';
+}): Promise<void> {
+  const m = getMessages(notice.locale).emailNoticeMail;
+  const body = notice.kind === 'requested' ? m.requested(notice.newEmail) : m.changed(notice.newEmail);
+  await sendMail({
+    to: notice.to,
+    subject: notice.kind === 'requested' ? m.requestedSubject : m.changedSubject,
+    text: [body, '', m.notYou].join('\n'),
+    html: [`<p>${escapeHtml(body)}</p>`, `<p>${escapeHtml(m.notYou)}</p>`].join('\n'),
   });
 }

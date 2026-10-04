@@ -696,6 +696,50 @@ export const fr: Messages = {
     save: 'Enregistrer',
     saved: 'Profil enregistré.',
     invalid: 'Vérifiez le nom et le fuseau.',
+    emailChange: 'Changer d’adresse',
+    emailNew: 'Nouvelle adresse',
+    emailSend: 'Envoyer le lien',
+    emailCancel: 'Annuler',
+    emailSent: (to: string) =>
+      `Lien envoyé à ${to}. Il est valable une heure ; votre adresse actuelle reste active jusqu’au clic.`,
+    emailSame: 'C’est déjà votre adresse.',
+    emailTaken: 'Un autre compte utilise déjà cette adresse.',
+    emailInvalid: 'Adresse invalide.',
+    emailCooldown: 'Un lien vient de partir : attendez une minute avant d’en demander un autre.',
+    emailMailFailed: 'Le lien n’a pas pu partir : le SMTP de l’instance est à vérifier.',
+  },
+  emailChangeMail: {
+    subject: 'Hygie : confirmez votre nouvelle adresse',
+    greeting: (name: string) => `Bonjour ${name},`,
+    body: (from: string) =>
+      `Vous avez demandé que votre compte Hygie, connecté aujourd’hui avec ${from}, utilise désormais cette adresse.`,
+    action: 'Ouvrez le lien ci-dessous puis confirmez. Il est valable une heure.',
+    link: 'Confirmer la nouvelle adresse',
+    ignore: 'Si vous n’êtes pas à l’origine de cette demande, ignorez ce message : rien ne change sans confirmation.',
+  },
+  emailNoticeMail: {
+    requestedSubject: 'Hygie : changement d’adresse demandé',
+    requested: (to: string) =>
+      `Un changement de l’adresse de connexion de votre compte Hygie vers ${to} vient d’être demandé. Il ne prendra effet que si cette nouvelle adresse le confirme.`,
+    changedSubject: 'Hygie : votre adresse de connexion a changé',
+    changed: (to: string) =>
+      `Votre compte Hygie se connecte désormais avec ${to}. Cette adresse-ci ne reçoit plus de lien de connexion.`,
+    notYou: 'Si ce n’est pas vous, prévenez l’administrateur de votre instance Hygie.',
+  },
+  emailConfirm: {
+    title: 'Confirmer la nouvelle adresse',
+    body: (from: string, to: string) =>
+      `Votre compte se connectera avec ${to} au lieu de ${from}. Vos autres sessions ouvertes seront fermées.`,
+    button: 'Confirmer la nouvelle adresse',
+    done: 'Adresse changée',
+    doneSignedIn: 'Vos autres sessions sont fermées ; celle-ci reste ouverte.',
+    doneSignIn: 'Connectez-vous désormais avec cette adresse. Vos sessions ouvertes ont été fermées.',
+    back: 'Retour à Hygie',
+    signIn: 'Se connecter',
+    invalid: 'Lien invalide ou expiré',
+    invalidBody:
+      'Ce lien ne vaut plus : il a expiré, a déjà servi, ou l’adresse a changé depuis. Redemandez un changement depuis votre profil.',
+    taken: 'Un autre compte utilise désormais cette adresse : le changement ne peut pas se faire.',
   },
   admin: {
     title: 'Membres',

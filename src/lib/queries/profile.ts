@@ -6,6 +6,7 @@
 // of the subject it owns change together. It is the name shown in the sidebar
 // and the one the admin sees in the member list.
 import { getDb, withTransaction } from '@/lib/db';
+import type { EmailChangeClaim } from '@/lib/auth/email-change';
 import type { SessionUser } from './context';
 
 export interface OwnedSubject {
@@ -86,4 +87,70 @@ export async function updateProfile(user: SessionUser, update: ProfileUpdate): P
       [user.userId, update.name, update.timezone]
     );
   });
+}
+
+/** True when an account (enabled or not) already uses the address: users.email is unique. */
+export async function emailTaken(email: string): Promise<boolean> {
+  const { rows } = await getDb().query<{ taken: boolean }>(
+    'select exists (select 1 from users where email = $1) as taken',
+    [email]
+  );
+  return rows[0]?.taken ?? false;
+}
+
+/** The account a verified email change token names, for the confirmation page. */
+export async function emailChangeAccount(claim: EmailChangeClaim): Promise<{ name: string; locale: string } | null> {
+  const { rows } = await getDb().query<{ display_name: string; locale: string }>(
+    'select display_name, locale from users where id = $1 and email = $2 and disabled_at is null',
+    [claim.userId, claim.from]
+  );
+  return rows[0] ? { name: rows[0].display_name, locale: rows[0].locale } : null;
+}
+
+export type EmailChangeOutcome = 'changed' | 'stale' | 'taken';
+
+const UNIQUE_VIOLATION = '23505';
+
+/**
+ * Applies a verified email change. `stale` when the account's address is no
+ * longer the one the token was issued for (already applied, changed since,
+ * account disabled): that is what makes a token single use.
+ *
+ * Then every session of the account is closed except `keepSessionHash`, the
+ * one confirming, when it belongs to that account; and pending sign-in links
+ * of the old address are dropped.
+ */
+export async function applyEmailChange(
+  claim: EmailChangeClaim,
+  keepSessionHash: string | null
+): Promise<EmailChangeOutcome> {
+  try {
+    return await withTransaction(async (client) => {
+      const res = await client.query(
+        `update users set email = $3 where id = $1 and email = $2 and disabled_at is null`,
+        [claim.userId, claim.from, claim.to]
+      );
+      if ((res.rowCount ?? 0) === 0) return 'stale' as const;
+      await client.query(
+        `delete from auth_sessions where user_id = $1 and token is distinct from $2`,
+        [claim.userId, keepSessionHash]
+      );
+      await client.query('delete from auth_verification_tokens where identifier = $1', [claim.from]);
+      return 'changed' as const;
+    });
+  } catch (err) {
+    if (typeof err === 'object' && err !== null && (err as { code?: unknown }).code === UNIQUE_VIOLATION) {
+      return 'taken';
+    }
+    throw err;
+  }
+}
+
+/** True when the session (by its stored hash) belongs to the account. */
+export async function sessionBelongsTo(sessionHash: string, userId: string): Promise<boolean> {
+  const { rows } = await getDb().query<{ mine: boolean }>(
+    'select exists (select 1 from auth_sessions where token = $1 and user_id = $2) as mine',
+    [sessionHash, userId]
+  );
+  return rows[0]?.mine ?? false;
 }
