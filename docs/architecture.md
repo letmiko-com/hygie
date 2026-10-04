@@ -157,6 +157,17 @@ secondary indexes → first full backup → then enable PITR.
   is created by a one-time bootstrap (CLI or env var), members by admin invitation
   afterwards. Sessions live in the database (immediate revocation must be real; no
   self-contained JWT).
+- Changing the sign-in address (profile, decided 2026-10-04) only takes effect once the
+  NEW address confirms it: a link to `/login/email` carrying an HMAC-signed token (key
+  derived from `AUTH_SECRET`, one hour, `lib/auth/email-change.ts`). Stateless and single
+  use by construction: the token names the account's address at request time, and the
+  update requires it to still be the current one. The confirmation is a POST, like the
+  magic link, and works without a session (the link may open on another device).
+  Applying it closes every other session of the account and drops pending sign-in
+  links of the old address; the old address is told when the change is requested and
+  when it is applied. One request per account per minute. An admin never changes the
+  address of a member who has data: setting it to their own would open that member's
+  data to them.
 - Device API keys: random, shown once, stored hashed, revocable, one per device per
   subject. Separate secret universe from user sessions.
 - No health values, payloads, or secrets in logs. Ingestion logs metadata only (batch id,
