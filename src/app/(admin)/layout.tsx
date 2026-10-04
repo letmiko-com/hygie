@@ -28,6 +28,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       userName={ctx?.subjectName ?? email}
       userDetail={email}
       logoutLabel={m.common.logout}
+      profileLabel={m.common.profile}
     >
       {children}
     </AppShell>

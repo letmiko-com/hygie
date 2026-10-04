@@ -6,6 +6,7 @@ export const fr: Messages = {
     noDataOnPeriod: 'Pas de donnée sur la période',
     approx: '≈',
     logout: 'Se déconnecter',
+    profile: 'Votre profil',
     sourceLink: 'Source',
     seeDetail: 'Détail',
     loading: 'Chargement',
@@ -679,6 +680,22 @@ export const fr: Messages = {
     lessThanShare: '< 0,1 %',
     receivedVsVisible:
       'Un batch est visible une fois normalisé : reçu ne veut pas encore dire interrogeable.',
+  },
+  profile: {
+    title: 'Profil',
+    subtitle: 'Votre compte sur cette instance.',
+    name: 'Nom',
+    nameHint: 'Affiché dans la barre latérale et vu par l’administrateur : c’est aussi le nom de vos données de santé.',
+    nameHintNoSubject: 'Affiché dans la barre latérale et dans les invitations que vous envoyez.',
+    email: 'Adresse e-mail',
+    emailHint: 'Votre adresse de connexion : le lien magique part là.',
+    locale: 'Langue',
+    timezone: 'Fuseau',
+    timezoneHint:
+      'Découpe vos jours, vos nuits et vos cumuls. Les nuits déjà enregistrées gardent le fuseau de leur enregistrement.',
+    save: 'Enregistrer',
+    saved: 'Profil enregistré.',
+    invalid: 'Vérifiez le nom et le fuseau.',
   },
   admin: {
     title: 'Membres',

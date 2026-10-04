@@ -1,0 +1,48 @@
+// Profile: the signed-in account edits its own name (shared with the subject
+// it owns), its language and its subject's time zone.
+import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import { getMessages } from '@/lib/i18n';
+import { getSessionUser } from '@/lib/queries/context';
+import { getProfile } from '@/lib/queries/profile';
+import { ProfileForm } from './ui';
+
+export const metadata: Metadata = { title: 'Profil · Hygie' };
+export const dynamic = 'force-dynamic';
+
+export default async function ProfilePage() {
+  const user = await getSessionUser();
+  if (!user) redirect('/login');
+  const m = getMessages(user.locale);
+  const profile = await getProfile(user);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <header style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+        <h1 style={{ font: '600 var(--text-xl)/1.2 var(--font-ui)', margin: 0 }}>{m.profile.title}</h1>
+        <span style={{ font: '400 var(--text-sm)/1.4 var(--font-ui)', color: 'var(--text-3)' }}>
+          {m.profile.subtitle}
+        </span>
+      </header>
+      <ProfileForm
+        name={profile.name}
+        email={profile.email}
+        locale={profile.locale}
+        timezone={profile.subject?.timezone ?? null}
+        zones={Intl.supportedValuesOf('timeZone')}
+        labels={{
+          name: m.profile.name,
+          nameHint: profile.subject ? m.profile.nameHint : m.profile.nameHintNoSubject,
+          email: m.profile.email,
+          emailHint: m.profile.emailHint,
+          locale: m.profile.locale,
+          timezone: m.profile.timezone,
+          timezoneHint: m.profile.timezoneHint,
+          save: m.profile.save,
+          saved: m.profile.saved,
+          invalid: m.profile.invalid,
+        }}
+      />
+    </div>
+  );
+}

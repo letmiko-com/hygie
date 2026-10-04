@@ -10,12 +10,14 @@ export function AppShell({
   userName,
   userDetail,
   logoutLabel,
+  profileLabel,
   children,
 }: {
   sections: NavSection[];
   userName: string;
   userDetail: string;
   logoutLabel: string;
+  profileLabel: string;
   children: ReactNode;
 }) {
   async function logout() {
@@ -30,6 +32,7 @@ export function AppShell({
         userName={userName}
         userDetail={userDetail}
         logoutLabel={logoutLabel}
+        profileLabel={profileLabel}
         onLogout={logout}
       />
       <main className="hy-main" style={{ flex: 1, minWidth: 0, padding: '18px 22px 36px', boxSizing: 'border-box' }}>

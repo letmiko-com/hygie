@@ -29,12 +29,14 @@ export function Sidebar({
   userName,
   userDetail,
   logoutLabel,
+  profileLabel,
   onLogout,
 }: {
   sections: NavSection[];
   userName: string;
   userDetail: string;
   logoutLabel: string;
+  profileLabel: string;
   onLogout: () => Promise<void>;
 }) {
   const pathname = usePathname();
@@ -117,56 +119,75 @@ export function Sidebar({
           borderTop: '1px solid var(--border)',
         }}
       >
-        <span
-          aria-hidden
-          className="tnum"
+        <Link
+          href="/profile"
+          title={profileLabel}
+          aria-label={profileLabel}
+          aria-current={isActive(pathname, '/profile') ? 'page' : undefined}
+          className="hy-ghost"
           style={{
-            display: 'inline-flex',
+            display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            width: 28,
-            height: 28,
-            borderRadius: '50%',
-            background: 'var(--surface-3)',
-            font: '600 var(--text-2xs)/1 var(--font-ui)',
-            color: 'var(--text-2)',
-            flex: 'none',
-          }}
-        >
-          {initials}
-        </span>
-        <span
-          className="hy-user-text"
-          style={{
+            gap: 8,
             flex: 1,
             minWidth: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 2,
+            padding: 2,
+            borderRadius: 'var(--r-md)',
+            textDecoration: 'none',
+            color: 'inherit',
           }}
         >
           <span
+            aria-hidden
+            className="tnum"
             style={{
-              font: '500 var(--text-sm)/1.1 var(--font-ui)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 28,
+              height: 28,
+              borderRadius: '50%',
+              background: 'var(--surface-3)',
+              font: '600 var(--text-2xs)/1 var(--font-ui)',
+              color: 'var(--text-2)',
+              flex: 'none',
             }}
           >
-            {userName}
+            {initials}
           </span>
           <span
+            className="hy-user-text"
             style={{
-              font: '400 var(--text-2xs)/1.1 var(--font-ui)',
-              color: 'var(--text-3)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
+              flex: 1,
+              minWidth: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
             }}
           >
-            {userDetail}
+            <span
+              style={{
+                font: '500 var(--text-sm)/1.1 var(--font-ui)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {userName}
+            </span>
+            <span
+              style={{
+                font: '400 var(--text-2xs)/1.1 var(--font-ui)',
+                color: 'var(--text-3)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {userDetail}
+            </span>
           </span>
-        </span>
+        </Link>
         <form action={onLogout} style={{ display: 'flex' }}>
           <button
             type="submit"

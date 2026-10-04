@@ -6,6 +6,7 @@ export const en = {
     noDataOnPeriod: 'No data on this period',
     approx: '≈',
     logout: 'Sign out',
+    profile: 'Your profile',
     sourceLink: 'Source',
     seeDetail: 'Details',
     loading: 'Loading',
@@ -672,6 +673,23 @@ export const en = {
     lessThanShare: '< 0.1 %',
     receivedVsVisible:
       'A batch is visible once normalized: received does not mean queryable yet.',
+  },
+  // Profile screen (src/app/(account)/profile): the signed-in account only.
+  profile: {
+    title: 'Profile',
+    subtitle: 'Your account on this instance.',
+    name: 'Name',
+    nameHint: 'Shown in the sidebar and to the administrator: it is also the name of your health data.',
+    nameHintNoSubject: 'Shown in the sidebar and in the invitations you send.',
+    email: 'Email',
+    emailHint: 'Your sign-in address: the magic link goes there.',
+    locale: 'Language',
+    timezone: 'Time zone',
+    timezoneHint:
+      'Cuts your days, nights and totals. Nights already recorded keep the zone they were recorded in.',
+    save: 'Save',
+    saved: 'Profile saved.',
+    invalid: 'Check the name and the time zone.',
   },
   // Administration section (src/app/(admin)): instance state only, never a
   // health value nor the name of a data type (architecture §1).

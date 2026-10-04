@@ -29,6 +29,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       userName={ctx?.subjectName ?? email}
       userDetail={email}
       logoutLabel={m.common.logout}
+      profileLabel={m.common.profile}
     >
       {ctx ? children : <EmptyState icon="lock" title={m.noSubject.title} hint={m.noSubject.hint} />}
     </AppShell>
