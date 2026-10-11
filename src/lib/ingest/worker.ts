@@ -30,7 +30,7 @@ import {
 } from '@/lib/ingest/normalize-native';
 import { runSilenceAlerts } from '@/lib/ingest/silence-alert';
 import { drainRollupQueue } from '@/lib/rollups';
-import { reportError } from '@/lib/sentry';
+import { reportError, reportIngestHeartbeat } from '@/lib/sentry';
 
 const LEASE = "interval '5 minutes'";
 const DEFAULT_POLL_MS = 5_000;
@@ -271,6 +271,7 @@ async function processBatch(batch: ClaimedBatch, workerId: string): Promise<void
       console.log(
         `[worker] batch ${batch.id} rollups_ready (${ranges} ranges, ${hours} hours)`
       );
+      reportIngestHeartbeat();
       break;
     }
   }

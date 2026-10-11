@@ -21,8 +21,12 @@
 // only err.name (mail errors can quote an address) withhold it here too, and
 // Postgres data exceptions (SQLSTATE class 22, whose messages can quote the
 // offending value) travel as their code alone.
+//
+// SENTRY_INGEST_MONITOR (a monitor slug) also turns on a cron check-in each
+// time a batch completes the pipeline: see reportIngestHeartbeat().
 import {
   ServerRuntimeClient,
+  captureCheckIn,
   captureException,
   createStackParser,
   createTransport,
@@ -33,9 +37,11 @@ import {
   type BaseTransportOptions,
   type ErrorEvent,
   type EventHint,
+  type MonitorConfig,
   type Transport,
   type TransportRequest,
 } from '@sentry/core';
+import { staleAfterMs } from '@/lib/silence';
 
 // The same failure is reported at most once per window and per process: a
 // database outage fails the worker loop every 5 seconds, and the free plan
@@ -43,10 +49,18 @@ import {
 const REPORT_EVERY_MS = 10 * 60 * 1000;
 const MAX_TRACKED_FAILURES = 500;
 const SEND_TIMEOUT_MS = 10_000;
+// Sentry accepts 6 check-ins a minute per monitor, and a backlog drains
+// hundreds of batches in a row: one check-in per window is plenty for a
+// silence measured in hours.
+const CHECK_IN_EVERY_MS = 10 * 60 * 1000;
+const CHECK_IN_MARGIN_MIN = 60;
+const MONITOR_SLUG_RE = /^[a-z0-9_-]{1,50}$/;
 
 interface SentryState {
   enabled: boolean;
   lastReported: Map<string, number>;
+  monitorSlug: string | null;
+  lastCheckIn: number;
 }
 
 // Next builds instrumentation, route handlers and the proxy as separate module
@@ -55,7 +69,7 @@ const STATE_KEY = Symbol.for('hygie.sentry');
 
 function state(): SentryState {
   const g = globalThis as { [STATE_KEY]?: SentryState };
-  return (g[STATE_KEY] ??= { enabled: false, lastReported: new Map() });
+  return (g[STATE_KEY] ??= { enabled: false, lastReported: new Map(), monitorSlug: null, lastCheckIn: 0 });
 }
 
 function fetchTransport(options: BaseTransportOptions): Transport {
@@ -137,8 +151,18 @@ export function initErrorReporting(): void {
     enhanceFetchErrorMessages: false,
     beforeSend: scrub,
   });
+  const slug = process.env.SENTRY_INGEST_MONITOR?.trim();
+  if (slug && MONITOR_SLUG_RE.test(slug)) {
+    s.monitorSlug = slug;
+  } else if (slug) {
+    console.error(
+      '[sentry] SENTRY_INGEST_MONITOR must be a slug (a-z, 0-9, - and _, 50 at most), ingest monitor stays off'
+    );
+  }
   s.enabled = true;
-  console.log(`[sentry] error reporting on (environment ${environment})`);
+  console.log(
+    `[sentry] error reporting on (environment ${environment}, ingest monitor ${s.monitorSlug ?? 'off'})`
+  );
 }
 
 export interface ReportOptions {
@@ -206,4 +230,48 @@ export function reportRequestError(
     context: { method: request.method, route: context.routePath, digest },
     handled: false,
   });
+}
+
+/**
+ * The monitor's schedule, sent with every check-in so that the monitor is
+ * created, then kept in line with the configuration, by the server itself.
+ * The interval is the silence threshold (src/lib/silence.ts, 24 h by default).
+ */
+function ingestMonitorConfig(): MonitorConfig {
+  const minutes = Math.max(1, Math.round(staleAfterMs() / 60_000));
+  return {
+    schedule:
+      minutes % 60 === 0
+        ? { type: 'interval', value: minutes / 60, unit: 'hour' }
+        : { type: 'interval', value: minutes, unit: 'minute' },
+    checkinMargin: Math.min(CHECK_IN_MARGIN_MIN, minutes),
+    timezone: 'UTC',
+    failureIssueThreshold: 1,
+    recoveryThreshold: 1,
+  };
+}
+
+/**
+ * Dead man's switch on ingestion, end to end. Called when a batch reaches
+ * rollups_ready; sends an `ok` check-in at most every 10 minutes.
+ *
+ * For an interval schedule, Sentry expects the next check-in one interval
+ * after the last successful one (monitors/schedule.py and logic/mark_ok.py in
+ * getsentry/sentry, read on 2026-10-11): the monitor fires after that long
+ * without any batch completing, whatever stopped, the phones, the API behind
+ * its proxy, the worker or the database. The in-app silence alert covers one
+ * device going quiet, but it runs in this very worker and sends through SMTP;
+ * this one watches from outside.
+ */
+export function reportIngestHeartbeat(): void {
+  const s = state();
+  if (!s.enabled || s.monitorSlug === null) return;
+  const now = Date.now();
+  if (now - s.lastCheckIn < CHECK_IN_EVERY_MS) return;
+  s.lastCheckIn = now;
+  try {
+    captureCheckIn({ monitorSlug: s.monitorSlug, status: 'ok' }, ingestMonitorConfig());
+  } catch {
+    // Same rule as reportError: never break the caller.
+  }
 }

@@ -262,6 +262,20 @@ requests, queries and breadcrumbs; for a server holding health data, collection 
 explicit. The core package is the one dependency this costs, and it is inert when
 `SENTRY_DSN` is empty.
 
+### Watching ingestion from outside
+
+The silence alert of section 2 runs inside Hygie: if the worker dies, the database stops
+answering or the SMTP relay breaks, it says nothing. Set `SENTRY_INGEST_MONITOR` to a
+monitor slug (`hygie-ingestion`, say) and each time a batch completes the pipeline the
+server also sends a check-in to a Sentry cron monitor of that name, at most one every ten
+minutes. The first check-in creates the monitor; every check-in sets its schedule to an
+interval of `HYGIE_SILENCE_ALERT_HOURS` (24 h by default) with a one-hour margin. For an
+interval, Sentry expects the next check-in one interval after the last successful one, so
+the monitor fires when the whole instance has completed no batch for that long, whatever
+the reason: phones silent, API unreachable behind the proxy, worker stuck. It needs
+`SENTRY_DSN` and a service that supports cron monitors (Sentry does; check before relying
+on an alternative). Decide in the monitor's settings who gets the alert.
+
 Prefer a project in the EU data region if your provider offers one, and check its
 retention settings: a report holds no health value, but it is still your server's
 internals on someone else's machine.
