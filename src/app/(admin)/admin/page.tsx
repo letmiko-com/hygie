@@ -1,31 +1,42 @@
 // Administration home: every live subject with its instance state (who, which
-// devices, whether batches arrive), and the administrator accounts. Reads the
-// instance layer only: no health value, no data type (architecture §1).
+// devices, whether batches arrive), the disabled members (re-enable, or erase
+// for good), and the administrator accounts. Reads the instance layer only: no
+// health value, no data type (architecture §1).
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from '@/components/ui/Link';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { Panel, PanelLabel } from '@/components/ui/Panel';
+import { RevokeButton } from '@/components/ui/RevokeButton';
 import { EmptyState } from '@/components/data/EmptyState';
 import { SyncBadge } from '@/components/data/SyncBadge';
 import { fmtDay, fmtRelative } from '@/lib/format';
 import { getMessages, resolveLocale } from '@/lib/i18n';
-import { getInstanceContext, listAdmins, listMembers } from '@/lib/queries/instance';
+import { getInstanceContext, listAdmins, listInactiveMembers, listMembers } from '@/lib/queries/instance';
 import { dayInZone } from '@/lib/queries/time';
+import { enableMemberAction } from './actions';
 import { InvitePanel } from './invite';
+import { PurgeMember } from './purge';
 import { memberState } from './state';
 
 export const metadata: Metadata = { title: 'Membres · Hygie' };
 export const dynamic = 'force-dynamic';
 
-export default async function AdminPage() {
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
   const ictx = await getInstanceContext();
   if (!ictx) notFound();
   const locale = resolveLocale(ictx.locale);
   const m = getMessages(locale);
 
-  const [members, admins] = await Promise.all([listMembers(ictx), listAdmins(ictx)]);
+  const [members, inactive, admins] = await Promise.all([
+    listMembers(ictx),
+    listInactiveMembers(ictx),
+    listAdmins(ictx),
+  ]);
+  const { notice } = await searchParams;
+  const noticeText =
+    notice === 'disabled' ? m.admin.noticeDisabled : notice === 'disabled-nomail' ? m.admin.noticeDisabledNoMail : null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 980 }}>
@@ -51,6 +62,22 @@ export default async function AdminPage() {
         <Icon name="shield_person" size={16} />
         <span>{m.admin.boundary}</span>
       </div>
+
+      {noticeText && (
+        <span
+          role="status"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            font: '400 var(--text-sm)/1.4 var(--font-ui)',
+            color: notice === 'disabled' ? 'var(--ok)' : 'var(--warn)',
+          }}
+        >
+          <Icon name={notice === 'disabled' ? 'check' : 'warning'} size={15} />
+          {noticeText}
+        </span>
+      )}
 
       <InvitePanel
         defaultLocale={locale}
@@ -155,6 +182,74 @@ export default async function AdminPage() {
             );
           })}
         </div>
+      )}
+
+      {inactive.length > 0 && (
+        <Panel>
+          <PanelLabel>{m.admin.inactiveTitle}</PanelLabel>
+          <p style={{ font: '400 var(--text-2xs)/1.5 var(--font-ui)', color: 'var(--text-3)', margin: '0 0 8px' }}>
+            {m.admin.inactiveHint}
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {inactive.map((s) => (
+              <div
+                key={s.subjectId}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                  padding: '8px 10px',
+                  borderRadius: 'var(--r-md)',
+                  background: 'var(--surface-2)',
+                }}
+              >
+                <Icon name="person_off" size={18} />
+                <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+                  <span style={{ font: '500 var(--text-sm)/1.25 var(--font-ui)' }}>{s.subjectName}</span>
+                  <div style={{ font: '400 var(--text-2xs)/1.4 var(--font-ui)', color: 'var(--text-3)' }}>
+                    {s.accounts.length > 0 ? s.accounts.map((a) => a.email).join(', ') : m.admin.noAccount}
+                    {s.disabledAt && (
+                      <>
+                        {' · '}
+                        {m.admin.disabledOn} {fmtDay(dayInZone(s.disabledAt, s.timezone), locale)}
+                      </>
+                    )}
+                  </div>
+                </div>
+                {s.state === 'revoked' && (
+                  <form action={enableMemberAction} style={{ display: 'flex' }}>
+                    <input type="hidden" name="subjectId" value={s.subjectId} />
+                    <RevokeButton
+                      label={m.admin.enableButton}
+                      confirmText={m.admin.confirmEnable}
+                      icon="how_to_reg"
+                      tone="neutral"
+                    />
+                  </form>
+                )}
+                <PurgeMember
+                  subjectId={s.subjectId}
+                  name={s.subjectName}
+                  purging={s.state === 'purging'}
+                  labels={{
+                    button: m.admin.purgeButton,
+                    hint: m.admin.purgeHint,
+                    label: m.admin.purgeLabel,
+                    submit: m.admin.purgeSubmit,
+                    cancel: m.admin.inviteCancel,
+                    mismatch: m.admin.purgeMismatch,
+                    locked: m.admin.purgeLocked,
+                    invalid: m.admin.purgeMismatch,
+                    started: m.admin.purgeStarted,
+                    startedNoMail: m.admin.purgeStartedNoMail,
+                    purging: m.admin.purgingBadge,
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </Panel>
       )}
 
       <Panel>

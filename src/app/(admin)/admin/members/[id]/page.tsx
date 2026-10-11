@@ -1,8 +1,9 @@
 // One member's instance state: accounts, devices (revocable, never created
 // here), the correction of a mistyped invitation while nothing reached it,
-// daily totals received over 30 days, and the recent batches. Reads the
-// instance layer only: all types summed, batch errors as code and step, no
-// health value and no data type (architecture §1).
+// daily totals received over 30 days, the recent batches, and disabling the
+// member (first act of deleting them). Reads the instance layer only: all
+// types summed, batch errors as code and step, no health value and no data
+// type (architecture §1).
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from '@/components/ui/Link';
@@ -20,7 +21,7 @@ import { getMessages, resolveLocale } from '@/lib/i18n';
 import { getInstanceContext, memberDetail, type MemberBatch } from '@/lib/queries/instance';
 import { dayInZone } from '@/lib/queries/time';
 import { staleAfterMs } from '@/lib/silence';
-import { revokeMemberDeviceAction } from '../../actions';
+import { disableMemberAction, revokeMemberDeviceAction } from '../../actions';
 import { memberState } from '../../state';
 import { CorrectInvitation } from './correct';
 
@@ -60,7 +61,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
       </Panel>
     );
   }
-  const { summary, devices, batches, volumes, invitation } = detail;
+  const { summary, devices, batches, volumes, invitation, canDisable } = detail;
   const tz = summary.timezone;
   const state = memberState(summary);
   const batches30d = volumes.reduce((a, v) => a + v.batches, 0);
@@ -293,6 +294,32 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
           />
         )}
       </Panel>
+
+      {canDisable && (
+        <Panel>
+          <PanelLabel>{m.admin.disableTitle}</PanelLabel>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <p
+              style={{
+                flex: '1 1 320px',
+                margin: 0,
+                font: '400 var(--text-sm)/1.5 var(--font-ui)',
+                color: 'var(--text-2)',
+              }}
+            >
+              {m.admin.disableHint}
+            </p>
+            <form action={disableMemberAction} style={{ display: 'flex' }}>
+              <input type="hidden" name="subjectId" value={summary.subjectId} />
+              <RevokeButton
+                label={m.admin.disableButton}
+                confirmText={m.admin.confirmDisable(summary.subjectName)}
+                icon="person_off"
+              />
+            </form>
+          </div>
+        </Panel>
+      )}
     </div>
   );
 }

@@ -1,10 +1,20 @@
 'use client';
-// Destructive submit button with a native confirmation: revoking a device key
-// (the member's Devices screen, and the Administration section for a lost
-// phone). Cancelling the dialog cancels the submit.
+// Submit button with a native confirmation: revoking a device key (the
+// member's Devices screen, and the Administration section for a lost phone),
+// disabling or re-enabling a member. Cancelling the dialog cancels the submit.
 import { Icon } from '@/components/ui/Icon';
 
-export function RevokeButton({ label, confirmText }: { label: string; confirmText: string }) {
+export function RevokeButton({
+  label,
+  confirmText,
+  icon = 'link_off',
+  tone = 'danger',
+}: {
+  label: string;
+  confirmText: string;
+  icon?: string;
+  tone?: 'danger' | 'neutral';
+}) {
   return (
     <button
       type="submit"
@@ -21,12 +31,12 @@ export function RevokeButton({ label, confirmText }: { label: string; confirmTex
         borderRadius: 'var(--r-md)',
         border: 'none',
         background: 'transparent',
-        color: 'var(--danger)',
+        color: tone === 'danger' ? 'var(--danger)' : 'var(--accent)',
         font: '500 var(--text-sm)/1 var(--font-ui)',
         cursor: 'pointer',
       }}
     >
-      <Icon name="link_off" size={15} />
+      <Icon name={icon} size={15} />
       {label}
     </button>
   );

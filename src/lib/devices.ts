@@ -1,12 +1,14 @@
 // Device pairing: create (the raw key exists only in the creation response,
 // shown once, stored as a sha256 hash), list with push counts, revoke
-// (devices are never deleted: the ingest audit trail survives). Every entry
-// point takes the SubjectContext: a device always belongs to the session's
-// granted subject.
+// (recorded in the tombstone registry, so a restore cannot bring the key
+// back; a device row is deleted only by its member's purge, the ingest audit
+// trail survives revocation). Every entry point takes the SubjectContext: a
+// device always belongs to the session's granted subject.
 import { createHash, randomBytes } from 'node:crypto';
-import { getDb } from '@/lib/db';
+import { getDb, withTransaction } from '@/lib/db';
 import type { SubjectContext } from '@/lib/queries/context';
 import { staleAfterMs } from '@/lib/silence';
+import { appendTombstones } from '@/lib/tombstones';
 
 const KEY_PREFIX_DISPLAY = 10;
 
@@ -33,12 +35,16 @@ export async function createDevice(
 
 /** Revokes within the subject scope; returns false when nothing matched. */
 export async function revokeDevice(ctx: SubjectContext, deviceId: string): Promise<boolean> {
-  const res = await getDb().query(
-    `update devices set revoked_at = now()
-     where id = $1 and subject_id = $2 and revoked_at is null`,
-    [deviceId, ctx.subjectId]
-  );
-  return (res.rowCount ?? 0) > 0;
+  return withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `select 1 from devices where id = $1 and subject_id = $2 and revoked_at is null for update`,
+      [deviceId, ctx.subjectId]
+    );
+    if (rows.length === 0) return false;
+    await appendTombstones(client, [{ kind: 'device_revoked', device: deviceId, subject: ctx.subjectId }]);
+    await client.query('update devices set revoked_at = now() where id = $1', [deviceId]);
+    return true;
+  });
 }
 
 export interface DeviceRow {

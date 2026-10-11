@@ -800,6 +800,29 @@ export const en = {
     correctLocked: 'This member now has a device or data: only they can change their address.',
     invitedProxy:
       'If this instance sits behind an access proxy (Cloudflare Access, Authelia…), allow this address there too, or they will never reach the sign-in page.',
+    disableTitle: 'Disable this member',
+    disableHint:
+      'Cuts every access at once: sessions and device keys are revoked, nothing arrives any more and nobody reads the data. Everything is kept and you can give the access back; the member then pairs their devices again. An email tells them.',
+    disableButton: 'Disable',
+    confirmDisable: (name: string) =>
+      `Disable ${name}? Their sessions and device keys are revoked immediately, and they receive an email.`,
+    noticeDisabled: 'Member disabled, and told by email.',
+    noticeDisabledNoMail: 'Member disabled, but the email did not leave: check SMTP.',
+    inactiveTitle: 'Disabled members',
+    inactiveHint: 'No access, no device, data kept. Give the access back, or erase everything for good.',
+    disabledOn: 'disabled on',
+    enableButton: 'Give access back',
+    confirmEnable: 'Give this member access again? Their device keys stay revoked: they will pair their devices again.',
+    purgeButton: 'Erase for good…',
+    purgeHint:
+      'Erases every measure, workout and raw file of this member, then their account. It cannot be undone. Type {name} to confirm.',
+    purgeLabel: 'Member name',
+    purgeSubmit: 'Erase',
+    purgeMismatch: 'The name typed does not match.',
+    purgeLocked: 'This member is no longer disabled.',
+    purgeStarted: 'Erasure started; the member was told by email.',
+    purgeStartedNoMail: 'Erasure started, but the email did not leave: check SMTP.',
+    purgingBadge: 'Erasing',
   },
   // Invitation email (src/lib/auth/mailer.ts). No token in it: the invitee
   // requests an ordinary magic link on the sign-in page.
@@ -830,6 +853,26 @@ export const en = {
     adminNote:
       'You receive this message as an administrator of this instance. It carries no health data.',
     once: 'This alert is sent once per silence: the next batch from the device re-arms it.',
+  },
+  // Member notices (src/lib/auth/mailer.ts): disable, then purge. Values are
+  // escaped by the caller.
+  memberDisabledMail: {
+    subject: 'Hygie: your access is suspended',
+    greeting: (name: string) => `Hello ${name},`,
+    body: (admin: string) =>
+      `${admin} has suspended your access to Hygie. You can no longer sign in, and the keys of your devices are revoked: they no longer send anything.`,
+    kept:
+      'Your data is kept as it is, and nobody reads it. The administrator can give your access back (you will then pair your devices again), or erase your data for good, in which case you will receive one last message.',
+    contact: (admin: string) => `For any question, ask ${admin}.`,
+  },
+  memberPurgedMail: {
+    subject: 'Hygie: your data has been erased',
+    greeting: (name: string) => `Hello ${name},`,
+    body: (admin: string) =>
+      `${admin} has erased your Hygie account and all the health data it held. The erasure completes within minutes; only an anonymous trace remains, which keeps a restore of the instance from bringing your data back.`,
+    backups:
+      'Encrypted backups of the instance may hold a copy until they expire; restoring one applies this erasure again.',
+    last: 'This is the last message you will receive from this instance.',
   },
 };
 

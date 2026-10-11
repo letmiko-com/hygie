@@ -11,7 +11,14 @@
 // The health read layer takes a SubjectContext and nothing else; this layer
 // takes an InstanceContext and nothing else. Neither can be built from the
 // other, so the boundary holds in the query layer, not in the screens.
+//
+// Deleting a member is two acts (decision of 2026-09-28): disable, which cuts
+// every access at once and can be undone, then purge, a separate request
+// confirmed by typing the member's name, carried out by the worker
+// (src/lib/purge.ts). Every revocation is written to the tombstone registry
+// before it is applied (src/lib/tombstones.ts).
 import { getDb, withTransaction } from '@/lib/db';
+import { appendTombstones, cutOffSubjects, restoreSubjects } from '@/lib/tombstones';
 import { getSessionUser } from './context';
 import { todayInZone } from './time';
 
@@ -174,6 +181,8 @@ export interface MemberDetail {
    * and its only account is a non-admin owner. Null otherwise.
    */
   invitation: { name: string; email: string } | null;
+  /** False when an administrator holds a grant on the subject: an admin is never disabled from here. */
+  canDisable: boolean;
 }
 
 /** One live subject's instance state, or null when it does not exist or is not live. */
@@ -277,6 +286,7 @@ export async function memberDetail(
   return {
     summary,
     invitation,
+    canDisable: !summary.accounts.some((a) => a.isAdmin),
     devices: devices.rows.map((r) => ({
       id: r.id,
       name: r.name,
@@ -319,14 +329,187 @@ export async function revokeMemberDevice(
   deviceId: string
 ): Promise<boolean> {
   void ictx;
-  const res = await getDb().query(
-    `update devices d set revoked_at = now()
+  return withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `select 1 from devices d
+       join subjects s on s.id = d.subject_id and s.purge_state = 'live'
+       where d.id = $1 and d.subject_id = $2 and d.revoked_at is null
+       for update of d`,
+      [deviceId, subjectId]
+    );
+    if (rows.length === 0) return false;
+    await appendTombstones(client, [{ kind: 'device_revoked', device: deviceId, subject: subjectId }]);
+    await client.query('update devices set revoked_at = now() where id = $1', [deviceId]);
+    return true;
+  });
+}
+
+export interface InactiveMember {
+  subjectId: string;
+  subjectName: string;
+  /** 'revoked': disabled, can be re-enabled or purged. 'purging': the worker is erasing it. */
+  state: 'revoked' | 'purging';
+  /** IANA zone of the subject: dates are shown in it. */
+  timezone: string;
+  /** When its accounts were disabled; null when it never had one. */
+  disabledAt: Date | null;
+  accounts: MemberAccount[];
+}
+
+/** Disabled members, and those being purged, oldest first. Purged subjects are gone from every list. */
+export async function listInactiveMembers(ictx: InstanceContext): Promise<InactiveMember[]> {
+  void ictx;
+  const { rows } = await getDb().query<{
+    id: string;
+    display_name: string;
+    purge_state: 'revoked' | 'purging';
+    timezone: string;
+    disabled_at: Date | null;
+    accounts: MemberAccount[];
+  }>(
+    `select s.id, s.display_name, s.purge_state, s.timezone,
+            (select max(u.disabled_at) from access_grants g join users u on u.id = g.user_id
+             where g.subject_id = s.id) as disabled_at,
+            coalesce((select json_agg(json_build_object(
+                               'email', u.email, 'displayName', u.display_name, 'isAdmin', u.is_admin)
+                             order by u.created_at)
+                      from access_grants g join users u on u.id = g.user_id
+                      where g.subject_id = s.id), '[]'::json) as accounts
      from subjects s
-     where d.id = $1 and d.subject_id = $2 and d.revoked_at is null
-       and s.id = d.subject_id and s.purge_state = 'live'`,
-    [deviceId, subjectId]
+     where s.purge_state in ('revoked', 'purging')
+     order by s.created_at`
   );
-  return (res.rowCount ?? 0) > 0;
+  return rows.map((r) => ({
+    subjectId: r.id,
+    subjectName: r.display_name,
+    state: r.purge_state,
+    timezone: r.timezone,
+    disabledAt: r.disabled_at,
+    accounts: r.accounts,
+  }));
+}
+
+/** Who a member's notice goes to: the subject's non-admin accounts. */
+export interface MemberRecipient {
+  email: string;
+  name: string;
+  locale: string;
+}
+
+export type DisableOutcome =
+  | { ok: true; subjectName: string; recipients: MemberRecipient[] }
+  | { ok: false; error: 'locked' };
+
+/**
+ * Disables a live member, at once and reversibly: subject set to 'revoked',
+ * accounts disabled, sessions and pending sign-in links dropped, every device
+ * key revoked. Data stays, unreachable. Refused when an administrator holds a
+ * grant on the subject: disabling an admin is not an Administration gesture.
+ * Returns the accounts to notify, read before they are disabled.
+ */
+export async function disableMember(ictx: InstanceContext, subjectId: string): Promise<DisableOutcome> {
+  void ictx;
+  return withTransaction(async (client) => {
+    const subject = await client.query<{ display_name: string }>(
+      `select display_name from subjects where id = $1 and purge_state = 'live' for update`,
+      [subjectId]
+    );
+    if (subject.rows.length === 0) return { ok: false as const, error: 'locked' as const };
+    const accounts = await client.query<{
+      email: string;
+      display_name: string;
+      locale: string;
+      is_admin: boolean;
+      disabled_at: Date | null;
+    }>(
+      `select u.email, u.display_name, u.locale, u.is_admin, u.disabled_at
+       from access_grants g join users u on u.id = g.user_id
+       where g.subject_id = $1`,
+      [subjectId]
+    );
+    if (accounts.rows.some((a) => a.is_admin)) return { ok: false as const, error: 'locked' as const };
+    const devices = await client.query<{ id: string }>(
+      'select id from devices where subject_id = $1 and revoked_at is null',
+      [subjectId]
+    );
+    await appendTombstones(client, [
+      { kind: 'subject_disabled', subject: subjectId },
+      ...devices.rows.map((d) => ({ kind: 'device_revoked' as const, device: d.id, subject: subjectId })),
+    ]);
+    await cutOffSubjects(client, [subjectId], 'revoked');
+    return {
+      ok: true as const,
+      subjectName: subject.rows[0].display_name,
+      recipients: accounts.rows
+        .filter((a) => a.disabled_at === null)
+        .map((a) => ({ email: a.email, name: a.display_name, locale: a.locale })),
+    };
+  });
+}
+
+/**
+ * Gives a disabled member their access back: subject live, accounts enabled.
+ * Their device keys stay revoked: the member pairs their devices again.
+ */
+export async function enableMember(ictx: InstanceContext, subjectId: string): Promise<boolean> {
+  void ictx;
+  return withTransaction(async (client) => {
+    const subject = await client.query(
+      `select 1 from subjects where id = $1 and purge_state = 'revoked' for update`,
+      [subjectId]
+    );
+    if (subject.rows.length === 0) return false;
+    await appendTombstones(client, [{ kind: 'subject_enabled', subject: subjectId }]);
+    await restoreSubjects(client, [subjectId]);
+    return true;
+  });
+}
+
+export type PurgeOutcome =
+  | { ok: true; recipients: MemberRecipient[] }
+  | { ok: false; error: 'locked' | 'mismatch' };
+
+/** The typed confirmation matches the name whatever the case and the surrounding spaces. */
+function sameName(typed: string, name: string): boolean {
+  const norm = (v: string) => v.normalize('NFC').trim().toLocaleLowerCase();
+  return norm(name) !== '' && norm(typed) === norm(name);
+}
+
+/**
+ * Requests the purge of a disabled member, confirmed by their name typed in
+ * full. Final from here: the subject goes to 'purging', the registry records
+ * it, and the worker erases every row and raw file, then the accounts and
+ * devices (src/lib/purge.ts). Returns the accounts to notify, read while they
+ * still exist.
+ */
+export async function requestPurge(
+  ictx: InstanceContext,
+  subjectId: string,
+  typedName: string
+): Promise<PurgeOutcome> {
+  void ictx;
+  return withTransaction(async (client) => {
+    const subject = await client.query<{ display_name: string }>(
+      `select display_name from subjects where id = $1 and purge_state = 'revoked' for update`,
+      [subjectId]
+    );
+    if (subject.rows.length === 0) return { ok: false as const, error: 'locked' as const };
+    if (!sameName(typedName, subject.rows[0].display_name)) {
+      return { ok: false as const, error: 'mismatch' as const };
+    }
+    const accounts = await client.query<{ email: string; display_name: string; locale: string }>(
+      `select u.email, u.display_name, u.locale
+       from access_grants g join users u on u.id = g.user_id
+       where g.subject_id = $1 and not u.is_admin`,
+      [subjectId]
+    );
+    await appendTombstones(client, [{ kind: 'subject_purged', subject: subjectId }]);
+    await cutOffSubjects(client, [subjectId], 'purging');
+    return {
+      ok: true as const,
+      recipients: accounts.rows.map((a) => ({ email: a.email, name: a.display_name, locale: a.locale })),
+    };
+  });
 }
 
 export interface InviteInput {

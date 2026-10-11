@@ -3,8 +3,18 @@
 // action is a public endpoint, the layout that rendered the button proves
 // nothing.
 import { revalidatePath } from 'next/cache';
-import { sendInvitationEmail } from '@/lib/auth/mailer';
-import { correctInvitation, getInstanceContext, inviteMember, revokeMemberDevice } from '@/lib/queries/instance';
+import { redirect } from 'next/navigation';
+import { sendInvitationEmail, sendMemberDisabledEmail, sendMemberPurgedEmail } from '@/lib/auth/mailer';
+import {
+  correctInvitation,
+  disableMember,
+  enableMember,
+  getInstanceContext,
+  inviteMember,
+  requestPurge,
+  revokeMemberDevice,
+  type MemberRecipient,
+} from '@/lib/queries/instance';
 import { reportError } from '@/lib/sentry';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -121,4 +131,75 @@ export async function correctInvitationAction(
     reportError(err, 'mail.invitation', { withholdMessage: true });
   }
   return { ok: true, email, emailChanged: true, mailSent };
+}
+
+/**
+ * Sends one notice per account; true when every one left. Awaited like the
+ * invitation: this path is admin-only, its timing reveals nothing.
+ */
+async function notifyMembers(
+  recipients: MemberRecipient[],
+  send: (r: MemberRecipient) => Promise<void>,
+  label: string
+): Promise<boolean> {
+  let allSent = true;
+  for (const r of recipients) {
+    try {
+      await send(r);
+    } catch (err) {
+      allSent = false;
+      console.error(`[admin] ${label} email failed: ${err instanceof Error ? err.name : 'error'}`);
+      reportError(err, label, { withholdMessage: true });
+    }
+  }
+  return allSent;
+}
+
+export async function disableMemberAction(formData: FormData): Promise<void> {
+  const ictx = await getInstanceContext();
+  if (!ictx) return;
+  const subjectId = String(formData.get('subjectId') ?? '');
+  if (!UUID.test(subjectId)) return;
+  const outcome = await disableMember(ictx, subjectId);
+  revalidatePath('/admin');
+  revalidatePath(`/admin/members/${subjectId}`);
+  if (!outcome.ok) return;
+  const mailSent = await notifyMembers(
+    outcome.recipients,
+    (r) => sendMemberDisabledEmail({ to: r.email, name: r.name, admin: ictx.displayName, locale: r.locale }),
+    'mail.member-disabled'
+  );
+  redirect(`/admin?notice=${mailSent ? 'disabled' : 'disabled-nomail'}`);
+}
+
+export async function enableMemberAction(formData: FormData): Promise<void> {
+  const ictx = await getInstanceContext();
+  if (!ictx) return;
+  const subjectId = String(formData.get('subjectId') ?? '');
+  if (!UUID.test(subjectId)) return;
+  await enableMember(ictx, subjectId);
+  revalidatePath('/admin');
+  revalidatePath(`/admin/members/${subjectId}`);
+}
+
+export type PurgeResult =
+  | { ok: true; mailSent: boolean }
+  | { ok: false; error: 'invalid' | 'mismatch' | 'locked' | 'unauthorized' };
+
+export async function purgeMemberAction(_prev: PurgeResult | null, formData: FormData): Promise<PurgeResult> {
+  const ictx = await getInstanceContext();
+  if (!ictx) return { ok: false, error: 'unauthorized' };
+  const subjectId = String(formData.get('subjectId') ?? '');
+  const typedName = String(formData.get('name') ?? '');
+  if (!UUID.test(subjectId) || typedName.length > 80) return { ok: false, error: 'invalid' };
+
+  const outcome = await requestPurge(ictx, subjectId, typedName);
+  if (!outcome.ok) return { ok: false, error: outcome.error };
+  revalidatePath('/admin');
+  const mailSent = await notifyMembers(
+    outcome.recipients,
+    (r) => sendMemberPurgedEmail({ to: r.email, name: r.name, admin: ictx.displayName, locale: r.locale }),
+    'mail.member-purged'
+  );
+  return { ok: true, mailSent };
 }

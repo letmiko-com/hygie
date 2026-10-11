@@ -41,19 +41,23 @@ interface DeviceRow {
   subject_id: string;
   key_hash: Buffer;
   revoked_at: Date | null;
+  live: boolean;
 }
 
 /**
  * Authenticates the device key against devices.key_hash (sha256), timing-safe.
  * Scans every device row and compares each hash so the response time does not
- * depend on whether or where a match occurs. Revoked devices never match.
+ * depend on whether or where a match occurs. Revoked devices never match, nor
+ * the devices of a subject that is not live (disabled or being purged), whose
+ * keys the tombstone registry revokes anyway.
  */
 export async function authenticateDevice(
   key: string
 ): Promise<{ deviceId: string; subjectId: string } | null> {
   const presented = createHash('sha256').update(key, 'utf8').digest();
   const { rows } = await getDb().query<DeviceRow>(
-    'select id, subject_id, key_hash, revoked_at from devices'
+    `select d.id, d.subject_id, d.key_hash, d.revoked_at, s.purge_state = 'live' as live
+     from devices d join subjects s on s.id = d.subject_id`
   );
   let match: DeviceRow | null = null;
   for (const row of rows) {
@@ -63,7 +67,7 @@ export async function authenticateDevice(
     // No early exit: constant work over the whole table.
     if (equal && match === null) match = row;
   }
-  if (match === null || match.revoked_at !== null) return null;
+  if (match === null || match.revoked_at !== null || !match.live) return null;
   return { deviceId: match.id, subjectId: match.subject_id };
 }
 

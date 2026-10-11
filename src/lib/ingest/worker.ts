@@ -8,9 +8,12 @@
 // orphan files and rows whose file is gone.
 // 'rollups_ready' is earned, not declared: the normalize transaction queues the
 // UTC hours it touched (src/lib/rollups.ts) and step 3 rebuilds them all first.
-// When idle the loop drains the ranges queued by everyone else (cutovers, XML
-// backfill) and, hourly, rotates raw bodies past their retention and emails
-// about devices that have gone silent (src/lib/ingest/silence-alert.ts).
+// When idle the loop erases members whose purge was requested (src/lib/purge.ts),
+// then drains the ranges queued by everyone else (cutovers, XML backfill). At
+// boot and hourly it re-applies the tombstone registry (src/lib/tombstones.ts),
+// so a restored database cannot serve a revoked member or key; hourly it also
+// rotates raw bodies past their retention and emails about devices that have
+// gone silent (src/lib/ingest/silence-alert.ts).
 import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, rename, stat, unlink } from 'node:fs/promises';
 import { hostname } from 'node:os';
@@ -29,8 +32,10 @@ import {
   readAndValidateNativeBatchFile,
 } from '@/lib/ingest/normalize-native';
 import { runSilenceAlerts } from '@/lib/ingest/silence-alert';
+import { purgeNextChunk } from '@/lib/purge';
 import { drainRollupQueue } from '@/lib/rollups';
 import { reportError, reportIngestHeartbeat } from '@/lib/sentry';
+import { reapplyTombstones } from '@/lib/tombstones';
 
 const LEASE = "interval '5 minutes'";
 const DEFAULT_POLL_MS = 5_000;
@@ -93,6 +98,7 @@ async function claimNext(workerId: string): Promise<ClaimedBatch | null> {
        where status in ('received', 'validated', 'normalized')
          and (locked_until is null or locked_until < now())
          and attempt_count < $2
+         and subject_id not in (select id from subjects where purge_state in ('purging', 'purged'))
        order by received_at
        limit 1
        for update skip locked
@@ -426,6 +432,51 @@ async function purgeExpiredRawBodies(): Promise<void> {
 }
 
 /**
+ * Re-applies the tombstone registry (src/lib/tombstones.ts): at boot, so a
+ * database restored from an older dump stops serving revoked members and keys
+ * as soon as the process starts, then hourly. Logs counts only, when something
+ * changed; unreadable lines (a torn append) are reported at boot.
+ */
+async function runTombstones(atBoot: boolean): Promise<void> {
+  const r = await reapplyTombstones();
+  if (r.seeded > 0) {
+    console.log(`[worker] tombstones: registry created from the database with ${r.seeded} entries`);
+  }
+  if (r.devices + r.disabled + r.enabled + r.purging > 0) {
+    console.log(
+      `[worker] tombstones re-applied: ${r.devices} device(s) revoked, ${r.disabled} subject(s) disabled, ` +
+        `${r.enabled} enabled, ${r.purging} back to purging`
+    );
+  }
+  if (atBoot && r.unreadable > 0) {
+    console.warn(`[worker] tombstones: ${r.unreadable} unreadable line(s) skipped`);
+  }
+}
+
+function logTombstoneFailure(err: unknown): void {
+  console.error(
+    `[worker] tombstone re-application failed: ${err instanceof Error ? err.message : 'unknown error'}`
+  );
+  reportError(err, 'tombstones');
+}
+
+/** After a failed purge chunk, other work goes on and the purge waits this long. */
+const PURGE_RETRY_MS = 60_000;
+let purgeRetryAt = 0;
+
+async function runPurgeChunk(): Promise<boolean> {
+  if (Date.now() < purgeRetryAt) return false;
+  try {
+    return await purgeNextChunk();
+  } catch (err) {
+    purgeRetryAt = Date.now() + PURGE_RETRY_MS;
+    console.error(`[worker] purge failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+    reportError(err, 'purge');
+    return false;
+  }
+}
+
+/**
  * Hourly housekeeping piggybacked on the worker loop: expired database
  * sessions and consumed-or-stale magic-link tokens have no reason to
  * outlive their expiry (revocation stays immediate either way; this only
@@ -442,6 +493,7 @@ async function runMaintenance(): Promise<void> {
         `[worker] maintenance: purged ${sessions.rowCount ?? 0} expired sessions, ${tokens.rowCount ?? 0} expired tokens`
       );
     }
+    await runTombstones(false).catch(logTombstoneFailure);
     await purgeExpiredRawBodies();
   } finally {
     // Whatever became of the housekeeping: a failed purge must not silence the
@@ -466,6 +518,7 @@ async function runLoop(workerId: string): Promise<void> {
     );
     reportError(err, 'ingest.worker.boot');
   }
+  await runTombstones(true).catch(logTombstoneFailure);
   console.log(`[worker] ingest worker ${workerId} started`);
   let lastMaintenance = 0;
   while (!s.stopping) {
@@ -484,9 +537,11 @@ async function runLoop(workerId: string): Promise<void> {
         }
         continue; // drain the queue before sleeping
       }
-      // Idle: consume the invalidation ranges nobody is waiting on (channel
-      // cutovers, XML backfill, manual rebuild requests). One pass per turn so a
-      // large queue never starves an incoming batch.
+      // Idle: erase a member whose purge was requested, then consume the
+      // invalidation ranges nobody is waiting on (channel cutovers, XML
+      // backfill, manual rebuild requests). One chunk or one pass per turn so
+      // neither ever starves an incoming batch.
+      if (await runPurgeChunk()) continue;
       const rollups = await drainRollupQueue({ limit: 100 });
       if (rollups.ranges > 0) {
         console.log(

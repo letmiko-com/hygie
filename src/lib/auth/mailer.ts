@@ -1,6 +1,7 @@
 // Outgoing email over SMTP (nodemailer): the magic link, the invitation of a
-// new member, the email change link and its notices, and the silence alert
-// of the worker (src/lib/ingest/silence-alert.ts). Configuration is env-driven
+// new member, the email change link and its notices, the notices of a member
+// disabled then purged, and the silence alert of the worker
+// (src/lib/ingest/silence-alert.ts). Configuration is env-driven
 // (.env.example: SMTP_HOST/PORT/USER/PASSWORD/FROM; port 2587 works from
 // Railway). Test escape hatch: when HYGIE_MAIL_CAPTURE_DIR is set, the message
 // goes through nodemailer's jsonTransport and is written to a file in that
@@ -154,5 +155,39 @@ export async function sendEmailChangeNotice(notice: {
     subject: notice.kind === 'requested' ? m.requestedSubject : m.changedSubject,
     text: [body, '', m.notYou].join('\n'),
     html: [`<p>${escapeHtml(body)}</p>`, `<p>${escapeHtml(m.notYou)}</p>`].join('\n'),
+  });
+}
+
+/** Tells a member that an administrator suspended their access (Administration, disable). */
+export async function sendMemberDisabledEmail(notice: {
+  to: string;
+  name: string;
+  admin: string;
+  locale: string;
+}): Promise<void> {
+  const m = getMessages(notice.locale).memberDisabledMail;
+  const lines = [m.greeting(notice.name), m.body(notice.admin), m.kept, m.contact(notice.admin)];
+  await sendMail({
+    to: notice.to,
+    subject: m.subject,
+    text: lines.join('\n\n'),
+    html: lines.map((l) => `<p>${escapeHtml(l)}</p>`).join('\n'),
+  });
+}
+
+/** The last message to a member whose purge was requested, sent while the account still exists. */
+export async function sendMemberPurgedEmail(notice: {
+  to: string;
+  name: string;
+  admin: string;
+  locale: string;
+}): Promise<void> {
+  const m = getMessages(notice.locale).memberPurgedMail;
+  const lines = [m.greeting(notice.name), m.body(notice.admin), m.backups, m.last];
+  await sendMail({
+    to: notice.to,
+    subject: m.subject,
+    text: lines.join('\n\n'),
+    html: lines.map((l) => `<p>${escapeHtml(l)}</p>`).join('\n'),
   });
 }

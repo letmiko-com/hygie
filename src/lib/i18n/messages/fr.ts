@@ -802,6 +802,30 @@ export const fr: Messages = {
     correctLocked: 'Ce membre a désormais un appareil ou des données : seul lui peut changer son adresse.',
     invitedProxy:
       'Si cette instance est derrière un proxy d’accès (Cloudflare Access, Authelia…), autorisez-y aussi cette adresse, sinon la page de connexion lui restera fermée.',
+    disableTitle: 'Désactiver ce membre',
+    disableHint:
+      'Coupe tout accès sur-le-champ : sessions et clés d’appareil révoquées, plus rien n’arrive et personne ne lit les données. Tout est conservé et vous pouvez rétablir l’accès ; le membre appaire alors à nouveau ses appareils. Un e-mail le prévient.',
+    disableButton: 'Désactiver',
+    confirmDisable: (name: string) =>
+      `Désactiver ${name} ? Ses sessions et ses clés d’appareil sont révoquées immédiatement, et un e-mail le prévient.`,
+    noticeDisabled: 'Membre désactivé, et prévenu par e-mail.',
+    noticeDisabledNoMail: 'Membre désactivé, mais l’e-mail n’est pas parti : vérifiez le SMTP.',
+    inactiveTitle: 'Membres désactivés',
+    inactiveHint: 'Aucun accès, aucun appareil, données conservées. Rétablissez l’accès, ou effacez tout définitivement.',
+    disabledOn: 'désactivé le',
+    enableButton: 'Rétablir l’accès',
+    confirmEnable:
+      'Rétablir l’accès de ce membre ? Ses clés d’appareil restent révoquées : il appairera à nouveau ses appareils.',
+    purgeButton: 'Effacer définitivement…',
+    purgeHint:
+      'Efface toutes les mesures, séances et fichiers bruts de ce membre, puis son compte. C’est irréversible. Tapez {name} pour confirmer.',
+    purgeLabel: 'Nom du membre',
+    purgeSubmit: 'Effacer',
+    purgeMismatch: 'Le nom saisi ne correspond pas.',
+    purgeLocked: 'Ce membre n’est plus désactivé.',
+    purgeStarted: 'Effacement lancé ; le membre est prévenu par e-mail.',
+    purgeStartedNoMail: 'Effacement lancé, mais l’e-mail n’est pas parti : vérifiez le SMTP.',
+    purgingBadge: 'Effacement en cours',
   },
   inviteMail: {
     subject: (inviter: string) => `Hygie : ${inviter} vous invite`,
@@ -828,5 +852,23 @@ export const fr: Messages = {
     adminNote:
       'Vous recevez ce message en tant qu’administrateur de cette instance. Il ne contient aucune donnée de santé.',
     once: 'Cette alerte part une fois par silence : le prochain envoi de l’appareil la réarme.',
+  },
+  memberDisabledMail: {
+    subject: 'Hygie : votre accès est suspendu',
+    greeting: (name: string) => `Bonjour ${name},`,
+    body: (admin: string) =>
+      `${admin} a suspendu votre accès à Hygie. Vous ne pouvez plus vous connecter, et les clés de vos appareils sont révoquées : ils n’envoient plus rien.`,
+    kept:
+      'Vos données sont conservées telles quelles, et personne ne les lit. L’administrateur peut rétablir votre accès (vous appairerez alors à nouveau vos appareils), ou effacer définitivement vos données : vous recevrez alors un dernier message.',
+    contact: (admin: string) => `Pour toute question, adressez-vous à ${admin}.`,
+  },
+  memberPurgedMail: {
+    subject: 'Hygie : vos données ont été effacées',
+    greeting: (name: string) => `Bonjour ${name},`,
+    body: (admin: string) =>
+      `${admin} a effacé votre compte Hygie et toutes les données de santé qu’il contenait. L’effacement s’achève dans les minutes qui suivent ; il ne reste qu’une trace anonyme, qui empêche une restauration de l’instance de faire revenir vos données.`,
+    backups:
+      'Les sauvegardes chiffrées de l’instance peuvent en garder une copie jusqu’à leur expiration ; en restaurer une réapplique cet effacement.',
+    last: 'C’est le dernier message que vous recevrez de cette instance.',
   },
 };
