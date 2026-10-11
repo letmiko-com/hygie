@@ -110,6 +110,14 @@ new member's data. If the web interface sits behind an access proxy (Cloudflare 
 Authelia, an IP allowlist), allow the new address there as well, or the invitation leads
 to a page they cannot open.
 
+Removing a member takes two gestures, both in **Administration**. **Disable**, on the
+member's page, cuts every access at once: sessions, sign-in links and device keys are
+revoked, and the data stays, unreachable. **Give access back** undoes it; the member then
+pairs their devices again. **Erase for good**, offered on a disabled member once you type
+their name, hands the subject to the worker, which deletes every measure and raw body,
+then the account, within minutes. The member receives an email at each step. A subject
+that holds an administrator account cannot be disabled from there.
+
 How magic links are hardened (single use, expiry, no account-existence oracle, rate
 limiting) is described in `docs/architecture.md` §5.
 
@@ -128,6 +136,12 @@ uploads it to S3-compatible storage. That is the entire scope. **Not** in the ba
 - **`HYGIE_DATA_DIR`** (`/data` in the image): the raw ingest bodies under `ingest/` and
   the tile cache. The database holds every parsed measurement, so a restore loses no
   health data, but the raw bodies kept for reprocessing are gone.
+- **`HYGIE_DATA_DIR/tombstones.jsonl`**, the registry of revocations (members disabled or
+  erased, device keys revoked), on purpose. When you restore an older dump and restart
+  the app on the same volume, the worker re-applies it, so the restore brings back
+  neither an erased member nor a revoked key. Keep this file when you move the instance.
+  Losing the volume loses the registry: a restore then serves the database exactly as it
+  was dumped.
 - **Your environment variables.** `AUTH_SECRET`, the database URL, the SMTP credentials
   and `HYGIE_BACKUP_PUBKEY` are not in the dump. Keep them wherever you keep secrets; a
   database you can restore into an instance you cannot reconfigure is half a recovery.

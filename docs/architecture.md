@@ -34,9 +34,34 @@ exactly one subject and authenticates with its own API key.
   had a device nor a batch and its only account is a non-admin owner: nothing has reached
   it yet. The check locks the subject row, which any device or batch insert must
   key-share lock, so none can land in between.
-- Deleting a member = revoke sessions, device keys, and grants immediately (data becomes
-  unreachable), then a background job physically purges rows and raw files, verifiably.
-  Restores from backup must not resurrect revoked keys: a tombstone registry (purged subjects, revoked keys) is stored outside the main backup set and re-applied after any restore. Purge runs table by table in batches; ON DELETE CASCADE is an integrity net, not the purge algorithm.
+- Deleting a member (decided 2026-09-28) is two acts in the Administration section.
+  **Disable** cuts every access at once and can be undone: the subject goes to `revoked`,
+  its accounts are disabled (unless one still holds a grant on another live subject),
+  their sessions and pending sign-in links are dropped, and its device keys are revoked.
+  The grant rows stay, so re-enabling restores exactly the access that existed; devices
+  are paired again. A subject holding an admin account is never disabled from there.
+  **Purge** is a separate request on a disabled member, confirmed by typing its name. The
+  subject goes to `purging` and the worker erases it in its idle turns (`lib/purge.ts`):
+  table by table in chunks of 5 000 rows, raw bodies file first, source names nobody
+  points to any more, then one transaction deletes the accounts, grants and devices and
+  keeps the subject row as `purged` with an empty name. ON DELETE CASCADE is an integrity
+  net, not the purge algorithm. The final transaction checks every table carrying a
+  `subject_id` in the catalog: a table the job does not know stops the purge with an
+  error instead of being skipped. The member receives an email at each act.
+- Restores must not resurrect what was revoked. The tombstone registry
+  (`lib/tombstones.ts`, decided 2026-10-11) is an append-only JSON Lines file on the
+  app's data volume, `HYGIE_DATA_DIR/tombstones.jsonl`: outside the database, therefore
+  outside its dumps. It records device revocations and the disable, enable and purge of
+  subjects, as ids and timestamps only. Each line is written and fsynced before the
+  change it records, inside the same transaction, under an advisory lock the
+  re-application takes too: a crash in between leaves an intent the next re-application
+  completes, never a change without its line. The worker re-applies the registry at boot
+  and hourly: every revoked key stays revoked, every subject ends in the state of its
+  last event, and a purged subject goes back to `purging` for the job to erase again.
+  When the file does not exist yet (first start of the release that brought it, or a
+  fresh volume), it is first created from the database: revoked keys and subjects that
+  are not live. The registry lives on the volume, not in a remote copy: losing the volume loses it,
+  and a restore then serves the database exactly as it was dumped.
 
 Per-subject settings that are not measures live in `subject_settings` (migration
 0005): today a declared maximum heart rate, which the zone accounting
@@ -107,6 +132,11 @@ is an in-process loop; no third service.
    the per-subject sync state the admin already sees, never a health value. The same
    threshold drives the "behind" badges of the Devices and Sync screens and the
    dashboard banner.
+7. Member purge and tombstones, in the same loop (§1). When no batch is waiting, the
+   worker runs one chunk of a pending purge before the rollup queue. It never claims a
+   batch of a subject being purged, and a purge waits for any batch still leased by an
+   overlapping process. The tombstone registry is re-applied at boot and in the hourly
+   maintenance.
 
 The XML backfill is a local CLI (streaming, COPY-based; 7.17M rows imported in 91s on the
 bench), never HTTP. Sequence: minimal schema → bulk import → validation/reconciliation →
@@ -210,8 +240,10 @@ secondary indexes → first full backup → then enable PITR.
 Railway volume snapshots + Postgres PITR (first line of defense) AND a scheduled encrypted
 logical dump (public-key encryption, private key held outside Railway) pushed to external
 S3-compatible object storage via the private network. TCP proxy to Postgres stays disabled
-outside the initial backfill window. A restore drill is mandatory before inviting a second
-member. Database size alert at 3.5 GB (Hobby volume is 5 GB); the upgrade path is
+outside the initial backfill window. A restored database is served by restarting the app
+on its own data volume: the worker re-applies the tombstone registry at boot (§1), so a
+member disabled or purged, or a key revoked, after the dump stays that way. A restore
+drill is mandatory before inviting a second member. Database size alert at 3.5 GB (Hobby volume is 5 GB); the upgrade path is
 documented, not improvised.
 
 ## 7. MVP scope (vertical slice)

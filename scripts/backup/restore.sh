@@ -48,4 +48,5 @@ psql "$TARGET" -tAc "
 # as in a real recovery, then re-pair devices deliberately.
 psql "$TARGET" -qc "delete from auth_sessions; delete from auth_verification_tokens;"
 echo "sessions and pending magic links cleared on the restored copy"
-echo "reminder: re-apply the tombstone registry (purged subjects, revoked device keys) before serving this copy"
+echo "reminder: serve this copy through the app on its own data volume and restart it:"
+echo "          its worker re-applies the tombstone registry (HYGIE_DATA_DIR/tombstones.jsonl) at boot"

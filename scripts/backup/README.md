@@ -75,8 +75,12 @@ HYGIE_BACKUP_KEYFILE=~/hygie-backup.key \
 
 It decrypts, restores, prints the row counts and coverage window that make a restore
 verifiable, then **clears sessions and pending magic links** on the copy: a restore must
-not resurrect access that was revoked. Re-apply the tombstone registry (purged subjects,
-revoked device keys) before serving a restored copy, and re-pair devices deliberately.
+not resurrect access that was revoked. Then serve the copy through the app **on its own
+data volume** and restart it: at boot the worker re-applies the tombstone registry
+(`HYGIE_DATA_DIR/tombstones.jsonl`, outside the dump on purpose, see
+`docs/architecture.md` §1), so the members disabled or purged and the device keys
+revoked after the dump was taken stay that way, and a purged member is erased again.
+Devices are re-paired deliberately.
 
 A drill is not optional. Measured on the real dataset (6.5 M observations, 2026-08-04):
 
