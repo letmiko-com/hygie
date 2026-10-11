@@ -143,7 +143,10 @@ export function initErrorReporting(): void {
     // error fields. What leaves is built by reportError() alone.
     integrations: [],
     environment,
-    release: process.env.SENTRY_RELEASE?.trim() || undefined,
+    // On Railway the deployed commit stands in: a ${{RAILWAY_GIT_COMMIT_SHA}}
+    // reference in SENTRY_RELEASE resolves to an empty string there.
+    release:
+      process.env.SENTRY_RELEASE?.trim() || process.env.RAILWAY_GIT_COMMIT_SHA?.trim() || undefined,
     platform: 'node',
     runtime: { name: 'node', version: process.version },
     maxBreadcrumbs: 0,

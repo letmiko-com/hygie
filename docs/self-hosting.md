@@ -258,8 +258,11 @@ failures it catches:
 What a report carries: the error's type and message, its stack frames (file, function,
 line), a code when the error has one (SQLSTATE, errno, batch validation code), a fixed
 label for where it happened or, for a request, the route **template**
-(`GET /metrics/[type]`, not the metric viewed), and `SENTRY_ENVIRONMENT` (default
-`production`) and `SENTRY_RELEASE` (a commit hash is a good value) when set.
+(`GET /metrics/[type]`, not the metric viewed), `SENTRY_ENVIRONMENT` (default
+`production`) and the release: `SENTRY_RELEASE` (a commit hash is a good value) when set,
+otherwise the deployed commit on Railway (`RAILWAY_GIT_COMMIT_SHA`). Railway does not
+resolve a `${{RAILWAY_GIT_COMMIT_SHA}}` reference in `SENTRY_RELEASE`, so leave it unset
+there.
 
 What it never carries: request bodies, headers, cookies, query strings, users,
 breadcrumbs, source lines, local variables, the extra fields of an error (a Postgres
