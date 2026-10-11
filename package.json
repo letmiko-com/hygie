@@ -19,6 +19,7 @@
     "synthetic": "node scripts/synthetic-data.mjs"
   },
   "dependencies": {
+    "@sentry/core": "10.75.3",
     "next": "^16.0.0",
     "next-auth": "^5.0.0-beta.32",
     "nodemailer": "^10.0.0",

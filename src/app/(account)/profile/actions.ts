@@ -6,6 +6,7 @@ import { createEmailChangeToken } from '@/lib/auth/email-change';
 import { sendEmailChangeLink, sendEmailChangeNotice } from '@/lib/auth/mailer';
 import { getSessionUser } from '@/lib/queries/context';
 import { emailTaken, isKnownTimezone, updateProfile } from '@/lib/queries/profile';
+import { reportError } from '@/lib/sentry';
 
 export type ProfileResult = { ok: true } | { ok: false; error: 'invalid' | 'unauthorized' };
 
@@ -84,6 +85,7 @@ export async function requestEmailChangeAction(
     });
   } catch (err) {
     console.error(`[profile] email change link failed: ${err instanceof Error ? err.name : 'error'}`);
+    reportError(err, 'mail.email-change', { withholdMessage: true });
     return { ok: false, error: 'mail' };
   }
   // The old address learns of the request; a failure here does not undo it.
@@ -91,6 +93,7 @@ export async function requestEmailChangeAction(
     await sendEmailChangeNotice({ to: user.email, newEmail: to, locale: user.locale, kind: 'requested' });
   } catch (err) {
     console.error(`[profile] email change notice failed: ${err instanceof Error ? err.name : 'error'}`);
+    reportError(err, 'mail.email-change', { withholdMessage: true });
   }
   return { ok: true, to };
 }

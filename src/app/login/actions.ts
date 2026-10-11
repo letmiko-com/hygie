@@ -10,6 +10,7 @@
 import { redirect } from 'next/navigation';
 import { signIn } from '@/auth';
 import { getDb } from '@/lib/db';
+import { reportError } from '@/lib/sentry';
 
 const MIN_RESPONSE_MS = 400;
 
@@ -33,6 +34,7 @@ export async function requestLoginLink(formData: FormData): Promise<void> {
       console.error(
         `[auth] magic link request failed: ${err instanceof Error ? err.name : 'error'}`
       );
+      reportError(err, 'auth.magic-link-request', { withholdMessage: true });
     }
   }
 

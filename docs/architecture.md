@@ -177,6 +177,12 @@ secondary indexes → first full backup → then enable PITR.
 - No health values, payloads, or secrets in logs. Ingestion logs metadata only (batch id,
   counts, sizes, checksums, redacted errors). Rate limiting on ingestion; CSP strict;
   cross-subject leak tests are part of the test suite.
+- Error reporting is opt-in (`SENTRY_DSN`, `lib/sentry.ts`) and follows the log rule. It
+  is built on `@sentry/core` without automatic instrumentation: every report is an
+  explicit call carrying the error type, message and stack frames, a fixed label or the
+  route template, never a URL, body, header, user or breadcrumb. A message the log
+  withholds (mail errors) is withheld from the report too, and Postgres data exceptions
+  (SQLSTATE class 22, which can quote a value) travel as their code alone.
 - Data minimization (CNIL): default ingest allowlist covers the product's types; ECG,
   symptoms, medications, reproductive data are opt-in per subject. Unknown types are
   recorded in the taxonomy but not ingested automatically.

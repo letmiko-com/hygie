@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { createGzip } from 'node:zlib';
 import { getDb } from '@/lib/db';
+import { reportError } from '@/lib/sentry';
 
 export const HAE_FORMAT_VERSION = 'hae-v2';
 export const HAE_ADAPTER_VERSION = '0.1.0';
@@ -184,6 +185,7 @@ async function receiveBatch(
     console.error(
       `[ingest] device authentication failed: ${err instanceof Error ? err.message : 'unknown error'}`
     );
+    reportError(err, 'ingest.receive.auth');
     return errorResponse(500, 'internal_error', 'internal error');
   }
   if (device === null) {
@@ -228,6 +230,7 @@ async function receiveBatch(
     console.error(
       `[ingest] body streaming failed for batch ${batchId}: ${err instanceof Error ? err.message : 'unknown error'}`
     );
+    reportError(err, 'ingest.receive.stream', { context: { batch: batchId } });
     return errorResponse(500, 'internal_error', 'internal error');
   }
 
@@ -266,6 +269,7 @@ async function receiveBatch(
     console.error(
       `[ingest] batch row insert failed for batch ${batchId}: ${err instanceof Error ? err.message : 'unknown error'}`
     );
+    reportError(err, 'ingest.receive.insert', { context: { batch: batchId } });
     return errorResponse(500, 'internal_error', 'internal error');
   }
 

@@ -5,6 +5,7 @@
 import { revalidatePath } from 'next/cache';
 import { sendInvitationEmail } from '@/lib/auth/mailer';
 import { correctInvitation, getInstanceContext, inviteMember, revokeMemberDevice } from '@/lib/queries/instance';
+import { reportError } from '@/lib/sentry';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -67,6 +68,7 @@ export async function inviteMemberAction(_prev: InviteResult | null, formData: F
     mailSent = true;
   } catch (err) {
     console.error(`[admin] invitation email failed: ${err instanceof Error ? err.name : 'error'}`);
+    reportError(err, 'mail.invitation', { withholdMessage: true });
   }
   return { ok: true, email, mailSent };
 }
@@ -116,6 +118,7 @@ export async function correctInvitationAction(
     mailSent = true;
   } catch (err) {
     console.error(`[admin] corrected invitation email failed: ${err instanceof Error ? err.name : 'error'}`);
+    reportError(err, 'mail.invitation', { withholdMessage: true });
   }
   return { ok: true, email, emailChanged: true, mailSent };
 }

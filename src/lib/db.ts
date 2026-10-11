@@ -1,6 +1,7 @@
 // Lazy pg pool. Never instantiated at module load: Next evaluates modules during
 // build where DATABASE_URL may be absent. Callers use getDb() at request/worker time.
 import pg from 'pg';
+import { reportError } from '@/lib/sentry';
 
 let pool: pg.Pool | null = null;
 
@@ -19,6 +20,7 @@ export function getDb(): pg.Pool {
     // Without a handler, an idle client error crashes the process.
     pool.on('error', (err) => {
       console.error(`[db] idle client error: ${err.message}`);
+      reportError(err, 'db.idle-client');
     });
   }
   return pool;

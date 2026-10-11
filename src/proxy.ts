@@ -7,6 +7,7 @@
 // bodies to disk and must NEVER be matched here.
 import { NextResponse, type NextRequest } from 'next/server';
 import { isValidSession, sessionCookieName } from '@/lib/auth/session';
+import { reportError } from '@/lib/sentry';
 
 export default async function proxy(request: NextRequest): Promise<NextResponse> {
   const raw = request.cookies.get(sessionCookieName())?.value;
@@ -17,6 +18,7 @@ export default async function proxy(request: NextRequest): Promise<NextResponse>
     } catch (err) {
       // Fail closed, without leaking internals.
       console.error(`[proxy] session check failed: ${err instanceof Error ? err.message : 'error'}`);
+      reportError(err, 'proxy.session');
       return new NextResponse('Service indisponible', { status: 503 });
     }
   }

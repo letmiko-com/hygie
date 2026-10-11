@@ -14,6 +14,7 @@ import { hygieAdapter } from '@/lib/auth/adapter';
 import { sendMagicLinkEmail } from '@/lib/auth/mailer';
 import { getDb } from '@/lib/db';
 import { sessionCookieName, sessionCookieSecure } from '@/lib/auth/session';
+import { reportError } from '@/lib/sentry';
 
 export const MAGIC_LINK_MAX_AGE_S = 15 * 60; // « valable 15 minutes » (maquette Login)
 /**
@@ -102,6 +103,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           console.error(
             `[auth] magic link send failed: ${err instanceof Error ? err.name : 'error'}`
           );
+          reportError(err, 'mail.magic-link', { withholdMessage: true });
         });
       },
     }),

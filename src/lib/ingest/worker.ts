@@ -30,6 +30,7 @@ import {
 } from '@/lib/ingest/normalize-native';
 import { runSilenceAlerts } from '@/lib/ingest/silence-alert';
 import { drainRollupQueue } from '@/lib/rollups';
+import { reportError } from '@/lib/sentry';
 
 const LEASE = "interval '5 minutes'";
 const DEFAULT_POLL_MS = 5_000;
@@ -189,6 +190,9 @@ async function markFailure(
   console.error(
     `[worker] batch ${batch.id} step ${batch.status} failed (${code}, attempt ${batch.attempt_count}${permanent ? ', giving up' : `, retry in ${backoff}s`})`
   );
+  reportError(err, 'ingest.worker.batch', {
+    context: { batch: batch.id, step: batch.status, attempt: batch.attempt_count, code, permanent },
+  });
 }
 
 /**
@@ -402,6 +406,7 @@ async function purgeExpiredRawBodies(): Promise<void> {
         console.error(
           `[worker] purge: cannot delete body of batch ${row.id}: ${err instanceof Error ? err.message : 'unknown error'}`
         );
+        reportError(err, 'ingest.worker.purge', { context: { batch: row.id } });
         continue;
       }
       missing++;
@@ -445,6 +450,7 @@ async function runMaintenance(): Promise<void> {
       console.error(
         `[worker] silence alert failed: ${err instanceof Error ? err.message : 'unknown error'}`
       );
+      reportError(err, 'ingest.silence-alert');
     });
   }
 }
@@ -457,6 +463,7 @@ async function runLoop(workerId: string): Promise<void> {
     console.error(
       `[worker] boot reconciliation failed: ${err instanceof Error ? err.message : 'unknown error'}`
     );
+    reportError(err, 'ingest.worker.boot');
   }
   console.log(`[worker] ingest worker ${workerId} started`);
   let lastMaintenance = 0;
@@ -490,6 +497,7 @@ async function runLoop(workerId: string): Promise<void> {
       console.error(
         `[worker] loop error: ${err instanceof Error ? err.message : 'unknown error'}`
       );
+      reportError(err, 'ingest.worker.loop');
     }
     await sleep(pollMs(), s);
   }
@@ -524,6 +532,7 @@ export function startIngestWorker(): void {
     console.error(
       `[worker] loop crashed: ${err instanceof Error ? err.message : 'unknown error'}`
     );
+    reportError(err, 'ingest.worker.crash');
     s.started = false;
   });
 }

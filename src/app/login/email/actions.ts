@@ -8,6 +8,7 @@ import { verifyEmailChangeToken } from '@/lib/auth/email-change';
 import { sendEmailChangeNotice } from '@/lib/auth/mailer';
 import { hashToken, sessionCookieName } from '@/lib/auth/session';
 import { applyEmailChange, emailChangeAccount, sessionBelongsTo } from '@/lib/queries/profile';
+import { reportError } from '@/lib/sentry';
 
 export type ConfirmResult =
   | { ok: true; signedIn: boolean }
@@ -32,6 +33,7 @@ export async function confirmEmailChangeAction(_prev: ConfirmResult | null, form
     await sendEmailChangeNotice({ to: claim.from, newEmail: claim.to, locale: account.locale, kind: 'changed' });
   } catch (err) {
     console.error(`[profile] email changed notice failed: ${err instanceof Error ? err.name : 'error'}`);
+    reportError(err, 'mail.email-change', { withholdMessage: true });
   }
   return { ok: true, signedIn: keep !== null };
 }

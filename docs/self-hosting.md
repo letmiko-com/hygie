@@ -2,7 +2,7 @@
 
 The README takes you from an empty server to your first chart. This guide covers what
 comes after: putting the instance behind HTTPS, making login work, backing up, updating,
-and replacing the phone that feeds it.
+replacing the phone that feeds it, and, if you want it, reporting errors.
 
 It assumes Docker and PostgreSQL 16+. Railway is one deployment among others and gets no
 special treatment here; where a hosting platform changes something, it is called out.
@@ -226,6 +226,45 @@ What it deliberately does not do:
   written.
 - It does not promote the conflicts recorded while the new device was not authoritative.
   The app re-emits recent minutes by itself; an older gap is a backfill matter.
+
+## 6. Error reporting (optional)
+
+By default Hygie reports nothing to anyone: failures go to the server log and stay there.
+Set `SENTRY_DSN` to the DSN of a Sentry project, or of a service that speaks the same
+protocol (GlitchTip, Bugsink, which you can host yourself), and the server also sends the
+failures it catches:
+
+- errors Next.js catches in a page, a route handler, a server action or the proxy;
+- ingestion failures: a batch that fails a step, the worker loop, boot reconciliation,
+  the hourly maintenance and the silence alert;
+- the device API answering 500, the session check failing in the proxy, the database
+  pool losing an idle client;
+- emails that could not be sent (sign-in links, invitations, address changes).
+
+What a report carries: the error's type and message, its stack frames (file, function,
+line), a code when the error has one (SQLSTATE, errno, batch validation code), a fixed
+label for where it happened or, for a request, the route **template**
+(`GET /metrics/[type]`, not the metric viewed), and `SENTRY_ENVIRONMENT` (default
+`production`) and `SENTRY_RELEASE` (a commit hash is a good value) when set.
+
+What it never carries: request bodies, headers, cookies, query strings, users,
+breadcrumbs, source lines, local variables, the extra fields of an error (a Postgres
+error's `detail` quotes the row) or its cause. A report never says more than the log
+line of the same failure: the email errors, logged by name only because their message
+can quote an address, are reported by name only, and a Postgres data exception
+(SQLSTATE class 22, whose message can quote the offending value) is reported as its code
+alone. The same failure is sent at most once every ten minutes per process, so an
+outage that fails the worker loop every five seconds does not exhaust a quota.
+
+The integration is built on `@sentry/core` alone, not on Sentry's Node.js SDK. The SDK
+brings OpenTelemetry and instruments `http`, `pg` and the console by itself to collect
+requests, queries and breadcrumbs; for a server holding health data, collection has to be
+explicit. The core package is the one dependency this costs, and it is inert when
+`SENTRY_DSN` is empty.
+
+Prefer a project in the EU data region if your provider offers one, and check its
+retention settings: a report holds no health value, but it is still your server's
+internals on someone else's machine.
 
 ## What this guide does not cover
 

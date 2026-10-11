@@ -10,6 +10,7 @@
 // appears in the response, only counters, timestamps and type names; no side
 // effect, in particular last_seen_at is NOT touched (it means "sent data").
 import { getDb } from '@/lib/db';
+import { reportError } from '@/lib/sentry';
 import { authenticateDevice } from './receive';
 import { NATIVE_FORMAT_VERSION } from './normalize-native';
 
@@ -177,6 +178,7 @@ export async function deviceStatusResponse(req: Request): Promise<Response> {
     console.error(
       `[device-status] device authentication failed: ${err instanceof Error ? err.message : 'unknown error'}`
     );
+    reportError(err, 'device-status.auth');
     return errorResponse(500, 'internal_error', 'internal error');
   }
   if (device === null) {
@@ -194,6 +196,7 @@ export async function deviceStatusResponse(req: Request): Promise<Response> {
     console.error(
       `[device-status] read failed for device ${device.deviceId}: ${err instanceof Error ? err.message : 'unknown error'}`
     );
+    reportError(err, 'device-status.read', { context: { device: device.deviceId } });
     return errorResponse(500, 'internal_error', 'internal error');
   }
 }
