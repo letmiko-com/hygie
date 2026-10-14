@@ -101,9 +101,17 @@ function buildMessage(device: ClaimedDevice, recipient: Recipient, hours: number
   const locale = resolveLocale(recipient.locale);
   const m = getMessages(locale).silenceMail;
   const intl = locale === 'fr' ? 'fr-FR' : 'en-GB';
+  // In the subject's time zone, the device's, and named: an admin elsewhere
+  // reads this too. Intl refuses timeZoneName next to dateStyle/timeStyle,
+  // hence the explicit fields; shortOffset gives an offset in every locale
+  // (UTC−7, GMT+2) where short would print CEST or BST in English.
   const since = new Intl.DateTimeFormat(intl, {
-    dateStyle: 'long',
-    timeStyle: 'short',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZoneName: 'shortOffset',
     timeZone: device.timezone,
   }).format(device.since);
   const hoursText = new Intl.NumberFormat(intl, { maximumFractionDigits: 1 }).format(hours);
